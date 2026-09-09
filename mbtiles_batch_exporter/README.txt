@@ -1,24 +1,16 @@
-MBTiles Batch Exporter (QGIS plugin) — v0.2.2 (stable + faster)
-==============================================================
+MBTiles Batch Exporter — archiwizacja projektów QGIS
+=================================================
 
-Dlaczego v0.2.1 mogła działać wolniej niż skrypt?
-- Wtyczka musi utrzymywać responsywność UI, więc częściej "przepompowuje" zdarzenia (progress/log).
-- Dodatkowo przełączanie widoczności warstw może powodować odświeżanie Map Canvas (rendering), co bywa kosztowne (zwłaszcza WMS/XYZ).
+Wersja jest podana w metadata.txt. Wymagane: QGIS 3.40 z PyQt5 i GDAL >= 3.7.
 
-Co zmieniono w v0.2.2:
-- Dodano opcję: "Wstrzymaj renderowanie mapy (szybciej)" — domyślnie włączona.
-  Dzięki temu przy przełączaniu widoczności warstw QGIS nie renderuje mapy w canvasie, a algorytm i tak renderuje kafle.
-- Ograniczono częstotliwość odświeżania UI (processEvents) — throttling ~150ms.
+Funkcja „Archiwizuj projekt…” zapisuje lokalne dane, mapy PNG z przezroczystością,
+zasoby, kopię projektu oraz raport. Obsługuje równoległe procesy dla map.
+Dotychczasowy eksporter MBTiles pozostaje osobną funkcją.
 
-Funkcje:
-- Eksportuje wybrane warstwy (wektorowe i rastrowe) osobno do plików .mbtiles (XYZ tiles)
-- Wybór folderu zapisu
-- Wybór warstw: lista z checkboxami (domyślnie zaznaczone wszystkie) + przyciski Zaznacz/Odznacz wszystko
-- Wybór obszaru: map canvas albo extent z warstwy poligonowej (zaznaczenie ma priorytet)
-- Wybór formatu kafli: PNG / JPEG
-- Wybór zoom min/max
-- Log + postęp
-- Przycisk „Przerwij”
+Zainstaluj paczkę przez menedżer wtyczek QGIS, zakładkę „Zainstaluj z ZIP”.
+Pełna instrukcja zespołowa znajduje się w dołączonym INSTRUKCJA.md, a w repozytorium
+w docs/team-guide.md.
 
-Instalacja (ręcznie):
-Skopiuj folder `mbtiles_batch_exporter` do katalogu plugins profilu (jak wcześniej), restart QGIS, włącz w menedżerze wtyczek.
+Przenoś cały folder archiwum. Przed uznaniem go za kompletne sprawdź raport
+i otwórz projekt bez internetu oraz sieci firmowej. Odbiór MSSQL należy wykonać
+na stanowisku z dostępem do firmowej bazy.
