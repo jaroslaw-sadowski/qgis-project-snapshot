@@ -1,11 +1,11 @@
 [general]
 name=MBTiles Batch Exporter
 qgisMinimumVersion=3.22
-description=Batch export selected layers as MBTiles (XYZ tiles) with selectable extent, zoom range and tile format.
-version=0.2.9
+description=Batch MBTiles export and partial offline project archives with vector data in GeoPackage.
+version=0.3.0
 author=ChatGPT
 email=
-about=Exports chosen vector and raster layers one-by-one using the Processing algorithm "Generate XYZ tiles (MBTiles)". Stable synchronous runner + performance tweaks + refresh on open.
+about=Includes the original MBTiles exporter and project archiving step 1: layer tree selection, polygon area, vector data and styles in a local GeoPackage, and a partial-archive report. Raster archiving is not yet available in the project archive action.
 category=Raster
 icon=icon.png
 
