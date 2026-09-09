@@ -67,7 +67,7 @@ class MBTilesBatchExporterDialog(QDialog):
     def __init__(self, iface, parent=None):
         super().__init__(parent)
         self.iface = iface
-        self.setWindowTitle("MBTiles Batch Exporter (stable)")
+        self.setWindowTitle("qgis-project-snapshot — Eksport MBTiles")
         self.resize(760, 640)
 
         self.alg_id = None
@@ -105,11 +105,11 @@ class MBTilesBatchExporterDialog(QDialog):
         form.addRow("Folder zapisu:", out_row)
 
         self.extent_combo = QComboBox()
-        self.extent_combo.addItems(["Obszar map canvas", "Obszar z warstwy poligonowej"])
+        self.extent_combo.addItems(["Aktualny widok mapy", "Obszar z warstwy poligonowej"])
         self.extent_combo.currentIndexChanged.connect(self._update_extent_ui)
 
         self.poly_layer_combo = QComboBox()
-        self.poly_layer_hint = QLabel("Uwaga: jeśli zaznaczysz obiekty, użyty będzie extent zaznaczenia.")
+        self.poly_layer_hint = QLabel("Użyj zaznaczonych poligonów lub całej warstwy.")
         self.poly_layer_hint.setWordWrap(True)
 
         form.addRow("Obszar:", self.extent_combo)
@@ -136,7 +136,7 @@ class MBTilesBatchExporterDialog(QDialog):
         self.jpeg_quality = QSpinBox(); self.jpeg_quality.setRange(1, 100); self.jpeg_quality.setValue(75)
         form.addRow("Jakość JPEG:", self.jpeg_quality)
 
-        self.chk_pause_render = QCheckBox("Wstrzymaj renderowanie mapy (szybciej)")
+        self.chk_pause_render = QCheckBox("Wstrzymaj odświeżanie mapy")
         self.chk_pause_render.setChecked(True)
         form.addRow("", self.chk_pause_render)
 
@@ -177,7 +177,7 @@ class MBTilesBatchExporterDialog(QDialog):
 
         layout.addWidget(QLabel("Postęp:"))
         layout.addWidget(self.progress)
-        layout.addWidget(QLabel("Log:"))
+        layout.addWidget(QLabel("Dziennik:"))
         layout.addWidget(self.log, 1)
 
         # Buttons
@@ -198,6 +198,31 @@ class MBTilesBatchExporterDialog(QDialog):
         btn_row.addWidget(self.close_btn)
 
         layout.addLayout(btn_row)
+
+        tips = {
+            self.output_edit: 'Wskaż folder na pliki MBTiles. Ten tryb zapisuje osobny plik dla każdej mapy, bez kopii całego projektu.',
+            self.output_browse: 'Otwiera wybór folderu zapisu.',
+            self.extent_combo: 'Widok mapy używa aktualnego zasięgu QGIS. Warstwa poligonowa wyznacza prostokąt '
+                               'obejmujący zaznaczone obiekty, a bez zaznaczenia wszystkie. Przycinanie do kształtu pasa jest dostępne w Archiwizuj projekt.',
+            self.poly_layer_combo: 'Wybierz poligony wyznaczające zasięg. Zaznaczenie obiektów ma pierwszeństwo przed całą warstwą.',
+            self.poly_layer_hint: 'Ten eksporter używa prostokąta otaczającego poligony. Nie wycina ich dokładnego kształtu.',
+            self.format_combo: 'PNG zachowuje przezroczystość. JPEG tworzy obraz bez przezroczystości i może tracić szczegóły.',
+            self.zoom_min: 'Najmniejszy zapisany zoom: widok większego obszaru z mniejszą szczegółowością.',
+            self.zoom_max: 'Największy zapisany zoom: więcej szczegółów, ale zwykle większy plik i dłuższy eksport.',
+            self.jpeg_quality: 'Dotyczy tylko JPEG. Wyższa wartość oznacza mniej strat i większy plik; nie zmienia jakości PNG.',
+            self.chk_pause_render: 'Podczas eksportu nie odświeżaj mapy głównej. Ogranicza dodatkową pracę QGIS; stan zostanie przywrócony po eksporcie.',
+            self.layer_list: 'Zaznacz mapy do zapisania jako MBTiles. Do archiwum całego projektu użyj osobnej akcji Archiwizuj projekt.',
+            self.btn_select_all: 'Zaznacza wszystkie warstwy z listy do eksportu.',
+            self.btn_select_none: 'Odznacza wszystkie warstwy z listy.',
+            self.btn_refresh_layers: 'Wczytuje ponownie warstwy projektu i zaznacza je wszystkie.',
+            self.progress: 'Postęp eksportu bieżącej warstwy zgłaszany przez algorytm QGIS.',
+            self.log: 'Komunikaty algorytmu, kolejne warstwy i błędy eksportu.',
+            self.run_btn: 'Rozpoczyna eksport zaznaczonych map do plików MBTiles.',
+            self.cancel_btn: 'Prosi algorytm o przerwanie eksportu. Zakończenie bieżącej operacji może chwilę potrwać.',
+            self.close_btn: 'Zamyka okno eksportera MBTiles.',
+        }
+        for widget, text in tips.items():
+            widget.setToolTip(f'<p>{text}</p>')
 
 
     def prepare_on_open(self):
@@ -450,8 +475,8 @@ class MBTilesBatchExporterDialog(QDialog):
             self._failed_layers.append(layer_name)
             self._log(f"  ❌ Błąd podczas eksportu warstwy '{layer_name}': {e}")
             QgsMessageLog.logMessage(
-                f"MBTiles Batch Exporter: błąd dla warstwy '{layer_name}': {e}",
-                "MBTiles Batch Exporter",
+                f"qgis-project-snapshot: błąd dla warstwy '{layer_name}': {e}",
+                "qgis-project-snapshot",
                 Qgis.Critical,
             )
 

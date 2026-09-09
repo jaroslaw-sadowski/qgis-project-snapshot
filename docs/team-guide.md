@@ -1,64 +1,39 @@
-# Archiwum projektu — instrukcja dla zespołu
-
-Paczka jest przeznaczona do odbioru na komputerze służbowym. Testy na Ubuntu
-z QGIS 3.40 przeszły; pełny projekt z MSSQL nadal wymaga próby w sieci firmowej.
+# qgis-project-snapshot — krótka instrukcja
 
 ## Instalacja
 
-1. Uruchom QGIS 3.40. Wymagany jest GDAL co najmniej 3.7 i wersja QGIS z PyQt5.
-   Wersje bibliotek można sprawdzić w oknie informacji o QGIS.
-2. Wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP** i wskaż
-   plik `mbtiles_batch_exporter-0.5.0.zip`. ZIP-a nie trzeba rozpakowywać.
-3. Włącz **MBTiles Batch Exporter**. Jeżeli zastępujesz wcześniejszą wersję,
-   zakończ jej eksport i uruchom ponownie QGIS po instalacji.
-4. Nową funkcję znajdziesz w menu wtyczki jako **Archiwizuj projekt…**.
-   Dotychczasowa funkcja eksportu MBTiles nadal jest dostępna.
+1. W QGIS otwórz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
+2. Wskaż `qgis-project-snapshot-0.6.0.zip` i włącz **qgis-project-snapshot**.
+   Jeśli aktualizujesz poprzednią wersję, zakończ eksport i uruchom ponownie QGIS.
+3. Wybierz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
 
-Instalację z ZIP opisuje również
-[instrukcja QGIS](https://github.com/qgis/QGIS-Documentation/blob/master/docs/user_manual/plugins/plugins.rst).
+Wymagane: QGIS 3.40 z PyQt5 oraz GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
+pełny projekt z MSSQL trzeba jeszcze odebrać na komputerze służbowym.
 
-## Pierwsza próba
+## Utworzenie archiwum
 
-1. Połącz komputer z siecią firmową i otwórz projekt. Sprawdź dostęp do MSSQL,
-   usług mapowych i plików na udziałach sieciowych.
-2. Przybliż mapę do małego fragmentu inwestycji. Wybierz **Archiwizuj projekt…**.
-3. Wskaż folder zapisu, obszar i warstwy. Dla długiej inwestycji wybierz warstwę
-   poligonową z pasem opracowania, aby nie pobierać całego prostokąta zasięgu.
-   Przy zaznaczonych obiektach używane są tylko zaznaczone poligony.
-4. Na początek pozostaw zoom 13–17. Wyższy zoom oznacza więcej szczegółów,
-   ale więcej danych. Wektory zachowują geometrię i atrybuty niezależnie od zoomu.
-5. Wybierz 1 proces dla próby oszczędnej lub 2–4 dla większego obszaru.
-   Więcej procesów wymaga więcej pamięci i miejsca tymczasowego. Równoległość
-   obejmuje mapy; wektory z niezapisanymi edycjami pozostają w głównym QGIS.
-6. Uruchom eksport. Nie zamykaj QGIS do jego zakończenia. Przycisk przerwania
-   zachowuje ukończone, scalone warstwy; nie oznacza to kompletnego archiwum.
+1. Otwórz projekt z dostępem do jego danych. Pierwszą próbę zrób na małym obszarze.
+2. Wybierz folder, obszar i warstwy. Dla pasa inwestycji użyj poligonów obszaru.
+3. Na początek pozostaw zbliżenia 13–17. Jeden proces zużywa mniej pamięci;
+   2–4 mogą skrócić pracę nad większym obszarem.
+4. Kliknij **Utwórz archiwum**. Szczegóły każdej opcji przeczytasz po najechaniu kursorem.
 
-Powstanie osobny folder z projektem `.qgz`, `dane.gpkg`, raportem HTML,
-`manifest.json` i ewentualnym katalogiem `zasoby`. Oryginalny projekt nie jest
-zastępowany. Obrazy PNG zachowują przezroczystość i kompresję bezstratną.
+Pasek pokazuje liczbę zakończonych warstw. Kolumna **Stan** i **dziennik** opisują
+pobieranie map, fragmenty, ponowienia, zapis i kontrolę plików. **Kopiuj dziennik**
+pozwala zachować komunikaty. Niekiedy źródło długo odpowiada — ostatnia czynność
+pozostaje wtedy widoczna. **Przerwij** zachowuje ukończone, scalone warstwy.
 
-## Odbiór wyniku
+## Sprawdzenie wyniku
 
-1. Otwórz raport. Sprawdź błędy, puste zoomy, częściowe obrazy, brakujące zasoby
-   oraz przypadki zastąpienia danych wektorowych obrazem.
-2. Skopiuj **cały folder archiwum** do innego miejsca. Sam plik `.qgz` nie zawiera
-   wszystkich zapisanych danych.
-3. Zamknij projekt źródłowy. Odłącz sieć firmową/VPN i internet, a następnie
-   otwórz archiwalny `.qgz`. Nasza wtyczka nie jest wymagana do jego odczytu.
-4. Porównaj grupy, kolejność, widoczność warstw, symbole, etykiety i mapy
-   przy kilku zapisanych zoomach. Sprawdź atrybuty, formularze, relacje,
-   załączniki oraz używane wydruki.
-5. Najpierw odbierz mały fragment, następnie reprezentatywny długi pas.
-   Dopiero po tych próbach wykonaj archiwum całego wymaganego obszaru.
+1. Otwórz raport: sprawdź błędy, puste obrazy i elementy wymagające kontroli.
+2. Przenieś **cały folder archiwum**. Zamknij projekt źródłowy, odłącz internet
+   i sieć firmową, a następnie otwórz archiwalny `.qgz`.
+3. Porównaj mapę, atrybuty, załączniki i używane formularze oraz wydruki.
+   Po małej próbie sprawdź reprezentatywny długi pas i dopiero potem cały obszar.
 
-Status „do kontroli” nie oznacza automatycznie błędu: niektóre usługi poprawnie
-zwracają pusty obszar. Wymaga to sprawdzenia. Raport nie gwarantuje działania
-dowolnego kodu formularzy, wyrażeń ani zasobów, których nie udało się skopiować.
-Daty oznaczają czas pobierania warstw, a nie jeden wspólny moment wszystkich źródeł.
+Oryginalny projekt nie jest zastępowany. Archiwum może być częściowe; sam
+poprawny zapis nie potwierdza wszystkich zależności. Do odczytu lokalnej kopii
+nasza wtyczka nie jest potrzebna. Daty raportu oznaczają czas pobierania warstw.
 
-## Co zanotować przy problemie
-
-Zapisz wersję QGIS, nazwę warstwy, wybrany obszar, zoomy, liczbę procesów i
-komunikat z raportu. Raport i manifest pomogą znaleźć przyczynę. Przy błędzie
-procesu pomocniczego wtyczka próbuje zapisu w głównym QGIS; można też ponowić
-małą próbę z jednym procesem. Dane firmowe pozostaw w firmowym środowisku.
+Przy problemie zanotuj wersję QGIS/systemu, warstwę i opcje eksportu; zachowaj
+raport oraz dziennik. Dane i poświadczenia firmowe pozostaw w środowisku służbowym.

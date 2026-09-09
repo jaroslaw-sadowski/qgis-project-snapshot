@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (0.5.0)
+# Działanie i ograniczenia archiwizacji (0.6.0)
 
 Nowa akcja **Archiwizuj projekt…** w menu wtyczki zapisuje **archiwum częściowe**:
 
@@ -89,6 +89,25 @@ Zapisane tabele wektorowe nie wymagają naszej wtyczki ani połączenia ze źró
 Daty raportu oznaczają czas pobierania poszczególnych warstw, nie jednoczesny stan
 wszystkich zewnętrznych źródeł.
 
+
+## Postęp i komunikaty
+
+Okno pokazuje liczbę zakończonych warstw, stan każdej pozycji, upływ czasu i
+ostatnie 2000 komunikatów. Licznik nie jest prognozą pozostałego czasu; końcowa
+kontrola plików ma osobny etap. Błąd i anulowanie mają odrębne komunikaty końcowe.
+Dziennik można skopiować do schowka; pełne wyniki warstw pozostają w raporcie.
+
+Backend zachowuje tekstowy callback `progress` i dodatkowo przekazuje `layer_status`
+(zakończone/łącznie i rekord warstwy) oraz `worker_activity` (stany procesów).
+Proces pomocniczy zapisuje atomowo ostatni komunikat w prywatnym `progress.json`,
+nie częściej niż co 250 ms. Główny QGIS odczytuje stany do dwóch razy na sekundę;
+GUI pomija powtórzenia. Komunikaty nie zawierają łańcuchów połączeń ani treści błędów
+pochodzących bezpośrednio od dostawców. Nazwy warstw nadal mogą być danymi firmowymi.
+
+Renderowanie zgłasza oczekiwanie co 5 sekund, jeśli pętla zadania QGIS może działać.
+Synchroniczny odczyt dostawcy w głównym wątku nadal może czasowo blokować interfejs;
+wyświetlona pozostaje ostatnia konkretna czynność. Postęp nie oznacza, że cały
+backend został przeniesiony do wątków.
 
 ## Moduły
 

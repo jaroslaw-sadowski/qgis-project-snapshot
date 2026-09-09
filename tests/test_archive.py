@@ -189,12 +189,12 @@ class ArchiveTests(unittest.TestCase):
         second = self.add_points('Druga', [(3, 3)])
         cancelled = False
 
-        def progress(message):
+        def layer_status(record, completed, total):
             nonlocal cancelled
-            if message == 'Przygotowanie: Druga':
+            if record['id'] == second.id() and record['status'] == 'pending':
                 cancelled = True
 
-        result = self.archive(cancelled=lambda: cancelled, progress=progress)
+        result = self.archive(cancelled=lambda: cancelled, layer_status=layer_status)
         manifest = self.manifest(result)
         self.assertTrue(manifest['cancelled'])
         statuses = {r['id']: r['status'] for r in manifest['layers']}

@@ -121,10 +121,15 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
     network.finished[QgsNetworkReplyContent].connect(reply_finished)
     deadline = time.monotonic() + RENDER_TIMEOUT
     timed_out = False
+    last_notice = time.monotonic()
     job.start()
     try:
         while job.isActive():
             QCoreApplication.processEvents()
+            if time.monotonic() - last_notice >= 5:
+                seconds = int(RENDER_TIMEOUT - (deadline - time.monotonic()))
+                progress(f'{layer.name()}: renderowanie lub oczekiwanie na dane — {seconds} s (limit {RENDER_TIMEOUT} s).')
+                last_notice = time.monotonic()
             if cancelled() or time.monotonic() > deadline:
                 timed_out = not cancelled()
                 job.cancelWithoutBlocking()
@@ -287,6 +292,7 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
             failures_in_a_row = 0
             for level in reversed(levels):
                 zoom, resolution = level['zoom'], level['resolution']
+                progress(f'{layer.name()}: rozpoczęcie zoomu {zoom}; rozdzielczość {resolution:.3g} jednostek/piksel.')
                 level_stats = dict(zoom=zoom, attempted=0, nonempty=0, empty=0, failed=0)
                 stats['levels'].append(level_stats)
                 dataset = gdal.OpenEx(str(database), gdal.OF_RASTER | gdal.OF_UPDATE,
@@ -328,6 +334,8 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
                     level_stats['nonempty'] += 1
                 dataset.FlushCache()
                 dataset = None
+                progress(f'{layer.name()}: zoom {zoom} zakończony — zapisane {level_stats["nonempty"]}, '
+                         f'puste {level_stats["empty"]}, błędne {level_stats["failed"]} fragmenty.')
                 if stats['stopped_early']:
                     break
             if cancelled():

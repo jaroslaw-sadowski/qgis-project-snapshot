@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 import sys
+import time
 
 
 def main():
@@ -12,6 +13,22 @@ def main():
     from mbtiles_batch_exporter.raster_archive import write_rendered_raster
 
     folder = Path(sys.argv[1])
+    last_progress = 0.0
+
+    def progress(message):
+        nonlocal last_progress
+        if time.monotonic() - last_progress < 0.25:
+            return
+        last_progress = time.monotonic()
+        # A single atomic snapshot, not an unbounded log or a pipe which can fill.
+        try:
+            temporary = folder / 'progress.new'
+            temporary.write_text(json.dumps({'message': message, 'updated_at': time.time()}), encoding='utf-8')
+            temporary.replace(folder / 'progress.json')
+        except OSError:
+            pass  # Progress reporting must never make a successful export fail.
+
+    progress('Uruchamianie QGIS…')
     parameters = json.loads((folder / 'input.json').read_text())
     app = QgsApplication([], False)
     app.initQgis()
@@ -19,6 +36,7 @@ def main():
     project = QgsProject()
     try:
         started = datetime.now().astimezone().isoformat()
+        progress('Otwieranie źródła mapy…')
         if not project.read(str(folder / 'source.qgs')):
             raise RuntimeError('Nie można odczytać kopii warstwy.')
         layer = project.mapLayer(parameters['layer_id'])
@@ -28,7 +46,7 @@ def main():
             layer, project, QgsGeometry.fromWkt(parameters['area']),
             QgsCoordinateReferenceSystem(parameters['area_crs']), folder / 'raster.gpkg',
             parameters['table'], parameters['levels'], lambda: (folder / 'cancel').exists(),
-            lambda message: None,
+            progress,
         )
         result['worker_pid'] = os.getpid()
         result['started_at'] = started

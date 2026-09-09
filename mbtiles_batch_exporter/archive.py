@@ -289,7 +289,9 @@ def _local_project(snapshot, destination, records, resources=None):
 
 def create_archive(project, selected_ids, area, area_crs, output_folder,
                    cancelled=lambda: False, progress=lambda message: None,
-                   zoom_min=13, zoom_max=17, workers=1):
+                   zoom_min=13, zoom_max=17, workers=1,
+                   layer_status=lambda record, completed, total: None,
+                   worker_activity=lambda rows: None):
     """Create a partial archive; return its published directory.
 
     Called on the QGIS main thread. The dialog is modal and its progress callback
@@ -340,24 +342,42 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
     if selected_ids - known_ids:
         raise ValueError("Lista warstw zmieniła się. Otwórz ponownie okno archiwizacji.")
 
+    total = len(selected_ids)
+    completed = 0
+    parallel = None
+    notify = progress
+    last_activity = 0.0
+
+    def progress(message):
+        nonlocal last_activity
+        notify(message)
+        if parallel and time.monotonic() - last_activity >= 0.5:
+            last_activity = time.monotonic()
+            worker_activity(parallel.activity())
+
     with TemporaryDirectory(prefix='.archive-', dir=output_folder) as temporary, ExitStack() as processes:
         staging = Path(temporary)
         snapshot = staging / '_source.qgz'
+        progress(f'Przygotowanie kopii projektu. Wybrano {total} warstw; procesy map: {workers}.')
         _snapshot_project(project, snapshot)
         database = staging / 'dane.gpkg'
         levels = None
         parallel = None
         if workers > 1 and any(r['status'] == 'pending' and r['provider'] not in ('gdal', 'memory', 'ogr', 'mssql', 'WFS')
                                for r in records):
+            progress('Przygotowanie kolejki map dla osobnych procesów QGIS…')
             levels = zoom_levels(project, area, area_crs, zoom_min, zoom_max)
             parallel = processes.enter_context(RasterWorkers(snapshot, staging, project, records,
                                                               area, area_crs, levels, workers))
         for record in records:
             if record['status'] == 'excluded':
                 continue
-            progress(f"Przygotowanie: {record['name']}")
+            layer_status(dict(record), completed, total)
+            progress(f"Warstwa {completed + 1}/{total}: {record['name']} — źródło {record['provider']}.")
             if cancelled():
                 record.update(status='cancelled', reason='Nie zapisano — archiwizacja została przerwana.')
+                completed += 1
+                layer_status(dict(record), completed, total)
                 continue
             layer = project.mapLayer(record['id'])
             record['started_at'] = datetime.now().astimezone().isoformat()
@@ -369,6 +389,7 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                 try:
                     if isinstance(layer, QgsVectorLayer):
                         try:
+                            progress(f'{layer.name()}: odczyt danych i zapis geometrii oraz atrybutów…')
                             count = _write_vector(
                                 layer, area, area_crs, project, database, table, cancelled,
                                 lambda count: progress(f"{layer.name()}: zapisano {count} obiektów"),
@@ -382,13 +403,16 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                         except Exception:
                             _remove_table(database, table)
                             record['attempts'].append({'method': 'vector', 'reason': 'Eksport danych wektorowych nie powiódł się; próba zapisu obrazu.'})
+                            progress(f'{layer.name()}: zapis wektorów nie powiódł się. Próbuję zapisać wygląd mapy; atrybuty nie zostaną zachowane.')
                     elif isinstance(layer, QgsRasterLayer) and layer.providerType() == 'gdal':
                         try:
+                            progress(f'{layer.name()}: odczyt i kopiowanie wartości rastra…')
                             record.update(write_raster_data(layer, project, area, area_crs, staging, table, cancelled, progress))
                         except InterruptedError:
                             raise
                         except Exception:
                             record['attempts'].append({'method': 'raster_data', 'reason': 'Nie udało się zachować oryginalnych wartości rastra; próba zapisu obrazu.'})
+                            progress(f'{layer.name()}: nie udało się zachować wartości rastra. Próbuję zapisać wygląd mapy.')
                     if record['status'] != 'saved':
                         if levels is None:
                             levels = zoom_levels(project, area, area_crs, zoom_min, zoom_max)
@@ -401,6 +425,7 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                             except Exception:
                                 _remove_table(database, table)
                                 record['attempts'].append({'method': 'parallel', 'reason': 'Proces pomocniczy nie zakończył zapisu; ponowiono w głównym QGIS.'})
+                                progress(f'{layer.name()}: proces pomocniczy zawiódł. Ponawiam zapis w głównym QGIS.')
                         record.update(result if result is not None else write_rendered_raster(
                             layer, project, area, area_crs, database, table, levels, cancelled, progress))
                         if record['status'] == 'failed':
@@ -414,14 +439,22 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                     _remove_table(database, table)
                     record.update(status='failed', reason='Nie udało się zapisać danych ani obrazu tej warstwy.')
             record['finished_at'] = datetime.now().astimezone().isoformat()
+            completed += 1
+            layer_status(dict(record), completed, total)
+            progress(f'{record["name"]}: {record["reason"]}')
 
+        progress('Kończenie zadań pomocniczych i porządkowanie plików tymczasowych…')
         processes.close()
-        progress('Zapisywanie projektu i raportu…')
+        parallel = None
+        worker_activity([])
+        progress('Zapisywanie projektu, lokalnych symboli, formularzy i załączników…')
         resource_report = _local_project(snapshot, staging / (name + '.qgz'), records,
                                          ProjectResources(project, staging, cancelled, progress))
+        progress('Otwieranie zapisanych warstw — kontrola dostępności lokalnych danych…')
         local_failures = audit_local_layers(staging / (name + '.qgz'), records)
         snapshot.unlink()
         if database.exists():
+            progress('Kontrola integralności GeoPackage…')
             with closing(sqlite3.connect(database)) as connection:
                 if connection.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                     raise RuntimeError("Kontrola integralności GeoPackage nie powiodła się.")
@@ -440,6 +473,7 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
         }
         for path in sorted(staging.rglob('*')):
             if path.is_file():
+                progress(f'Kontrola pliku: {path.relative_to(staging).as_posix()} ({path.stat().st_size / 1048576:.1f} MiB)…')
                 digest = sha256()
                 with path.open('rb') as stream:
                     last_update = time.monotonic()
@@ -451,6 +485,7 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                 manifest['sha256'][path.relative_to(staging).as_posix()] = digest.hexdigest()
         manifest['cancelled'] = cancelled()
         manifest['finished_at'] = datetime.now().astimezone().isoformat()
+        progress('Zapisywanie manifestu i raportu z wynikami…')
         (staging / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
         labels = {'saved': 'Zapisano', 'failed': 'Błąd', 'excluded': 'Odznaczono',
                   'partial': 'Obraz częściowy', 'empty': 'Pusty zoom — do sprawdzenia', 'cancelled': 'Przerwano'}
@@ -461,10 +496,10 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
             )) + '</tr>' for record in records
         )
         (staging / 'raport.html').write_text(
-            '<!doctype html><html lang="pl"><meta charset="utf-8"><title>Raport archiwizacji</title>'
+            '<!doctype html><html lang="pl"><meta charset="utf-8"><title>qgis-project-snapshot — raport</title>'
             '<style>body{font-family:sans-serif;margin:2em}table{border-collapse:collapse}'
             'td,th{border:1px solid #aaa;padding:.5em;text-align:left}</style>'
-            '<h1>Archiwum — krok 3, do odbioru offline</h1>'
+            '<h1>qgis-project-snapshot — wynik archiwizacji</h1><p>Sprawdź archiwum bez dostępu do sieci.</p>'
             + ''.join(f'<p>{escape(text)}</p>' for text in ARCHIVE_LIMITATIONS)
             + f'<p>Zakres obrazów: zoom {zoom_min}–{zoom_max}. PNG: kompresja bezstratna 9, pełna przezroczystość.</p>'
             + f'<p>Procesy: {workers}. Skopiowane zasoby: {resource_report["copied_files"]}. '
@@ -479,5 +514,6 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
         )
         if destination.exists():
             raise FileExistsError("Folder docelowy już istnieje. Nie nadpisano archiwum.")
+        progress('Udostępnianie gotowego folderu archiwum…')
         staging.rename(destination)
     return destination

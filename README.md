@@ -6,15 +6,18 @@ Dotychczasowy eksporter MBTiles pozostaje dostępny.
 
 ## Paczka do testów służbowych
 
-**Wersja 0.5.0** — [ZIP instalacyjny](dist/mbtiles_batch_exporter-0.5.0.zip)
-i [SHA-256](dist/mbtiles_batch_exporter-0.5.0.zip.sha256).
+**Wersja 0.6.0** — [ZIP instalacyjny](dist/qgis-project-snapshot-0.6.0.zip)
+i [SHA-256](dist/qgis-project-snapshot-0.6.0.zip.sha256).
 W QGIS użyj menedżera wtyczek i zakładki **Zainstaluj z ZIP**.
 [Instrukcja dla zespołu](docs/team-guide.md) jest też dołączona do paczki.
 
 Wymagane: QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7.
-Sprawdzono 29 testów z gotowej paczki na Ubuntu/QGIS 3.40.15 oraz próbki
+Sprawdzono 33 testy z gotowej paczki na Ubuntu/QGIS 3.40.15 oraz próbki
 publicznych map i WFS offline. MSSQL, pliki firmowe i cały projekt wymagają
 odbioru na komputerze służbowym w sieci firmowej. Windows nie był testowany.
+
+Postęp pokazują licznik warstw, kolumna **Stan**, czas i dziennik. Objaśnienia opcji
+są dostępne po najechaniu kursorem. Menu: **Wtyczki → qgis-project-snapshot**.
 
 Archiwum przenoś jako **cały folder**, nie sam plik `.qgz`.
 Wyniki niepełne i zależności wymagające kontroli są opisane w raporcie.

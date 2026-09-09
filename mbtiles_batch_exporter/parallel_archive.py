@@ -69,6 +69,8 @@ class RasterWorkers:
         self.futures = {}
         self.parameters = (snapshot, project, records, area, crs, levels)
         self.server_limits = {}
+        self.started = set()
+        self.merged = set()
 
     def __enter__(self):
         try:
@@ -137,6 +139,7 @@ class RasterWorkers:
             environment['PYTHONDONTWRITEBYTECODE'] = '1'
             environment['PYTHONPATH'] = os.pathsep.join([str(Path(__file__).resolve().parent.parent), *sys.path])
             environment['GDAL_NUM_THREADS'] = '1'
+            self.started.add(folder.name)
             with subprocess.Popen([executable, '-m', 'mbtiles_batch_exporter.archive_worker', str(folder)],
                                   env=environment, stdin=subprocess.DEVNULL,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
@@ -185,7 +188,31 @@ class RasterWorkers:
                     raise InterruptedError()
                 merging.result()
         shutil.rmtree(folder)
+        self.merged.add(layer_id)
         return result
+
+    def activity(self):
+        """Read disposable worker snapshots on the main thread only."""
+        rows = []
+        for layer_id, (future, folder) in self.futures.items():
+            phase, message = 'queued', 'W kolejce'
+            if layer_id in self.merged:
+                phase, message = 'merged', 'Wynik przekazano do archiwizacji'
+            elif future.done():
+                failed = future.cancelled() or future.exception() is not None or future.result().get('status') == 'failed'
+                phase, message = ('failed', 'Proces zakończony bez obrazu') if failed else ('ready', 'Zakończono pobieranie — czeka na scalenie')
+            elif folder.name in self.started:
+                phase, message = 'active', 'Uruchamianie QGIS lub otwieranie źródła…'
+                try:
+                    state = json.loads((folder / 'progress.json').read_text(encoding='utf-8'))
+                    message = state['message']
+                    age = int(time.time() - state['updated_at'])
+                    if age >= 10:
+                        message += f' (ostatni komunikat {age} s temu)'
+                except (OSError, ValueError, KeyError):
+                    pass
+            rows.append({'id': layer_id, 'phase': phase, 'message': message})
+        return rows
 
     def __exit__(self, *args):
         self.stop.set()

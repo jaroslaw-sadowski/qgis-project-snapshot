@@ -1,6 +1,6 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 9 września 2026. Wersja wtyczki: **0.5.0**.
+Aktualizacja: 9 września 2026. Wersja wtyczki: **0.6.0**.
 Stan funkcjonalny: gotowa paczka do testów na komputerze służbowym;
 pełny odbiór wszystkich źródeł firmowych nie został wykonany.
 
@@ -21,16 +21,18 @@ Oryginalny eksporter MBTiles pozostaje dostępny jako osobna funkcja.
 4. Odbiór dostępnych źródeł publicznych i benchmark; źródła firmowe niedostępne tutaj.
 5. ZIP, instrukcja zespołowa, test gotowej paczki w tymczasowym profilu.
 6. Uporządkowanie dokumentacji, reguł agentów i niniejszego przekazania stanu.
+7. Wersja 0.6.0: szczegółowy postęp, stany warstw i procesów, dziennik, podpowiedzi
+   oraz nazwa qgis-project-snapshot w menedżerze, menu i oknach.
 
 Wynik eksportu nadal ma status archiwum częściowego/do odbioru. To celowe,
 ze względu na nierozstrzygnięte zależności i brak pełnego odbioru firmowego.
 
 ## Sprawdzona paczka i wyniki
 
-- `dist/mbtiles_batch_exporter-0.5.0.zip`, 47 162 bajty, 15 plików.
-- SHA-256: `c584c1edc5bf5e557c3479dfa657578a4530518785972d2bd963e8b24a980268`.
+- `dist/qgis-project-snapshot-0.6.0.zip`, 51,886 bajtów, 15 plików.
+- SHA-256: `e77aa32f3605df001024f307ee346036bd19d46ef73ecd4a3fd756683a8198d6`.
 - Build: `python3 scripts/build_plugin.py`. `dist/` nie jest wersjonowany.
-- 29 testów integracyjnych przeszło także z kodu ZIP-a, bez pominięć WMS.
+- 33 testy integracyjne przeszły także z kodu ZIP-a, bez pominięć WMS.
 - QGIS 3.40.15, PyQt5, GDAL 3.12.2, Python 3.14.4, Ubuntu; inne systemy nieodebrane.
 - ZIP wykryto i załadowano natywnymi mechanizmami QGIS, otwarto oba okna
   z minimalnym interfejsem testowym. Nie był to ręczny odbiór pełnego pulpitu.
@@ -77,3 +79,7 @@ Paczka nie została opublikowana jako GitHub Release ani w katalogu wtyczek QGIS
 Przy rozpoczęciu sesji sprawdź `git status` i historię; nie zakładaj, że zmiany
 z poprzedniej sesji zostały już zatwierdzone lub wysłane.
 Pliki prób w `/tmp/qgis-step4` są przejściowe i nie są wymagane do pracy nad kodem.
+
+Identyfikator instalacji pozostaje `mbtiles_batch_exporter` dla zgodności aktualizacji.
+Przy komunikatach użytkownika o braku postępu sprawdź dziennik i stany z procesów;
+nie zastępuj rzeczywistych informacji sztucznym procentem lub prognozą czasu.

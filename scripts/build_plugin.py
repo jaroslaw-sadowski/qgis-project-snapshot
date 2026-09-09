@@ -27,7 +27,7 @@ def build(output):
         if path.suffix == '.py':
             ast.parse(path.read_text(encoding='utf-8'), filename=name)
     output.mkdir(parents=True, exist_ok=True)
-    destination = output / f'mbtiles_batch_exporter-{version}.zip'
+    destination = output / f'qgis-project-snapshot-{version}.zip'
     with ZipFile(destination, 'w', compression=ZIP_DEFLATED, compresslevel=9) as archive:
         for name, path in sorted(sources.items()):
             info = ZipInfo(f'mbtiles_batch_exporter/{name}', date_time=(1980, 1, 1, 0, 0, 0))

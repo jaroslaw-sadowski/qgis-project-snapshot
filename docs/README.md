@@ -16,6 +16,7 @@ Raporty są zapisem historycznym; aktualne priorytety znajdują się w stanie pr
 - [Krok 4 — odbiór i wydajność](validation-step4.md)
 - [Surowe pomiary benchmarku](benchmark-step4.json)
 - [Krok 5 — paczka instalacyjna](validation-step5.md)
+- [Wersja 0.6.0 — postęp i nazwa wtyczki](validation-0.6.0.md)
 
 Kod nie znajduje się w dokumentacji: źródła wtyczki są w `mbtiles_batch_exporter/`,
 testy w `tests/`, a skrypt pakowania w `scripts/`. Paczki są generowane w `dist/`.

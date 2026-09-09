@@ -1,6 +1,6 @@
 """Check the built ZIP in an isolated QGIS profile and run integration tests from it.
 
-Run with isolation: python3 -I tests/check_plugin_zip.py dist/mbtiles_batch_exporter-0.5.0.zip
+Run with isolation: python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.6.0.zip
 """
 import argparse
 import importlib
@@ -52,6 +52,7 @@ def check(filename):
                 return self.canvas
 
             def addPluginToMenu(self, menu, action):
+                assert menu == 'qgis-project-snapshot'
                 self.menu.append(action)
 
             def removePluginMenu(self, menu, action):
@@ -74,6 +75,8 @@ def check(filename):
         module = importlib.import_module('mbtiles_batch_exporter')
         assert Path(module.__file__).resolve().is_relative_to(plugins)
         assert len(interface.menu) == len(interface.toolbar) == 2
+        assert interface.menu[0].text() == 'Archiwizuj projekt…'
+        assert qgis.utils.pluginMetadata('mbtiles_batch_exporter', 'name') == 'qgis-project-snapshot'
         QgsProject.instance().setCrs(QgsCoordinateReferenceSystem('EPSG:2180'))
         opened = []
 
@@ -81,6 +84,7 @@ def check(filename):
             dialog = plugin.archive_dlg
             opened.append(dialog is not None and dialog.isVisible())
             if dialog is not None:
+                assert dialog.windowTitle().startswith('qgis-project-snapshot')
                 dialog.reject()
 
         QTimer.singleShot(0, close_archive)
@@ -88,6 +92,7 @@ def check(filename):
         assert opened == [True] and plugin.archive_dlg is None
         plugin.action.trigger()
         assert plugin.dlg is not None and plugin.dlg.isVisible()
+        assert plugin.dlg.windowTitle().startswith('qgis-project-snapshot')
         plugin.dlg.close()
         assert qgis.utils.unloadPlugin('mbtiles_batch_exporter')
         assert not interface.menu and not interface.toolbar

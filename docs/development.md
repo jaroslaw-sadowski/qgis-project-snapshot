@@ -37,7 +37,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/mbtiles_batch_exporter-0.5.0.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.6.0.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -68,3 +68,10 @@ Po zmianach wyłącznie w dokumentacji poza paczką wystarczy kontrola odnośnik
 diff i zgodności ZIP-a ze sprawdzoną sumą; identycznego kodu nie trzeba testować od nowa.
 Uaktualnij [stan projektu](PROJECT_STATE.md). Testy firmowe prowadź według
 [instrukcji zespołowej](team-guide.md), bez dodawania danych i poświadczeń do Git.
+
+## Nazwa i zgodność instalacji
+
+Widoczna nazwa oraz prefiks ZIP-a to `qgis-project-snapshot`. Techniczny katalog
+Pythona/identyfikator QGIS pozostaje `mbtiles_batch_exporter`, aby aktualizacja
+zastępowała poprzednią instalację. Nie zmieniaj go razem z etykietami interfejsu
+bez osobnego planu migracji. Menu tworzy natywne `iface.addPluginToMenu`.

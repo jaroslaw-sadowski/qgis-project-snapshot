@@ -405,10 +405,14 @@ class LocalWmsTests(unittest.TestCase):
             self.project.addMapLayer(second, False)
             self.group.addLayer(second)
         before = len(self.server.requests)
+        activities = []
         result = create_archive(self.project, self.project.mapLayers().keys(), self.area, self.crs, self.folder,
-                                zoom_min=16, zoom_max=17, workers=workers)
+                                zoom_min=16, zoom_max=17, workers=workers,
+                                worker_activity=lambda rows: activities.extend(rows))
         manifest = json.loads((result / 'manifest.json').read_text())
         if workers > 1:
+            self.assertTrue(any(r['phase'] == 'active' and ('fragment' in r['message'] or 'zoom' in r['message'])
+                                for r in activities), activities)
             self.assertEqual(manifest['parallel']['completed_in_workers'], 2, manifest['layers'])
             self.assertEqual(len({r['worker_pid'] for r in manifest['layers'] if 'worker_pid' in r}), 2)
             self.assertEqual(self.server.peak, 2)
