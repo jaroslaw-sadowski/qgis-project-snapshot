@@ -313,7 +313,7 @@ class LocalWmsTests(unittest.TestCase):
                     </Request><Exception><Format>XML</Format></Exception><Layer><Title>Test</Title><CRS>EPSG:2180</CRS>
                     <Layer><Name>map</Name><Title>Map</Title><CRS>EPSG:2180</CRS>
                     <EX_GeographicBoundingBox><westBoundLongitude>18</westBoundLongitude><eastBoundLongitude>20</eastBoundLongitude><southBoundLatitude>51</southBoundLatitude><northBoundLatitude>54</northBoundLatitude></EX_GeographicBoundingBox>
-                    <BoundingBox CRS="EPSG:2180" minx="499000" miny="499000" maxx="502000" maxy="502000"/></Layer>
+                    <BoundingBox CRS="EPSG:2180" minx="499000" miny="499000" maxx="520000" maxy="520000"/></Layer>
                     </Layer></Capability></WMS_Capabilities>'''.encode()
                     content_type = 'text/xml'
                 else:
@@ -321,7 +321,7 @@ class LocalWmsTests(unittest.TestCase):
                     with self.server.lock:
                         self.server.active += 1
                         self.server.peak = max(self.server.peak, self.server.active)
-                    time.sleep(0.02)
+                    time.sleep(self.server.delay)
                     with self.server.lock:
                         self.server.active -= 1
                     width, height = int(parameters.get('WIDTH', 256)), int(parameters.get('HEIGHT', 256))
@@ -339,6 +339,7 @@ class LocalWmsTests(unittest.TestCase):
                 self.send_response(200)
                 self.send_header('Content-Type', content_type)
                 self.send_header('Content-Length', str(len(body)))
+                self.send_header('Cache-Control', 'no-store')
                 self.end_headers()
                 try:
                     self.wfile.write(body)
@@ -353,6 +354,7 @@ class LocalWmsTests(unittest.TestCase):
         self.server.lock = Lock()
         self.server.active = self.server.peak = 0
         self.server.fail_large = False
+        self.server.delay = 0.02
         self.thread = Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 

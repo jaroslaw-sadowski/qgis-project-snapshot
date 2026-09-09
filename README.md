@@ -115,6 +115,18 @@ Projekt nie ma osobnej konfiguracji lint, typecheck ani procesu build.
 
 ## Następne kroki
 
+Wyniki wykonanego odbioru na dostępnych źródłach i pomiarów 1/2/4 procesów
+opisuje [raport kroku 4](docs/validation-step4.md). Opcjonalny benchmark używa
+dwóch lokalnych serwerów WMS i usuwa swoje archiwa po kontroli:
+
+```bash
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 tests/benchmark_archive.py --output /tmp/benchmark.json
+```
+
+Wymaga Linuksa (pomiar RSS przez `/proc`), dostępu do lokalnych gniazd HTTP
+oraz tych samych modułów QGIS/GDAL co testy integracyjne. Nie korzysta z usług
+firmowych ani publicznych; wyniki nie są gwarancją przyspieszenia na innych danych.
+
 4. **Odbiór na rzeczywistym projekcie (pozostaje do wykonania w sieci firmowej):** mały obszar, następnie długi pas,
    stanowisko z dostępem do MSSQL i udziałów sieciowych; na końcu otwarcie
    przeniesionego folderu bez internetu, sieci firmowej i naszej wtyczki.

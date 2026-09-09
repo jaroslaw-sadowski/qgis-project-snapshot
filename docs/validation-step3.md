@@ -31,6 +31,9 @@ strukturę projektu; nie potwierdza pobrania danych z tych usług.
 
 ## Pozostały odbiór — krok 4
 
+Aktualizacja: wykonane próby dostępnych źródeł oraz pomiary opisuje
+[raport kroku 4](validation-step4.md). MSSQL pozostaje do odbioru w sieci firmowej.
+
 1. Na stanowisku z dostępem do MSSQL i udziałów sieciowych wykonać archiwum
    małego obszaru, następnie reprezentatywnego długiego pasa.
 2. Porównać warianty 1, 2 i 4 procesów: czas, zużycie RAM, miejsce tymczasowe,
