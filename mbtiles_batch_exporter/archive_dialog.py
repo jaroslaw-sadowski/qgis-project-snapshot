@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
+import math
+import os
 from pathlib import Path
 
 from qgis.PyQt.QtCore import QCoreApplication, Qt, QUrl
@@ -9,9 +11,13 @@ from qgis.PyQt.QtWidgets import (
     QLineEdit, QMessageBox, QProgressBar, QPushButton, QTreeWidget,
     QTreeWidgetItem, QTreeWidgetItemIterator, QVBoxLayout, QWidget,
 )
-from qgis.core import QgsGeometry, QgsLayerTreeGroup, QgsProject, QgsVectorLayer, QgsWkbTypes
+from qgis.core import (
+    QgsCoordinateTransform, QgsGeometry, QgsLayerTreeGroup, QgsProject,
+    QgsUnitTypes, QgsVectorLayer, QgsWkbTypes,
+)
 
 from .archive import create_archive, polygon_area
+from .raster_archive import TILE_SIZE, zoom_levels
 
 
 class ArchiveDialog(QDialog):
@@ -22,13 +28,14 @@ class ArchiveDialog(QDialog):
         self._running = False
         self._cancelled = False
         self._result = None
-        self.setWindowTitle('Archiwizuj projekt — krok 1: dane wektorowe')
+        self.setWindowTitle('Archiwizuj projekt — dane i obrazy offline')
         self.setWindowModality(Qt.ApplicationModal)
         self.resize(780, 680)
         layout = QVBoxLayout(self)
         notice = QLabel(
-            'Ten krok zapisuje wektory z atrybutami i stylami. WMS-y i inne obrazy '
-            'nie są jeszcze zapisywane. Wynik zostanie oznaczony jako archiwum częściowe.'
+            'Zapisujemy dane i obrazy map offline. PNG zachowuje przezroczystość '
+            'z maksymalną bezstratną kompresją. Kopiujemy lokalne symbole i załączniki. '
+            'Raport wskazuje zależności wymagające kontroli; archiwum wymaga odbioru offline.'
         )
         notice.setWordWrap(True)
         layout.addWidget(notice)
@@ -58,6 +65,24 @@ class ArchiveDialog(QDialog):
                       'Zachowujemy całe obiekty wektorowe przecinające obszar.')
         hint.setWordWrap(True)
         form.addRow(hint)
+        self.zoom_min = QComboBox()
+        self.zoom_max = QComboBox()
+        for combo, default in ((self.zoom_min, 13), (self.zoom_max, 17)):
+            for zoom in range(25):
+                combo.addItem(f'Zoom {zoom}', zoom)
+            combo.setCurrentIndex(default)
+            combo.currentIndexChanged.connect(self._ensure_zoom_order)
+        form.addRow('Obrazy — zoom minimalny:', self.zoom_min)
+        form.addRow('Obrazy — zoom maksymalny:', self.zoom_max)
+        self.workers = QComboBox()
+        for count in range(1, 9):
+            self.workers.addItem('1 — oszczędnie' if count == 1 else f'{count} procesy' if count < 5 else f'{count} procesów', count)
+        self.workers.setCurrentIndex(min(4, os.cpu_count() or 1) - 1)
+        form.addRow('Równoległe pobieranie map:', self.workers)
+        self.zoom_hint = QLabel()
+        self.zoom_hint.setWordWrap(True)
+        form.addRow(self.zoom_hint)
+        self.polygon_combo.currentIndexChanged.connect(self._update_zoom_labels)
         options_layout.addLayout(form)
         selection = QHBoxLayout()
         for label, checked in [('Zaznacz wszystko', True), ('Odznacz wszystko', False)]:
@@ -110,7 +135,7 @@ class ArchiveDialog(QDialog):
                 layer = child.layer()
                 item.setData(0, Qt.UserRole, child.layerId())
                 item.setText(1, 'Wektor → GeoPackage' if isinstance(layer, QgsVectorLayer)
-                             else 'Obraz — dostępny w kroku 2')
+                             else 'Raster / obraz offline')
             item.setCheckState(0, Qt.Checked)
 
     def _select_all(self, checked):
@@ -120,6 +145,53 @@ class ArchiveDialog(QDialog):
 
     def _update_area(self):
         self.polygon_combo.setEnabled(self.area_combo.currentIndex() == 1)
+        self._update_zoom_labels()
+
+    def _area(self, use_geometry=True):
+        if self.area_combo.currentIndex() == 0:
+            if self.iface is None:
+                raise ValueError('Podgląd skali wymaga widoku mapy.')
+            canvas = self.iface.mapCanvas()
+            return QgsGeometry.fromRect(canvas.extent()), canvas.mapSettings().destinationCrs()
+        layer = self.project.mapLayer(self.polygon_combo.currentData())
+        if layer is None or not layer.isValid():
+            raise ValueError('Wybierz dostępną warstwę poligonową.')
+        if use_geometry:
+            area = polygon_area(layer)
+        else:
+            bounds = layer.boundingBoxOfSelected() if layer.selectedFeatureCount() else layer.extent()
+            area = QgsGeometry.fromRect(bounds)
+        return area, layer.crs()
+
+    def _ensure_zoom_order(self):
+        if self.zoom_min.currentData() > self.zoom_max.currentData():
+            if self.sender() is self.zoom_min:
+                self.zoom_max.setCurrentIndex(self.zoom_min.currentIndex())
+            else:
+                self.zoom_min.setCurrentIndex(self.zoom_max.currentIndex())
+        if hasattr(self, 'zoom_hint'):
+            self._update_zoom_labels()
+
+    def _update_zoom_labels(self):
+        try:
+            area, crs = self._area(use_geometry=False)
+            levels = zoom_levels(self.project, area, crs, 0, 24)
+            unit = QgsUnitTypes.toAbbreviatedString(self.project.crs().mapUnits())
+            for level in levels:
+                label = f'Zoom {level["zoom"]} ≈ 1:{level["scale"]:,.0f} ({level["resolution"]:.3g} {unit}/piksel)'
+                for combo in (self.zoom_min, self.zoom_max):
+                    combo.setItemText(level['zoom'], label)
+            if crs != self.project.crs():
+                area.transform(QgsCoordinateTransform(crs, self.project.crs(), self.project))
+            box = area.boundingBox()
+            count = sum(math.ceil(box.width() / (TILE_SIZE * level['resolution']))
+                        * math.ceil(box.height() / (TILE_SIZE * level['resolution']))
+                        for level in levels[self.zoom_min.currentData():self.zoom_max.currentData() + 1])
+            self.zoom_hint.setText(f'Skala przybliżona dla środka obszaru, 96 DPI. Do {count:,} kafelków na mapę '
+                                   '(prostokąt zasięgu); dla pasa pobieramy tylko jego kształt. '
+                                   'Zoom nie ogranicza szczegółowości zachowanych danych wektorowych.')
+        except Exception:
+            self.zoom_hint.setText('Wybierz poprawny obszar, aby zobaczyć skalę dla każdego zoomu.')
 
     def _browse(self):
         folder = QFileDialog.getExistingDirectory(self, 'Folder na archiwum projektu')
@@ -157,24 +229,19 @@ class ArchiveDialog(QDialog):
         self.cancel_button.setEnabled(True)
         self.progress.setRange(0, 0)
         try:
-            if self.area_combo.currentIndex() == 0:
-                canvas = self.iface.mapCanvas()
-                area = QgsGeometry.fromRect(canvas.extent())
-                crs = canvas.mapSettings().destinationCrs()
-            else:
-                layer = self.project.mapLayer(self.polygon_combo.currentData())
-                if layer is None or not layer.isValid():
-                    raise ValueError('Wybierz dostępną warstwę poligonową.')
-                area = polygon_area(layer)
-                crs = layer.crs()
+            area, crs = self._area()
             self._result = create_archive(
                 self.project, selected_ids, area, crs, folder,
                 cancelled=lambda: self._cancelled, progress=self._update_progress,
+                zoom_min=self.zoom_min.currentData(), zoom_max=self.zoom_max.currentData(),
+                workers=self.workers.currentData(),
             )
             manifest = json.loads((self._result / 'manifest.json').read_text(encoding='utf-8'))
             saved = sum(record['status'] == 'saved' for record in manifest['layers'])
-            missing = sum(record['status'] not in ('saved', 'excluded') for record in manifest['layers'])
-            self.status.setText(f'Archiwum częściowe: zapisano {saved} warstw; niezapisanych: {missing}.\n{self._result}')
+            missing = sum(record['status'] in ('failed', 'cancelled') for record in manifest['layers'])
+            review = sum(record['status'] in ('empty', 'partial') for record in manifest['layers'])
+            self.status.setText(f'Archiwum częściowe: zapisano {saved} warstw; do sprawdzenia: {review}; '
+                                f'niezapisanych: {missing}.\n{self._result}')
             self.report_button.setEnabled(True)
             QMessageBox.information(self, 'Archiwum częściowe',
                                     self.status.text() + '\nSzczegóły i przyczyny braków znajdziesz w raporcie.')

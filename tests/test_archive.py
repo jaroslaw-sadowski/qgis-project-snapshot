@@ -161,7 +161,7 @@ class ArchiveTests(unittest.TestCase):
         statuses = {r['id']: r['status'] for r in self.manifest(result)['layers']}
         self.assertEqual(statuses[other.id()], 'excluded')
         self.assertEqual(statuses[invalid.id()], 'failed')
-        self.assertEqual(statuses[raster.id()], 'unsupported')
+        self.assertEqual(statuses[raster.id()], 'failed')
         with ZipFile(next(result.glob('*.qgz'))) as z:
             xml = z.read(next(n for n in z.namelist() if n.endswith('.qgs'))).decode()
         self.assertNotIn('missing.gpkg', xml)
@@ -234,7 +234,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertEqual((first / 'manifest.json').read_bytes(), contents)
 
-    def test_failed_write_drops_table_and_continues_with_next_layer(self):
+    def test_failed_vector_write_falls_back_to_image_and_continues(self):
         second = self.add_points('Druga', [(3, 3)])
         original_add = QgsVectorFileWriter.addFeature
         failed = False
@@ -247,12 +247,16 @@ class ArchiveTests(unittest.TestCase):
             return original_add(writer, *args)
 
         with patch.object(QgsVectorFileWriter, 'addFeature', fail_once):
-            result = self.archive()
+            result = self.archive(zoom_min=17, zoom_max=17)
         statuses = {r['id']: r['status'] for r in self.manifest(result)['layers']}
-        self.assertEqual(statuses[self.layer.id()], 'failed')
+        self.assertEqual(statuses[self.layer.id()], 'saved')
         self.assertEqual(statuses[second.id()], 'saved')
+        first = next(r for r in self.manifest(result)['layers'] if r['id'] == self.layer.id())
+        self.assertEqual(first['method'], 'raster_render')
+        self.assertIn('nie zachowuje obiektów', first['reason'])
         with closing(sqlite3.connect(result / 'dane.gpkg')) as database:
-            self.assertEqual(database.execute('SELECT count(*) FROM gpkg_contents').fetchone()[0], 1)
+            self.assertEqual(database.execute('SELECT count(*) FROM gpkg_contents').fetchone()[0], 2)
+            self.assertEqual(database.execute("SELECT count(*) FROM gpkg_contents WHERE data_type='features'").fetchone()[0], 1)
 
     def test_zero_features_is_valid_not_a_download_error(self):
         empty = self.add_points('Poza pasem', [(1, 9)])

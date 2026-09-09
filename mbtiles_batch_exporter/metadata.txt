@@ -1,11 +1,11 @@
 [general]
 name=MBTiles Batch Exporter
-qgisMinimumVersion=3.22
-description=Batch MBTiles export and partial offline project archives with vector data in GeoPackage.
-version=0.3.0
+qgisMinimumVersion=3.40
+description=Offline project archives with vector data, compressed PNG map tiles and local rasters, plus batch MBTiles export.
+version=0.5.0
 author=ChatGPT
 email=
-about=Includes the original MBTiles exporter and project archiving step 1: layer tree selection, polygon area, vector data and styles in a local GeoPackage, and a partial-archive report. Raster archiving is not yet available in the project archive action.
+about=Project archiving step 3: local vector data and compressed PNG maps, bounded parallel QGIS processes, portable symbols/forms/attachments, relation checks and local source audit. Reports unresolved dependencies; offline acceptance still required. Requires GDAL 3.7 or newer supplied with QGIS.
 category=Raster
 icon=icon.png
 
