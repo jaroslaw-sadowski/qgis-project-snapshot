@@ -124,6 +124,11 @@ class ArchiveTests(unittest.TestCase):
         ]
         self.assertEqual(events[-1]["event"], "archive_end")
         self.assertTrue(any(e["event"] == "vector_read" for e in events))
+        iterations = [e for e in events if e["event"] == "vector_iteration"]
+        self.assertEqual([e["written"] for e in iterations], [3, 1])
+        self.assertTrue(all(e["received"] >= e["written"] for e in iterations))
+        self.assertTrue(all(e["read_complete"] for e in iterations))
+
         self.assertEqual(manifest["status"], "partial")
         self.assertEqual([row["feature_count"] for row in manifest["layers"]], [3, 1])
         self.assertEqual(len({row["table"] for row in manifest["layers"]}), 2)

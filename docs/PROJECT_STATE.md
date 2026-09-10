@@ -1,11 +1,59 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 10 września 2026. Wersja **0.9.1** — diagnostyka eksportu.
+Aktualizacja: 10 września 2026. Wersja **0.9.3** — rozszerzona diagnostyka sieci i odczytu wektorów.
 Test firmowy 0.9.0 wykazał niekompletny wynik: zapisano 39/211 warstw,
 172 mapy nieudane, wszystkie trzy WFS puste, coordinator_failed=true.
 Nie uznawaj wcześniejszych testów Ubuntu za potwierdzenie działania na Windows.
-Przyczyna awarii koordynatora pozostaje nieustalona; wersja 0.9.1 dodaje
-informacje potrzebne do jej rozpoznania, nie deklaruje naprawy tego błędu.
+Diagnostyka firmowa 0.9.1 wskazała PermissionError, errno=13, winerror=5
+w `_coordinate → write_state → Path.replace`, podczas podmiany control.json.
+Następstwem było anulowanie pracownika i kolejki 171 map (CancelledError).
+To nie błąd sterownika GeoPackage. Nie ustalono, kto blokował plik na Windows;
+konflikt równoczesnego odczytu/podmiany pozostaje hipotezą. Poprawka 0.9.2
+ponawia atomową podmianę przy błędach 5/32/33; wymaga testu na tym Windows.
+Trzy WFS nadal puste, bez zgłoszonych błędów dostawcy — przyczyna nieustalona.
+Proxy aktywne i przekazane do procesu; sama konfiguracja nie potwierdza trasy.
+Po tej analizie ponownie przeszły 3 testy (11,893 s): WMS do GeoPackage i odczyt
+po wyłączeniu serwera, scalanie dwóch map w procesach oraz PNG RGBA/EPSG:2180.
+Testy wykonano na Ubuntu; nie stanowią odbioru Windows ani osobnego testu WMTS.
+
+## Zmiana 0.9.3
+
+- Zachowuje naprawę IPC 0.9.2. Najnowszy ZIP do próby firmowej to 0.9.3.
+- NetworkDiagnostics obserwuje istniejące sygnały QGIS, bez dodatkowych zapytań.
+  Rejestruje host/rozpoznaną operację/CRS, HTTP/Qt, czas i cache. Trzy próbki
+  na grupę i pełne sumy przy zamknięciu; brak startu daje kontekst/czas null.
+- XML: ograniczony prefiks, znane kody błędu OGC i liczniki FeatureCollection.
+  Nie zapisuj surowych wiadomości ani treści; brak body nie oznacza pustego WFS.
+- Wektory: stage, CRS, filtry/edycje (tylko flagi), received/written/empty_geometry/
+  outside_mask, stan iteratora, kody zapisu i liczba/zmiana błędów dostawcy.
+  Nie zmienia to klasyfikacji pustych wyników ani nie ustala przyczyny firmowego WFS.
+- layer_start łączy indeks wybranej warstwy z job/table. Nazwy dopasuj z manifestu;
+  główny kontekst nie dowodzi pochodzenia równoczesnych żądań innych zadań QGIS.
+- Proces: wersje, provider/CRS/skale i liczniki renderowania. Start: wolny dysk;
+  nieudany odczyt wolnego miejsca nie przerywa eksportu.
+- Testy źródeł: **84/84**, 66,023 s, bez pominięć; ZIP również **84/84**,
+  69,539 s, z poprawnym ładowaniem w QGIS. Ruff i kontrola diff poprawne.
+- Odbiór i ograniczenia: [0.9.3](validation-0.9.3.md).
+
+## Zmiana 0.9.2
+
+- Polecenia, telemetria i postęp używają `write_state` z maks. sześcioma próbami
+  podmiany po winerror 5/32/33; suma przerw 250 ms. Nie stosuj nieatomowego
+  nadpisywania ani nie przedłużaj pozwolenia tylko dlatego, że zapis się nie udał.
+- Przerwy respektują anulowanie. Ponowienie telemetrii nie powtarza pobierania
+  ani naliczania sukcesów. Poprzedni kompletny JSON pozostaje do czasu podmiany.
+- Diagnostyka: ipc_replace_retry/recovered/failed. Trwała blokada nadal kończy
+  koordynator bez obejścia ograniczeń; anulowane z tego powodu mapy raportują
+  etap coordinator i czerwone ostrzeżenie, zamiast ogólnego błędu pobierania.
+- Testy źródeł **80/80**, 63,641 s, bez pominięć. Symulacja błędów Windows
+  obejmuje krótką/trwałą blokadę, anulowanie, integralność JSON i telemetrii.
+  Lokalny WMS potwierdza ukończenie mapy po krótkiej blokadzie oraz bezpieczne
+  zatrzymanie i poprawne opisy kolejki po trwałej blokadzie.
+- WFS pozostaje do sprawdzenia na danych użytkownika. Nie zmieniono proxy,
+  formatu GeoPackage ani algorytmu renderowania.
+- ZIP 0.9.2: ładowanie i **80/80 testów z paczki**, 62,452 s, bez pominięć.
+  Instrukcja małego testu na tym samym Windows w `docs/team-guide.md`.
+  Raport odbioru: [0.9.2](validation-0.9.2.md).
 
 ## Zmiana 0.9.1
 

@@ -130,3 +130,44 @@ kody błędów Qt/HTTP. Nie deklarujemy obserwacji rzeczywistej trasy każdego �
 Główne zdarzenia warstw odnoszą się do numeru wybranej warstwy; procesy do
 technicznej nazwy tabeli. Log jest dopisywany do końca, nie należy do sha256
 manifestu. Nie przechwytujemy surowego stderr GDAL/QGIS ze względu na dane źródeł.
+
+## Blokady plików Windows (0.9.2)
+
+`write_state` zachowuje zapis do `.new` i atomową podmianę. Dla Windows
+winerror 5/32/33 ponawia wyłącznie podmianę: maksymalnie sześć prób i łącznie
+250 ms oczekiwania (10/20/40/80/100 ms). Poprzedni kompletny JSON zostaje
+nienaruszony, aż podmiana się powiedzie; brak nieatomowego nadpisywania.
+Sprawdzanie anulowania otacza przerwy. Zamykająca telemetria może być zapisana
+również po anulowaniu. Pozostałe błędy systemowe nie są ponawiane.
+
+Ta sama funkcja obsługuje polecenia, telemetrię i postęp procesu. Ponowienie
+publikacji nie powtarza operacji pobierania ani nie zwiększa liczników kafelków.
+Dzierżawa pozwolenia nadal wygasa po dwóch sekundach. Trwała blokada zatrzymuje
+koordynator; nie uruchamiamy pobierania bez kontroli. Kolejka anulowana w wyniku
+awarii otrzymuje WorkerError z etapem `coordinator`, widoczny również na czerwono
+w oknie. Zwykłe anulowanie podczas ponowienia nie oznacza awarii koordynatora.
+Diagnostyka zapisuje kody błędów i wyniki ponowień, bez pełnych ścieżek.
+
+## Obserwacja sieci i odczytu (0.9.3)
+
+NetworkDiagnostics używa sygnałów QgsNetworkAccessManager:
+requestAboutToBeCreated(QgsNetworkRequestParameters) i finished(QgsNetworkReplyContent).
+Nie przechwytuje żądań ani nie zmienia proxy. Dopasowuje identyfikatory do czasu
+startu i bieżącego kontekstu; limit pamięci oczekujących identyfikatorów to 4096.
+Odpowiedzi grupuje po kontekście, hoście, operacji i bezpiecznych metadanych;
+zapisuje pierwsze trzy przykłady, a przy zamknięciu pełne sumy i czasy.
+Brak powiązanego startu daje seconds/context=null. Błąd obserwatora jest logowany,
+a nie propagowany z Qt callback do pętli zdarzeń. Proces ma własnego obserwatora;
+QGIS przekazuje zdarzenia menedżerów wątków przez swoje sygnały.
+
+XML analizowany jest tylko w dostępnym prefiksie 16 KiB; persystujemy wyłącznie
+rozpoznane kody OGC i liczniki numeryczne FeatureCollection. Żadnych wiadomości
+ExceptionText ani nagłówków autoryzacji. Zwracane body_available=false i brak
+licznika nie dowodzą pustego źródła. Dla POST rodzaj operacji/CRS mogą pozostać
+nierozpoznane; nie analizujemy treści zapytania. To diagnostyka, nie walidator
+kompletności WFS. Nie traktuj kontekstu warstwy w GUI jako dowodu pochodzenia
+każdego żądania, jeśli inne zadania QGIS pracują równocześnie.
+
+_write_vector otrzymuje opcjonalną diagnostykę. Liczniki pochodzą z istniejącej
+iteracji, bez dodatkowego odczytu źródła. Stan iteratora logujemy przed jego
+zamknięciem; read_complete opisuje odczyt, a stage/writer_error osobno zapis.

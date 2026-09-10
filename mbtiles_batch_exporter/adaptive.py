@@ -9,10 +9,46 @@ from email.utils import parsedate_to_datetime
 PROTOCOL = 1
 
 
-def write_state(path, value):
+def write_state(path, value, *, cancelled=lambda: False, diagnostic=None):
+    """Atomically publish IPC, tolerating short Windows sharing/lock conflicts.
+
+    Keep the previous complete file until replacement succeeds. Never fall back
+    to truncating it: a worker could otherwise lose its permission/ack state.
+    Retries total at most 250 ms, below the 2 s permission lease.
+    """
     temporary = path.with_suffix(".new")
     temporary.write_text(json.dumps(value), encoding="utf-8")
-    temporary.replace(path)
+    delays = (0.01, 0.02, 0.04, 0.08, 0.10)
+    for attempt in range(len(delays) + 1):
+        try:
+            temporary.replace(path)
+        except OSError as error:
+            # Access denied, sharing violation, lock violation. Other errors
+            # (disk full, missing directory, etc.) need their original diagnosis.
+            if getattr(error, "winerror", None) not in (5, 32, 33):
+                raise
+            if diagnostic:
+                diagnostic.error(
+                    "ipc_replace_retry"
+                    if attempt < len(delays)
+                    else "ipc_replace_failed",
+                    error,
+                    file=path.name,
+                    attempt=attempt + 1,
+                )
+            if attempt == len(delays):
+                raise
+            if cancelled():
+                raise InterruptedError() from error
+            time.sleep(delays[attempt])
+            if cancelled():
+                raise InterruptedError() from error
+        else:
+            if attempt and diagnostic:
+                diagnostic.emit(
+                    "ipc_replace_recovered", file=path.name, attempts=attempt + 1
+                )
+            return
 
 
 def retry_after(value, now=None):
@@ -155,7 +191,8 @@ class HostPolicy:
 class WorkerGate:
     """Worker-owned telemetry and a fail-closed permission check before rendering."""
 
-    def __init__(self, folder, cancelled, pump=lambda: None):
+    def __init__(self, folder, cancelled, pump=lambda: None, diagnostic=None):
+        self.diagnostic = diagnostic
         self.folder = folder
         self.cancelled = cancelled
         self.pump = pump
@@ -176,10 +213,12 @@ class WorkerGate:
         self.started = 0.0
         self.publish()
 
-    def publish(self):
+    def publish(self, closing=False):
         write_state(
             self.folder / "telemetry.json",
             dict(self.state, counts=self.counts, events=self.events),
+            cancelled=(lambda: False) if closing else self.cancelled,
+            diagnostic=self.diagnostic,
         )
 
     def before(self, retry=False):
@@ -258,4 +297,4 @@ class WorkerGate:
         self.state.update(
             waiting=False, running=False, recoverable=False, retry=False, done=True
         )
-        self.publish()
+        self.publish(closing=True)

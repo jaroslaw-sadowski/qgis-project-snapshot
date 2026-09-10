@@ -118,7 +118,9 @@ class WorkerError(RuntimeError):
         self.details = dict(
             stage=stage, exit_code=exit_code, http_status=http_status, qt_error=qt_error
         )
-        if http_status == 407 or qt_error == 105:
+        if stage == "coordinator":
+            reason = tr("Koordynator pobierania zakończył pracę z błędem.")
+        elif http_status == 407 or qt_error == 105:
             reason = tr(
                 "Proxy odrzuciło uwierzytelnianie. Sprawdź konfigurację proxy w QGIS."
             )
@@ -390,6 +392,8 @@ class RasterWorkers:
                                     "ack": job["ack"],
                                     "expires": now + 2,
                                 },
+                                cancelled=self.stop.is_set,
+                                diagnostic=self.diagnostic,
                             )
                         state = (
                             "deferred"
@@ -431,6 +435,9 @@ class RasterWorkers:
                     self.rows = rows
                     self.condition.notify_all()
                 self.stop.wait(0.5)
+        except InterruptedError:
+            # Cancellation during an IPC retry is an ordinary user stop.
+            self.stop.set()
         except Exception as error:
             if self.diagnostic:
                 self.diagnostic.error("coordinator_exception", error)
@@ -498,7 +505,9 @@ class RasterWorkers:
         with self.condition:
             self._register(host, folder)
             self.jobs[folder.name]["active"] = True
-        return WorkerGate(folder, cancelled, QCoreApplication.processEvents)
+        return WorkerGate(
+            folder, cancelled, QCoreApplication.processEvents, self.diagnostic
+        )
 
     def finish_local(self, gate, failed=False):
         gate.close()
@@ -618,9 +627,7 @@ class RasterWorkers:
     def _run(self, folder):
         if self.stop.is_set():
             if self.coordinator_failed:
-                raise RuntimeError(
-                    tr("Koordynator pobierania zakończył pracę z błędem.")
-                )
+                raise WorkerError("coordinator")
             raise InterruptedError()
         executable = (
             sys.executable
@@ -685,9 +692,7 @@ class RasterWorkers:
                 )
             if self.stop.is_set():
                 if self.coordinator_failed:
-                    raise RuntimeError(
-                        tr("Koordynator pobierania zakończył pracę z błędem.")
-                    )
+                    raise WorkerError("coordinator")
                 raise InterruptedError()
             if process.returncode or not (folder / "result.json").exists():
                 details = {}
@@ -726,6 +731,8 @@ class RasterWorkers:
         if cancelled():
             self.stop.set()
             raise InterruptedError()
+        if self.coordinator_failed and future.cancelled():
+            raise WorkerError("coordinator")
         result = future.result()
         if result.get("local_source"):
             # SQLite/GDAL handles are created in this thread. UI events remain

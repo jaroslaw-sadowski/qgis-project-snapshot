@@ -310,10 +310,10 @@ class RasterTests(unittest.TestCase):
 
         from mbtiles_batch_exporter.archive import _write_vector
 
-        def write(layer, *args):
+        def write(layer, *args, **kwargs):
             if layer.id() == second.id():
                 raise RuntimeError("Test: wymuszenie zastępczego obrazu")
-            return _write_vector(layer, *args)
+            return _write_vector(layer, *args, **kwargs)
 
         with patch("mbtiles_batch_exporter.archive._write_vector", side_effect=write):
             result = create_archive(

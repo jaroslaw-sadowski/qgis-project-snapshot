@@ -424,6 +424,59 @@ class AdaptiveWmsTests(unittest.TestCase):
             )
         return result, json.loads((result / "manifest.json").read_text())
 
+    def test_windows_control_lock_recovers_and_map_is_saved(self):
+        from test_ipc import windows_lock
+
+        layer = self.add_map()
+        replace = Path.replace
+        failures = []
+
+        def locked(source, destination):
+            if Path(destination).name == "control.json" and Path(destination).exists():
+                if len(failures) < 3:
+                    failures.append(1)
+                    raise windows_lock()
+            return replace(source, destination)
+
+        with patch.object(Path, "replace", locked):
+            folder, manifest = self.capture([layer])
+        self.assertEqual(len(failures), 3)
+        self.assertFalse(manifest["adaptive"]["coordinator_failed"])
+        record = next(r for r in manifest["layers"] if r["id"] == layer.id())
+        self.assertEqual(record["status"], "saved")
+        with closing(sqlite3.connect(folder / "dane.gpkg")) as db:
+            count = db.execute(f'SELECT COUNT(*) FROM "{record["table"]}"').fetchone()[
+                0
+            ]
+        self.assertGreater(count, 0)
+        self.assertIn(
+            '"ipc_replace_recovered"', (folder / "diagnostic.jsonl").read_text()
+        )
+
+    def test_persistent_control_lock_reports_coordinator_for_queued_maps(self):
+        from test_ipc import windows_lock
+
+        layers = [self.add_map(name=f"Map {i}") for i in range(3)]
+        replace = Path.replace
+
+        def locked(source, destination):
+            if Path(destination).name == "control.json" and Path(destination).exists():
+                raise windows_lock()
+            return replace(source, destination)
+
+        with patch.object(Path, "replace", locked):
+            folder, manifest = self.capture(layers)
+        self.assertTrue(manifest["adaptive"]["coordinator_failed"])
+        selected = [
+            r for r in manifest["layers"] if r["id"] in {layer.id() for layer in layers}
+        ]
+        self.assertTrue(all(r["status"] == "failed" for r in selected))
+        self.assertTrue(
+            all(r["worker_error"]["stage"] == "coordinator" for r in selected)
+        )
+        self.assertFalse((folder / ".workers").exists())
+        self.assertIn('"ipc_replace_failed"', (folder / "diagnostic.jsonl").read_text())
+
     def test_rate_limit_repairs_same_map_and_records_recovery(self):
         layer = self.add_map()
         self.server.scripted_statuses = [429]

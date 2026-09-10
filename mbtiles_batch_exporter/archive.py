@@ -24,8 +24,6 @@ from qgis.core import (
     QgsFeatureSink,
     QgsGeometry,
     QgsMultiBandColorRenderer,
-    QgsNetworkAccessManager,
-    QgsNetworkReplyContent,
     QgsPathResolver,
     QgsProject,
     QgsRasterLayer,
@@ -33,11 +31,10 @@ from qgis.core import (
     QgsVectorFileWriter,
     QgsVectorLayer,
 )
-from qgis.PyQt.QtNetwork import QNetworkRequest
 from qgis.PyQt.QtXml import QDomDocument
 
 from .archive_resources import ProjectResources, audit_local_layers
-from .diagnostics import Diagnostics, network_details
+from .diagnostics import Diagnostics, NetworkDiagnostics, network_details
 from .i18n import tr
 from .parallel_archive import RasterWorkers, WorkerError
 from .raster_archive import write_raster_data, write_rendered_raster, zoom_levels
@@ -84,8 +81,20 @@ def polygon_area(layer):
     return area
 
 
-def _write_vector(layer, area, area_crs, project, path, table, cancelled, progress):
+def _write_vector(
+    layer, area, area_crs, project, path, table, cancelled, progress, diagnostic=None
+):
     """Stream live features (including the edit buffer) into a single GPKG table."""
+    if diagnostic:
+        diagnostic.emit(
+            "vector_setup",
+            job=table,
+            source_crs=layer.crs().authid(),
+            area_crs=area_crs.authid(),
+            spatial=layer.isSpatial(),
+            subset_filter=bool(layer.subsetString()),
+            editing=layer.isEditable(),
+        )
     mask = QgsGeometry(area)
     if layer.isSpatial() and layer.crs() != area_crs:
         if not layer.crs().isValid():
@@ -117,6 +126,10 @@ def _write_vector(layer, area, area_crs, project, path, table, cancelled, progre
     errors = []
     provider = layer.dataProvider()
     old_errors = list(provider.errors())
+    counters = dict(received=0, written=0, empty_geometry=0, outside_mask=0)
+    stage = "writer_create"
+    read_complete = False
+    started_read = time.monotonic()
     layer.raiseError.connect(errors.append)
     try:
         writer = QgsVectorFileWriter.create(
@@ -129,12 +142,15 @@ def _write_vector(layer, area, area_crs, project, path, table, cancelled, progre
         )
         if not writer or writer.hasError() != QgsVectorFileWriter.NoError:
             raise RuntimeError(tr("Nie można utworzyć tabeli GeoPackage."))
+        stage = "iterator_open"
         iterator = layer.getFeatures(request)
         if not iterator.isValid():
             raise RuntimeError(tr("Nie udało się rozpocząć odczytu obiektów."))
+        stage = "iterator_read"
         count = 0
         last_update = time.monotonic()
         for feature in iterator:
+            counters["received"] += 1
             if cancelled():
                 raise InterruptedError(
                     tr("Przerwano zapis warstwy; niepełną tabelę usunięto.")
@@ -145,20 +161,26 @@ def _write_vector(layer, area, area_crs, project, path, table, cancelled, progre
             if layer.isSpatial():
                 geometry = feature.geometry()
                 if geometry.isNull() or geometry.isEmpty():
+                    counters["empty_geometry"] += 1
                     continue
                 if not geometry.isGeosValid():
                     raise ValueError(
                         tr("Napotkano nieprawidłową geometrię w obszarze eksportu.")
                     )
                 if not engine.intersects(geometry.constGet()):
+                    counters["outside_mask"] += 1
                     continue
+            stage = "writer_insert"
             if not writer.addFeature(feature, QgsFeatureSink.FastInsert):
                 raise RuntimeError(tr("Nie udało się zapisać obiektu do GeoPackage."))
             count += 1
+            counters["written"] = count
+            stage = "iterator_read"
         if cancelled():
             raise InterruptedError(
                 tr("Przerwano zapis warstwy; niepełną tabelę usunięto.")
             )
+        stage = "provider_check"
         if errors or list(provider.errors()) != old_errors:
             # Provider messages may contain credentials or a full database URI.
             raise RuntimeError(
@@ -166,9 +188,26 @@ def _write_vector(layer, area, area_crs, project, path, table, cancelled, progre
             )
         if not iterator.isClosed():
             raise RuntimeError(tr("Odczyt warstwy nie zakończył się poprawnie."))
+        read_complete = True
+        stage = "writer_flush"
         if not writer.flushBuffer() or writer.hasError() != QgsVectorFileWriter.NoError:
             raise RuntimeError(tr("Nie udało się zakończyć zapisu tabeli GeoPackage."))
     finally:
+        if diagnostic:
+            diagnostic.emit(
+                "vector_iteration",
+                job=table,
+                stage=stage,
+                read_complete=read_complete,
+                seconds=time.monotonic() - started_read,
+                raised_errors=len(errors),
+                old_provider_errors=len(old_errors),
+                provider_errors=len(provider.errors()),
+                provider_errors_changed=list(provider.errors()) != old_errors,
+                iterator_closed=iterator.isClosed() if iterator is not None else None,
+                writer_error=int(writer.hasError()) if writer is not None else None,
+                **counters,
+            )
         layer.raiseError.disconnect(errors.append)
         if iterator is not None:
             iterator.close()
@@ -518,20 +557,12 @@ def create_archive(
             network=network_details(network_snapshot()),
         )
 
-        def network_finished(reply):
-            status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
-            if reply.error() or (status and status >= 400):
-                diagnostic.emit(
-                    "main_network_error",
-                    http_status=status,
-                    qt_error=int(reply.error()),
-                )
-
-        network_signal = QgsNetworkAccessManager.instance().finished[
-            QgsNetworkReplyContent
-        ]
-        network_signal.connect(network_finished)
-        processes.callback(network_signal.disconnect, network_finished)
+        network_monitor = NetworkDiagnostics(diagnostic)
+        processes.callback(network_monitor.close)
+        try:
+            diagnostic.emit("storage", free_bytes=shutil.disk_usage(staging).free)
+        except OSError as error:
+            diagnostic.error("storage_probe_error", error)
         snapshot = staging / "_source.qgz"
         progress(
             tr(
@@ -567,6 +598,14 @@ def create_archive(
         for record in records:
             if record["status"] == "excluded":
                 continue
+            job = "layer_" + sha256(record["id"].encode()).hexdigest()[:24]
+            network_monitor.context = job
+            diagnostic.emit(
+                "layer_start",
+                layer_index=completed + 1,
+                job=job,
+                provider=record["provider"],
+            )
             layer_status(dict(record), completed, total)
             progress(
                 tr("Warstwa {0}/{1}: {2} — źródło {3}.").format(
@@ -615,6 +654,7 @@ def create_archive(
                                         layer.name(), count
                                     )
                                 ),
+                                diagnostic=diagnostic,
                             )
                             diagnostic.emit(
                                 "vector_read",

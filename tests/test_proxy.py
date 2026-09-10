@@ -144,6 +144,17 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(manifest["parallel"]["completed_in_workers"], 1)
         self.assertTrue(manifest["local_layer_audit"]["passed"])
         self.assertTrue(self.proxy_requests)
+        replies = [
+            e["details"]
+            for e in self.diagnostic_events
+            if e.get("details", {}).get("event") == "network_reply"
+        ]
+        self.assertTrue(replies)
+        self.assertTrue(any(e["seconds"] is not None for e in replies))
+        self.assertTrue(any(e["http_status"] == 200 for e in replies))
+        # Replies started before observation (e.g. startup/cache) stay unattributed.
+        self.assertTrue(any(e["context"] is not None for e in replies))
+
         self.assertTrue(
             any(
                 e.get("details", {}).get("event") == "proxy_authentication_requested"

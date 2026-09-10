@@ -7,7 +7,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from .diagnostics import Diagnostics, network_details
+from .adaptive import write_state
+from .diagnostics import Diagnostics, NetworkDiagnostics, network_details
 from .i18n import tr
 
 
@@ -17,7 +18,7 @@ def main():
     diagnostic.emit("worker_bootstrap")
     stage = "bootstrap"
     network_error = {}
-    project = gate = None
+    project = gate = network_monitor = None
     last_progress = 0.0
     server_warnings = []
     last_message = ""
@@ -33,19 +34,16 @@ def main():
                 return
             last_progress = time.monotonic()
         try:
-            temporary = folder / "progress.new"
-            temporary.write_text(
-                json.dumps(
-                    {
-                        "message": last_message or message,
-                        "stage": stage,
-                        "updated_at": time.time(),
-                        "server_warnings": server_warnings,
-                    }
-                ),
-                encoding="utf-8",
+            write_state(
+                folder / "progress.json",
+                {
+                    "message": last_message or message,
+                    "stage": stage,
+                    "updated_at": time.time(),
+                    "server_warnings": server_warnings,
+                },
+                diagnostic=diagnostic,
             )
-            temporary.replace(folder / "progress.json")
         except OSError:
             pass
 
@@ -53,15 +51,13 @@ def main():
         network = json.load(sys.stdin)
         progress(tr("Uruchamianie QGIS…"))
         from qgis.core import (
+            Qgis,
             QgsApplication,
             QgsCoordinateReferenceSystem,
             QgsGeometry,
-            QgsNetworkAccessManager,
-            QgsNetworkReplyContent,
             QgsProject,
         )
         from qgis.PyQt.QtCore import QCoreApplication
-        from qgis.PyQt.QtNetwork import QNetworkReply, QNetworkRequest
 
         from .adaptive import WorkerGate
         from .raster_archive import write_rendered_raster
@@ -71,24 +67,24 @@ def main():
         app = QgsApplication([], False)
         app.initQgis()
         app.setMaxThreads(1)
+        diagnostic.emit(
+            "worker_environment",
+            qgis=Qgis.QGIS_VERSION,
+            python=".".join(map(str, sys.version_info[:3])),
+        )
         stage = "network_setup"
         configure_network(network, diagnostic)
         diagnostic.emit("worker_network_configuration", **network_details(network))
 
-        def finished(reply):
-            status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
-            if reply.error() != QNetworkReply.NoError or (status and status >= 400):
-                network_error.update(http_status=status, qt_error=int(reply.error()))
-                diagnostic.emit("network_error", stage=stage, **network_error)
-
-        QgsNetworkAccessManager.instance().finished[QgsNetworkReplyContent].connect(
-            finished
-        )
+        network_monitor = NetworkDiagnostics(diagnostic)
+        network_monitor.context = parameters["table"]
+        network_error = network_monitor.last_error
         gate = (
             WorkerGate(
                 folder,
                 lambda: (folder / "cancel").exists(),
                 QCoreApplication.processEvents,
+                diagnostic=diagnostic,
             )
             if parameters.get("adaptive")
             else None
@@ -102,7 +98,15 @@ def main():
         layer = project.mapLayer(parameters["layer_id"])
         if layer is None or not layer.isValid():
             raise RuntimeError()
-        diagnostic.emit("source_opened", valid=layer.isValid())
+        diagnostic.emit(
+            "source_opened",
+            valid=layer.isValid(),
+            provider=layer.providerType(),
+            crs=layer.crs().authid(),
+            scale_visibility=layer.hasScaleBasedVisibility(),
+            minimum_scale=layer.minimumScale(),
+            maximum_scale=layer.maximumScale(),
+        )
         stage = "render"
         result = write_rendered_raster(
             layer,
@@ -115,6 +119,21 @@ def main():
             lambda: (folder / "cancel").exists(),
             progress,
             gate=gate,
+        )
+        raster_stats = result.get("raster", {})
+        diagnostic.emit(
+            "render_result",
+            status=result.get("status"),
+            levels=[
+                {
+                    key: level[key]
+                    for key in ("zoom", "nonempty", "empty", "failed", "total")
+                    if key in level
+                }
+                for level in raster_stats.get("levels", [])
+            ],
+            stopped_early=raster_stats.get("stopped_early"),
+            retries=raster_stats.get("retries"),
         )
         result["worker_pid"] = os.getpid()
         result["started_at"] = started
@@ -139,6 +158,8 @@ def main():
         )
         return 1
     finally:
+        if network_monitor:
+            network_monitor.close()
         if gate:
             gate.close()
         if project:

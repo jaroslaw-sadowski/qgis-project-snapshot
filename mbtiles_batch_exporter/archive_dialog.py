@@ -837,8 +837,8 @@ class ArchiveDialog(QDialog):
     def _show_server_warning(self, message):
         if (
             message.startswith(("[HTTP 429]", "[HTTP 503]"))
-            and message not in self._server_warnings
-        ):
+            or message == tr("Koordynator pobierania zakończył pracę z błędem.")
+        ) and message not in self._server_warnings:
             self._server_warnings.add(message)
             self.server_warning.setText(message)
             self.server_warning.show()
@@ -874,6 +874,8 @@ class ArchiveDialog(QDialog):
         self.elapsed.setText(text)
 
     def _layer_status(self, record, completed, total):
+        if record.get("worker_error", {}).get("stage") == "coordinator":
+            self._show_server_warning(record["reason"])
         for warning in record.get("raster", {}).get("server_warnings", []):
             self._show_server_warning(warning)
         item = self._items.get(record["id"])

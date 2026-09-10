@@ -76,3 +76,164 @@ def network_details(snapshot):
         "timeout_ms": snapshot.get("timeout"),
         "route": "not_observed; configuration alone does not prove proxy use",
     }
+
+
+def response_details(reply):
+    """Whitelist response metadata; never persist headers or response bodies."""
+    import re
+
+    from qgis.PyQt.QtNetwork import QNetworkRequest
+
+    mime = bytes(reply.rawHeader(b"Content-Type")).split(b";", 1)[0].lower().strip()
+    known = (
+        b"image/png",
+        b"image/jpeg",
+        b"text/xml",
+        b"application/xml",
+        b"text/html",
+        b"application/json",
+        b"application/gml+xml",
+    )
+    result = {
+        "http_status": reply.attribute(QNetworkRequest.HttpStatusCodeAttribute),
+        "qt_error": int(reply.error()),
+        "content_type": mime.decode("ascii") if mime in known else "other",
+        "from_cache": bool(reply.attribute(QNetworkRequest.SourceIsFromCacheAttribute)),
+    }
+    if b"xml" in mime or mime == b"text/html":
+        prefix = bytes(reply.content()[:16384])
+        result["body_available"] = bool(prefix)
+        result["ogc_exception"] = bool(
+            re.search(
+                rb"<(?:\w+:)?(?:ExceptionReport|ServiceExceptionReport)\b", prefix
+            )
+        )
+        codes = re.findall(rb'(?:exceptionCode|code)=["\x27]([^"\x27]+)', prefix)
+        known_codes = {
+            b"InvalidParameterValue",
+            b"MissingParameterValue",
+            b"LayerNotDefined",
+            b"StyleNotDefined",
+            b"InvalidCRS",
+            b"OperationNotSupported",
+            b"NoApplicableCode",
+        }
+        if result["ogc_exception"]:
+            result["ogc_codes"] = sorted(
+                {c.decode("ascii") if c in known_codes else "other" for c in codes}
+            )
+        if re.search(rb"<(?:\w+:)?FeatureCollection\b", prefix):
+            for key in ("numberReturned", "numberMatched", "numberOfFeatures"):
+                match = re.search(key.encode() + rb'=["\x27](\d{1,15})["\x27]', prefix)
+                if match:
+                    result[key] = int(match[1])
+    return result
+
+
+class NetworkDiagnostics:
+    """Observe QGIS signals; sample repeated replies and retain aggregate totals."""
+
+    def __init__(self, diagnostic):
+        from qgis.core import (
+            QgsNetworkAccessManager,
+            QgsNetworkReplyContent,
+            QgsNetworkRequestParameters,
+        )
+
+        self.diagnostic = diagnostic
+        self.context = None
+        self.pending = {}
+        self.groups = {}
+        self.last_error = {}
+        manager = QgsNetworkAccessManager.instance()
+        self.started_signal = manager.requestAboutToBeCreated[
+            QgsNetworkRequestParameters
+        ]
+        self.finished_signal = manager.finished[QgsNetworkReplyContent]
+        self.started_signal.connect(self.started)
+        self.finished_signal.connect(self.finished)
+
+    def started(self, parameters):
+        import time
+
+        if len(self.pending) >= 4096:
+            self.diagnostic.emit("network_timing_overflow", count=len(self.pending))
+            self.pending.clear()
+        self.pending[parameters.requestId()] = (time.monotonic(), self.context)
+
+    def finished(self, reply):
+        try:
+            self._finished(reply)
+        except Exception as error:
+            # A diagnostic Qt slot must never abort the application's event loop.
+            self.diagnostic.error("network_observer_error", error)
+
+    def _finished(self, reply):
+        import re
+        import time
+
+        from qgis.PyQt.QtCore import QUrlQuery
+
+        started, context = self.pending.pop(reply.requestId(), (None, None))
+        url = reply.request().url()
+        operation = "other"
+        request_crs = None
+        bbox_present = False
+        for key, value in QUrlQuery(url).queryItems():
+            if key.lower() == "request" and value.lower() in (
+                "getmap",
+                "gettile",
+                "getfeature",
+                "getcapabilities",
+                "describefeaturetype",
+            ):
+                operation = value.lower()
+            if key.lower() in ("crs", "srs", "srsname"):
+                match = re.fullmatch(
+                    r"(?:EPSG:|urn:ogc:def:crs:EPSG:[^:]*:)([0-9]{1,6})", value
+                )
+                request_crs = "EPSG:" + match[1] if match else "other"
+            if key.lower() == "bbox":
+                bbox_present = True
+        details = response_details(reply)
+        details.update(request_crs=request_crs, bbox_present=bbox_present)
+        if details["qt_error"] or (
+            details["http_status"] and details["http_status"] >= 400
+        ):
+            self.last_error.update(
+                http_status=details["http_status"], qt_error=details["qt_error"]
+            )
+        key = (context, url.host(), operation, json.dumps(details, sort_keys=True))
+        summary = self.groups.setdefault(
+            key, {"count": 0, "timed_count": 0, "seconds": 0.0}
+        )
+        summary["count"] += 1
+        elapsed = None if started is None else max(0.0, time.monotonic() - started)
+        if elapsed is not None:
+            summary["timed_count"] += 1
+            summary["seconds"] += elapsed
+        if summary["count"] <= 3:
+            self.diagnostic.emit(
+                "network_reply",
+                context=context,
+                host=url.host(),
+                operation=operation,
+                seconds=elapsed,
+                **details,
+            )
+
+    def close(self):
+        self.started_signal.disconnect(self.started)
+        self.finished_signal.disconnect(self.finished)
+        for (context, host, operation, details), summary in self.groups.items():
+            self.diagnostic.emit(
+                "network_summary",
+                context=context,
+                host=host,
+                operation=operation,
+                **json.loads(details),
+                **summary,
+            )
+        self.diagnostic.emit(
+            "network_observer_end", unmatched_requests=len(self.pending)
+        )

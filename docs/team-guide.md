@@ -1,9 +1,9 @@
-# qgis-project-snapshot — instrukcja 0.9.1
+# qgis-project-snapshot — instrukcja 0.9.3
 
 ## Instalacja i uruchomienie
 
 1. QGIS: **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-0.9.1.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-0.9.3.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
 
 Wymagane: QGIS 3.40, PyQt5 i GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
@@ -138,3 +138,54 @@ adresów usług, treści wyjątków dostawców ani wartości atrybutów obiektó
 Konfiguracja proxy i zaobserwowane żądanie uwierzytelnienia są rozróżniane;
 brak żądania uwierzytelnienia nie oznacza, że proxy nie było używane.
 Wynik pusty jest oznaczany w diagnostyce, ale nie dowodzi poprawności źródła.
+
+## Próba poprawki Windows 0.9.3
+
+1. Zainstaluj ZIP 0.9.3 przez „Wtyczki → Zarządzanie i instalowanie wtyczek →
+   Instaluj z ZIP”, zamknij cały QGIS i uruchom go ponownie. Sprawdź wersję
+   w menedżerze wtyczek. Zachowaj firmowe ustawienia proxy.
+2. Użyj tego samego komputera. W projekcie źródłowym wybierz mały obszar,
+   na którym widać treść 3–5 publicznych WMS/WMTS. Nie wybieraj standardowych
+   kafelków OSM do tej próby. Ustaw zoom 16–17 i „Bieżący widok mapy”.
+3. Dodaj jeden WFS, na którym w tym obszarze widać konkretne obiekty.
+   Zanotuj jego nazwę i przybliżoną liczbę widocznych obiektów. W archiwizacji
+   zaznacz tylko te warstwy. Zapisz do nowego lokalnego folderu, poza OneDrive
+   i dyskiem sieciowym. Nie kasuj poprzednich wyników.
+4. Po zakończeniu zachowaj `diagnostic.jsonl`, `manifest.json` i `raport.html`.
+   Zamknij projekt źródłowy i QGIS. Odłącz sieć, uruchom QGIS i otwórz plik
+   `_archive_...qgz` z nowego folderu. Sprawdź treść map i obiekty WFS w tym
+   samym obszarze i przy skalach odpowiadających zapisanym zoomom. Zrzut ekranu
+   wyniku może pomóc, ale same pliki diagnostyczne nie dowodzą zgodności obrazu.
+5. Przekaż te trzy pliki oraz informację, które warstwy widać offline,
+   które są puste i czy działało „Przerwij”. Na razie nie potrzeba drugiego
+   komputera, konkretnego adresu proxy ani wyłączania zabezpieczeń.
+
+Dopiero po poprawnym małym teście zwiększ liczbę warstw i zoom do 20.
+Jeśli ponownie wystąpi błąd, najpierw przekaż log z tej wersji. Diagnostyka
+rozróżnia `ipc_replace_retry`, `ipc_replace_recovered` i `ipc_replace_failed`.
+Ta poprawka dotyczy awarii plików sterujących; nie potwierdza jeszcze poprawnego
+odczytu wszystkich firmowych WFS ani przyczyny ich wcześniejszych pustych wyników.
+
+## Rozszerzona diagnostyka 0.9.3
+
+Użyj wersji 0.9.3 do opisanej wyżej próby — zawiera także poprawkę blokad Windows.
+`diagnostic.jsonl` dodatkowo podaje:
+
+- powiązanie numeru wybranej warstwy z technicznym identyfikatorem procesu;
+- etapy odczytu wektorów, CRS, obecność filtra i edycji, liczbę odebranych,
+  zapisanych i pominiętych obiektów oraz stan iteratora i zapisu GeoPackage;
+- host, rozpoznany rodzaj zapytania, CRS żądania, kod HTTP/Qt, czas, typ odpowiedzi
+  i informację o pamięci podręcznej; trzy przykłady i sumy powtarzających się odpowiedzi;
+- rozpoznane błędy OGC w XML, także przy HTTP 200, oraz liczniki WFS z początku
+  odpowiedzi XML, jeśli QGIS udostępnia jej treść;
+- wersję QGIS/Pythona procesu, ograniczenia widoczności warstwy według skali,
+  liczniki pustych i niepustych kafelków oraz wolne miejsce przed eksportem.
+
+To obserwacja zwykłego eksportu, bez dodatkowych zapytań testowych. Brak treści
+odpowiedzi lub brak licznika WFS oznacza brak informacji, a nie zero obiektów.
+Kontekst głównej warstwy oznacza warstwę przetwarzaną w chwili rozpoczęcia
+żądania; równoczesne działania QGIS mogą wymagać dodatkowego porównania hostów.
+Nie zapisujemy adresów usług ze ścieżką/parametrami, treści odpowiedzi, atrybutów,
+haseł ani loginów. Nadal przekazuj również manifest, aby dopasować nazwy warstw.
+Żaden log nie gwarantuje wskazania przyczyny po stronie serwera lub zabezpieczeń
+komputera; w takim przypadku diagnostyka ma pokazać, czego nie udało się ustalić.

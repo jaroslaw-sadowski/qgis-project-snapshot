@@ -17,7 +17,7 @@ modyfikować i udostępniać na warunkach [licencji](LICENSE).
 ## Jak używać
 
 Wymaga QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7. Interfejs wybiera polski
-lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.1**.
+lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.3**.
 
 1. Zainstaluj paczkę przez **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
 2. Otwórz projekt i wybierz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**
@@ -72,13 +72,13 @@ nie certyfikat QGIS ani gwarancja poprawności dowolnego projektu.
 
 ## Paczka i rozwój
 
-Repozytorium zawiera źródła. Aby przygotować ZIP **0.9.1**, uruchom:
+Repozytorium zawiera źródła. Aby przygotować ZIP **0.9.3**, uruchom:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-Paczka `qgis-project-snapshot-0.9.1.zip` i suma SHA-256 powstaną w `dist/`.
+Paczka `qgis-project-snapshot-0.9.3.zip` i suma SHA-256 powstaną w `dist/`.
 Ten katalog nie jest przechowywany w Git. Samo przygotowanie ZIP-a nie oznacza
 publikacji w katalogu wtyczek QGIS.
 
