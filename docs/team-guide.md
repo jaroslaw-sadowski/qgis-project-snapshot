@@ -1,9 +1,9 @@
-# qgis-project-snapshot — instrukcja 0.9.3
+# qgis-project-snapshot — instrukcja 0.9.4
 
 ## Instalacja i uruchomienie
 
 1. QGIS: **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-0.9.3.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-0.9.4.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
 
 Wymagane: QGIS 3.40, PyQt5 i GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
@@ -139,9 +139,9 @@ Konfiguracja proxy i zaobserwowane żądanie uwierzytelnienia są rozróżniane;
 brak żądania uwierzytelnienia nie oznacza, że proxy nie było używane.
 Wynik pusty jest oznaczany w diagnostyce, ale nie dowodzi poprawności źródła.
 
-## Próba poprawki Windows 0.9.3
+## Próba poprawki Windows 0.9.4
 
-1. Zainstaluj ZIP 0.9.3 przez „Wtyczki → Zarządzanie i instalowanie wtyczek →
+1. Zainstaluj ZIP 0.9.4 przez „Wtyczki → Zarządzanie i instalowanie wtyczek →
    Instaluj z ZIP”, zamknij cały QGIS i uruchom go ponownie. Sprawdź wersję
    w menedżerze wtyczek. Zachowaj firmowe ustawienia proxy.
 2. Użyj tego samego komputera. W projekcie źródłowym wybierz mały obszar,
@@ -168,7 +168,7 @@ odczytu wszystkich firmowych WFS ani przyczyny ich wcześniejszych pustych wynik
 
 ## Rozszerzona diagnostyka 0.9.3
 
-Użyj wersji 0.9.3 do opisanej wyżej próby — zawiera także poprawkę blokad Windows.
+Użyj wersji 0.9.4 do opisanej wyżej próby — zawiera także poprawkę blokad Windows.
 `diagnostic.jsonl` dodatkowo podaje:
 
 - powiązanie numeru wybranej warstwy z technicznym identyfikatorem procesu;
@@ -189,3 +189,28 @@ Nie zapisujemy adresów usług ze ścieżką/parametrami, treści odpowiedzi, at
 haseł ani loginów. Nadal przekazuj również manifest, aby dopasować nazwy warstw.
 Żaden log nie gwarantuje wskazania przyczyny po stronie serwera lub zabezpieczeń
 komputera; w takim przypadku diagnostyka ma pokazać, czego nie udało się ustalić.
+
+## Pobieranie i przerwanie w 0.9.4
+
+Gotowe mapy są scalane na bieżąco, niezależnie od kolejności źródeł w projekcie.
+Wolna mapa nie zatrzymuje odbioru innych map ani późniejszych warstw wektorowych.
+„Przerwij” zatrzymuje dalsze pobieranie i zachowuje ukończone wyniki; końcowe
+scalanie może jeszcze potrwać. Układ i kolejność warstw w zapisanym projekcie
+pozostają takie jak w oryginale.
+
+Budżet procesów jest sprawdzany co pięć sekund. Przy 3,83 GiB dostępnego RAM,
+rezerwie 2 GiB i szacunku 1 GiB/proces nadal wynosi jeden. Po odzyskaniu pamięci
+może wzrosnąć. Okno pokazuje dostępny RAM, limit i czekanie na wolny proces;
+szczegóły są w podpowiedzi. Spadek budżetu nie przerywa działających procesów.
+
+Limit czasu QGIS bywa raportowany jako kod Qt 5. Wtyczka rozpoznaje teraz natywny
+sygnał timeoutu, także po przekierowaniu usługi; automat robi przerwę i ogranicza
+obciążenie. Nie zwiększamy samodzielnie firmowego timeoutu ani nie zmieniamy proxy.
+Zwykłe anulowanie żądania nie jest bezwarunkowo uznawane za timeout.
+
+Najpierw wykonaj mały test 3–5 WMS/WMTS i jednego WFS, zoom 16–17, zachowując
+raport, manifest i diagnostykę. Sprawdź mapy offline. W oddzielnej próbie przerwij
+eksport, gdy co najmniej jedna mapa ma status zakończony, i sprawdź zachowany wynik.
+Dopiero później zwiększ obszar i zoom. Dla obszaru z dostarczonego raportu zoom
+16–20 oznaczał 3644 kafelki na mapę, a dla 172 map szacunkowo do 626 768 operacji.
+Pobieranie dużego projektu nadal może długo trwać; czas zależy od serwerów i RAM.

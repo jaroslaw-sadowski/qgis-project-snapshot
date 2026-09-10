@@ -1098,5 +1098,25 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <source>nie rozpoznano</source>
       <translation>not detected</translation>
     </message>
+    <message>
+      <source>Pobieranie</source>
+      <translation>Downloading</translation>
+    </message>
+    <message>
+      <source>Czeka na wolny proces</source>
+      <translation>Waiting for a free process</translation>
+    </message>
+    <message>
+      <source>Dostępny RAM: {0:.1f} GiB; rezerwa: 2 GiB</source>
+      <translation>Available RAM: {0:.1f} GiB; reserve: 2 GiB</translation>
+    </message>
+    <message>
+      <source>Dostępny RAM: nieznany; maks. 2 procesy</source>
+      <translation>Available RAM: unknown; max. 2 processes</translation>
+    </message>
+    <message>
+      <source>Dostępne CPU: {0}. Budżet procesów: {1}. Na proces przyjmujemy 1 GiB RAM po pozostawieniu rezerwy 2 GiB. Budżet sprawdzamy co 5 sekund. Spadek budżetu nie kończy działających procesów; wstrzymuje uruchamianie kolejnych.</source>
+      <translation>Available CPUs: {0}. Process budget: {1}. We allow 1 GiB of RAM per process after keeping a 2 GiB reserve. The budget is checked every 5 seconds. A lower budget does not stop existing processes; it pauses the launch of new ones.</translation>
+    </message>
   </context>
 </TS>

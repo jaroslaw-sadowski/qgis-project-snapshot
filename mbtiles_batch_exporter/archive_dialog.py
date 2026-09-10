@@ -204,8 +204,9 @@ class ArchiveDialog(QDialog):
         ram_icon.setPixmap(
             QIcon(str(Path(__file__).with_name("ram.svg"))).pixmap(22, 22)
         )
-        ram_hint = QLabel(tr("Rezerwa RAM: 2 GiB"))
-        ram_hint.setToolTip(
+        self.ram_hint = QLabel(tr("Rezerwa RAM: 2 GiB"))
+        self.ram_hint.setWordWrap(True)
+        self.ram_hint.setToolTip(
             tr(
                 (
                     "Automat pozostawia 2 GiB pamięci dla QGIS i systemu. "
@@ -215,9 +216,9 @@ class ArchiveDialog(QDialog):
                 )
             )
         )
-        ram_icon.setToolTip(ram_hint.toolTip())
+        ram_icon.setToolTip(self.ram_hint.toolTip())
         resources.addWidget(ram_icon)
-        resources.addWidget(ram_hint)
+        resources.addWidget(self.ram_hint)
         layout.addLayout(resources)
         layout.addWidget(self.servers)
         self.status = QLabel(tr("Gotowe do wyboru obszaru i folderu."))
@@ -469,6 +470,8 @@ class ArchiveDialog(QDialog):
             "finished": tr("Zakończono"),
             "failed": tr("Zakończono z błędami"),
             "starting": tr("Rozpoczynanie"),
+            "running": tr("Pobieranie"),
+            "capacity": tr("Czeka na wolny proces"),
             "increasing": tr("Zwiększanie"),
             "stable": tr("Ustalony limit"),
             "cooldown": tr("Przerwa serwera"),
@@ -501,6 +504,21 @@ class ArchiveDialog(QDialog):
                 sum(r["active"] for r in rows),
             )
         )
+        if rows and "memory_available" in rows[0]:
+            memory = rows[0]["memory_available"]
+            self.ram_hint.setText(
+                tr("Dostępny RAM: {0:.1f} GiB; rezerwa: 2 GiB").format(memory / 1024**3)
+                if memory is not None
+                else tr("Dostępny RAM: nieznany; maks. 2 procesy")
+            )
+            explanation = tr(
+                "Dostępne CPU: {0}. Budżet procesów: {1}. "
+                "Na proces przyjmujemy 1 GiB RAM po pozostawieniu rezerwy 2 GiB. "
+                "Budżet sprawdzamy co 5 sekund. Spadek budżetu nie kończy "
+                "działających procesów; wstrzymuje uruchamianie kolejnych."
+            ).format(rows[0].get("cpu", "?"), rows[0]["budget"])
+            self.resource_hint.setToolTip(explanation)
+            self.ram_hint.setToolTip(explanation)
 
     def _populate_tree(self, node, parent):
         for child in node.children():
@@ -674,6 +692,8 @@ class ArchiveDialog(QDialog):
         self.resource_hint.setText(
             tr("Równoległość dobierana automatycznie podczas pobierania.")
         )
+        self.resource_hint.setToolTip("")
+        self.ram_hint.setText(tr("Rezerwa RAM: 2 GiB"))
         self.servers.clear()
         self._server_items.clear()
         self._server_warnings.clear()

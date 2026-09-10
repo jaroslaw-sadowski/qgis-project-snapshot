@@ -125,15 +125,18 @@ class ResponseDiagnosticsTests(unittest.TestCase):
             observer.diagnostic = log
             observer.pending = {}
             observer.groups = {}
+            observer.timed_out_requests = set()
+            observer.timeout_groups = {}
             observer.last_error = {}
             observer.started_signal = Mock()
             observer.finished_signal = Mock()
+            observer.timeout_signal = Mock()
             reply = self.reply(b"")
             reply.requestId.return_value = 1
             reply.request.return_value = QNetworkRequest(
                 QUrl(
                     "https://private-user:secret-password@example.test/private-path"
-                    "?request=GetFeature&token=secret-token&srsname=EPSG:2180"
+                    "?request=GetFeature&token=secret-token&srsname=EPSG%3A2180"
                 )
             )
             for _ in range(10):
@@ -154,3 +157,61 @@ class ResponseDiagnosticsTests(unittest.TestCase):
                 "secret-token",
             ):
                 self.assertNotIn(secret, text)
+
+    def test_native_qgis_timeouts_are_counted_separately_from_user_aborts(self):
+        from unittest.mock import Mock, patch
+
+        from qgis.PyQt.QtCore import QUrl
+        from qgis.PyQt.QtNetwork import QNetworkReply, QNetworkRequest
+
+        from mbtiles_batch_exporter.diagnostics import NetworkDiagnostics
+
+        observer = NetworkDiagnostics.__new__(NetworkDiagnostics)
+        observer.diagnostic = Mock()
+        observer.context = "layer_test"
+        observer.pending = {}
+        observer.groups = {}
+        observer.timed_out_requests = set()
+        observer.timeout_groups = {}
+        observer.last_error = {}
+        observer.started_signal = Mock()
+        observer.finished_signal = Mock()
+        observer.timeout_signal = Mock()
+        request = QNetworkRequest(
+            QUrl("https://example.test/private?token=secret&REQUEST=GetMap")
+        )
+        parameters = Mock()
+        parameters.request.return_value = request
+        reply = self.reply(b"", b"image/png")
+        reply.error.return_value = QNetworkReply.OperationCanceledError
+        reply.attribute.return_value = None
+        reply.request.return_value = request
+        with patch("time.monotonic", return_value=15.0):
+            for request_id in range(4):
+                parameters.requestId.return_value = request_id
+                reply.requestId.return_value = request_id
+                observer.pending[request_id] = (10.0, "layer_test")
+                observer.timed_out(parameters)
+                observer.timed_out(parameters)  # Duplicate notification is harmless.
+                observer.finished(reply)
+        self.assertEqual(observer.last_error["qt_error"], 5)
+        self.assertTrue(observer.last_error["qgis_timeout"])
+        self.assertFalse(observer.timed_out_requests)
+
+        # Qt's abort code alone does not prove a timeout, e.g. user cancellation.
+        reply.requestId.return_value = 5
+        observer.finished(reply)
+        self.assertFalse(observer.last_error["qgis_timeout"])
+        observer.close()
+        calls = observer.diagnostic.emit.call_args_list
+        self.assertEqual(sum(c.args[0] == "network_timeout" for c in calls), 3)
+        summary = next(
+            c.kwargs for c in calls if c.args[0] == "network_timeout_summary"
+        )
+        self.assertEqual(summary["count"], 4)
+        self.assertEqual(summary["seconds"], 20.0)
+        self.assertEqual(summary["context"], "layer_test")
+        self.assertEqual(summary["host"], "example.test")
+        serialized = str(calls)
+        self.assertNotIn("private", serialized)
+        self.assertNotIn("secret", serialized)

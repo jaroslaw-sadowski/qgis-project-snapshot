@@ -15,7 +15,11 @@ import test_archive_progress as progress_fixtures
 
 from mbtiles_batch_exporter import i18n
 from mbtiles_batch_exporter.parallel_archive import RasterWorkers
-from mbtiles_batch_exporter.resources import detect_resources, recommend
+from mbtiles_batch_exporter.resources import (
+    available_memory,
+    detect_resources,
+    recommend,
+)
 
 
 class LocaleTests(unittest.TestCase):
@@ -152,6 +156,54 @@ class OptionsTests(unittest.TestCase):
         finally:
             dialog.close()
 
+    def test_live_memory_budget_and_waiting_status_in_both_languages(self):
+        for language, waiting, downloading, unknown in (
+            ("pl", "Czeka na wolny proces", "Pobieranie", "nieznany"),
+            ("en", "Waiting for a free process", "Downloading", "unknown"),
+        ):
+            with self.subTest(language=language):
+                with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE=language):
+                    dialog = self.dialog()
+                    try:
+                        row = {
+                            "host": "example.invalid",
+                            "active": 0,
+                            "processes": 0,
+                            "limit": 1,
+                            "queued": 5,
+                            "rate": 0.0,
+                            "state": "capacity",
+                            "pause": 0,
+                            "budget": 1,
+                            "memory_available": 4111540224,
+                            "cpu": 14,
+                        }
+                        dialog._server_activity([row])
+                        self.assertEqual(
+                            dialog._server_items[row["host"]].text(4), waiting
+                        )
+                        self.assertIn("3.8 GiB", dialog.ram_hint.text())
+                        self.assertIn("14", dialog.resource_hint.toolTip())
+                        self.assertIn("1 GiB", dialog.ram_hint.toolTip())
+                        row.update(
+                            state="running",
+                            active=1,
+                            processes=1,
+                            budget=3,
+                            memory_available=5 * 1024**3,
+                        )
+                        dialog._server_activity([row])
+                        self.assertEqual(
+                            dialog._server_items[row["host"]].text(4), downloading
+                        )
+                        self.assertIn("1/3", dialog.resource_hint.text())
+                        self.assertIn("5.0 GiB", dialog.ram_hint.text())
+                        row.update(memory_available=None, budget=2)
+                        dialog._server_activity([row])
+                        self.assertIn(unknown, dialog.ram_hint.text())
+                    finally:
+                        dialog.close()
+
     def test_empty_partial_failed_retry_but_saved_and_excluded_do_not(self):
         layers = [self.layer] + [self.add_points(str(i), [(3, 3)]) for i in range(5)]
         dialog = self.dialog()
@@ -178,6 +230,33 @@ class OptionsTests(unittest.TestCase):
 
 
 class ResourceTests(unittest.TestCase):
+    def test_windows_memory_uses_available_physical_bytes(self):
+        def status(output):
+            native = output._obj
+            self.assertEqual(native.length, 64)
+            native.total = 16 * 1024**3
+            native.available = 4111540224
+            native.virtual_available = 128 * 1024**3
+            return 1
+
+        with (
+            patch("mbtiles_batch_exporter.resources.sys.platform", "win32"),
+            patch("mbtiles_batch_exporter.resources.ctypes.windll", create=True) as dll,
+        ):
+            dll.kernel32.GlobalMemoryStatusEx.side_effect = status
+            self.assertEqual(available_memory(), 4111540224)
+            dll.kernel32.GlobalMemoryStatusEx.side_effect = None
+            dll.kernel32.GlobalMemoryStatusEx.return_value = 0
+            self.assertIsNone(available_memory())
+
+    def test_budget_can_recover_without_exceeding_cpu_or_memory(self):
+        gib = 1024**3
+        self.assertEqual(recommend(14, 4111540224, True), 1)
+        self.assertEqual(recommend(14, 5 * gib, True), 3)
+        self.assertEqual(recommend(14, 3 * gib, True), 1)
+        self.assertEqual(recommend(14, None, True), 2)
+        self.assertEqual(recommend(14, 40 * gib, True), 28)
+
     def test_budgets_respect_ram_cpu_and_server_capacity(self):
         gb = 1024**3
         self.assertEqual(recommend(32, 3 * gb, True), 1)

@@ -156,11 +156,25 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
     source_uri.setEncodedUri(layer.source())
     service = QUrl(source_uri.param("url"))
     network = QgsNetworkAccessManager.instance()
-    requests, network_errors = set(), []
+    requests, request_threads, network_errors = set(), set(), []
 
     def request_created(request):
-        if service.host() and request.request().url().host() == service.host():
+        # Redirects and tiled services may download from another host. Follow
+        # the renderer's network thread after its first source request, without
+        # collecting unrelated desktop QGIS requests from other threads.
+        thread = request.originatingThreadId()
+        if (service.host() and request.request().url().host() == service.host()) or (
+            thread and thread in request_threads
+        ):
             requests.add(request.requestId())
+            if thread:
+                request_threads.add(thread)
+
+    def request_timed_out(request):
+        if request.requestId() in requests:
+            # QGIS aborts timed-out replies, which Qt reports as
+            # OperationCanceledError (5), not TimeoutError (4).
+            network_errors.append(("timeout", None))
 
     def reply_finished(reply):
         if reply.requestId() not in requests:
@@ -192,6 +206,7 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
         request_created
     )
     network.finished[QgsNetworkReplyContent].connect(reply_finished)
+    network.requestTimedOut[QgsNetworkRequestParameters].connect(request_timed_out)
     deadline = time.monotonic() + RENDER_TIMEOUT
     timed_out = False
     last_notice = time.monotonic()
@@ -273,6 +288,9 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
             request_created
         )
         network.finished[QgsNetworkReplyContent].disconnect(reply_finished)
+        network.requestTimedOut[QgsNetworkRequestParameters].disconnect(
+            request_timed_out
+        )
 
 
 def _render_tile(
@@ -287,16 +305,24 @@ def _render_tile(
             raise InterruptedError(tr("Przerwano pobieranie obrazu."))
         try:
             if gate:
-                gate.before(retry=gate.retrying)
-            image = _render_image(
-                layer,
-                project,
-                expanded,
-                size + 2 * gutter,
-                size + 2 * gutter,
-                cancelled,
-                progress,
-            )
+                started = time.monotonic()
+                try:
+                    gate.before(retry=gate.retrying)
+                finally:
+                    counters["timing_seconds"]["gate"] += time.monotonic() - started
+            started = time.monotonic()
+            try:
+                image = _render_image(
+                    layer,
+                    project,
+                    expanded,
+                    size + 2 * gutter,
+                    size + 2 * gutter,
+                    cancelled,
+                    progress,
+                )
+            finally:
+                counters["timing_seconds"]["render"] += time.monotonic() - started
             return image.copy(gutter, gutter, size, size)
         except (InterruptedError, HostDeferred):
             raise
@@ -361,7 +387,12 @@ def _render_tile(
     return result
 
 
-def _mask_image(image, area, bounds, resolution):
+def _mask_image(image, area, bounds, resolution, stats=None):
+    started = time.monotonic()
+    if stats is not None:
+        rgba = image.convertToFormat(QImage.Format_RGBA8888)
+        raw_nonempty = any(rgba.constBits().asstring(rgba.sizeInBytes())[3::4])
+        stats["raw_nonempty" if raw_nonempty else "raw_empty"] += 1
     clipped = area.intersection(QgsGeometry.fromRect(bounds))
     if clipped.lastError() or (not clipped.isEmpty() and not clipped.isGeosValid()):
         raise RuntimeError(tr("Nie udało się wyznaczyć maski fragmentu mapy."))
@@ -395,7 +426,14 @@ def _mask_image(image, area, bounds, resolution):
     painter.setCompositionMode(QPainter.CompositionMode_DestinationIn)
     painter.drawImage(0, 0, mask)
     painter.end()
-    return image.convertToFormat(QImage.Format_RGBA8888)
+    result = image.convertToFormat(QImage.Format_RGBA8888)
+    if stats is not None:
+        if raw_nonempty and not any(
+            result.constBits().asstring(result.sizeInBytes())[3::4]
+        ):
+            stats["masked_out"] += 1
+        stats["timing_seconds"]["mask"] += time.monotonic() - started
+    return result
 
 
 def write_rendered_raster(
@@ -473,6 +511,10 @@ def write_rendered_raster(
         "levels": [],
         "failures": [],
         "stopped_early": False,
+        "raw_empty": 0,
+        "raw_nonempty": 0,
+        "masked_out": 0,
+        "timing_seconds": {"gate": 0.0, "render": 0.0, "mask": 0.0, "write": 0.0},
     }
     try:
         with gdal.ExceptionMgr():
@@ -618,7 +660,7 @@ def write_rendered_raster(
                                 break
                             continue
                         failures_in_a_row = 0
-                        image = _mask_image(image, mask, tile_bounds, resolution)
+                        image = _mask_image(image, mask, tile_bounds, resolution, stats)
                         # Last overview tiles can be smaller
                         # than 256 pixels at dataset edges.
                         w = min(TILE_SIZE, dataset.RasterXSize - column * TILE_SIZE)
@@ -628,6 +670,7 @@ def write_rendered_raster(
                         if not any(pixels[3::4]):
                             level_stats["empty"] += 1
                             continue
+                        started = time.monotonic()
                         dataset.WriteRaster(
                             column * TILE_SIZE,
                             row * TILE_SIZE,
@@ -639,9 +682,12 @@ def write_rendered_raster(
                             buf_line_space=image.bytesPerLine(),
                             buf_band_space=1,
                         )
+                        stats["timing_seconds"]["write"] += time.monotonic() - started
                         level_stats["nonempty"] += 1
+                    started = time.monotonic()
                     dataset.FlushCache()
                     dataset = None
+                    stats["timing_seconds"]["write"] += time.monotonic() - started
                     progress(
                         tr(
                             (
@@ -789,6 +835,20 @@ def _capture_adaptive(
                 if deferred:
                     break
                 zoom, resolution = level["zoom"], level["resolution"]
+                total, pending = ledger.execute(
+                    'SELECT count(*),sum(status IN ("pending","retry")) '
+                    "FROM tiles WHERE zoom=?",
+                    (zoom,),
+                ).fetchone()
+                if not pending:
+                    continue
+                completed = total - pending
+                progress(
+                    tr(
+                        "{0}: rozpoczęcie zoomu {1}; rozdzielczość {2:.3g} "
+                        "jednostek/piksel."
+                    ).format(layer.name(), zoom, resolution)
+                )
                 dataset = gdal.OpenEx(
                     str(database),
                     gdal.OF_RASTER | gdal.OF_UPDATE,
@@ -820,7 +880,13 @@ def _capture_adaptive(
                             progress(
                                 tr(
                                     "{0} — zoom {1}, fragment {2}/{3}, próba {4}"
-                                ).format(layer.name(), zoom, column, row, attempts + 1)
+                                ).format(
+                                    layer.name(),
+                                    zoom,
+                                    completed + 1,
+                                    total,
+                                    attempts + 1,
+                                )
                             )
                             x, y = (
                                 x0 + column * TILE_SIZE * resolution,
@@ -844,7 +910,9 @@ def _capture_adaptive(
                                     stats,
                                     gate,
                                 )
-                                image = _mask_image(image, mask, bounds, resolution)
+                                image = _mask_image(
+                                    image, mask, bounds, resolution, stats
+                                )
                                 w = min(
                                     TILE_SIZE, dataset.RasterXSize - column * TILE_SIZE
                                 )
@@ -854,6 +922,7 @@ def _capture_adaptive(
                                 image = image.copy(0, 0, w, h)
                                 pixels = image.constBits().asstring(image.sizeInBytes())
                                 empty = not any(pixels[3::4])
+                                started = time.monotonic()
                                 if not empty:
                                     dataset.WriteRaster(
                                         column * TILE_SIZE,
@@ -883,6 +952,9 @@ def _capture_adaptive(
                                     ),
                                 )
                                 ledger.commit()
+                                stats["timing_seconds"]["write"] += (
+                                    time.monotonic() - started
+                                )
                                 gate.outcome()
                                 break
                             except HostDeferred:
@@ -923,12 +995,36 @@ def _capture_adaptive(
                                 ) or isinstance(error, TimeoutError)
                                 if not overload or not retryable:
                                     break
+                        completed += 1
                         if deferred:
                             break
                 finally:
                     cursor.close()
+                    started = time.monotonic()
                     dataset.FlushCache()
                     dataset = None
+                    stats["timing_seconds"]["write"] += time.monotonic() - started
+                counts = dict(
+                    ledger.execute(
+                        "SELECT status,count(*) FROM tiles "
+                        "WHERE zoom=? GROUP BY status",
+                        (zoom,),
+                    )
+                )
+                progress(
+                    tr(
+                        "{0}: zoom {1} zakończony — zapisane {2}, puste {3}, "
+                        "błędne {4} fragmenty."
+                    ).format(
+                        layer.name(),
+                        zoom,
+                        counts.get("saved", 0),
+                        counts.get("empty", 0),
+                        sum(
+                            v for k, v in counts.items() if k not in ("saved", "empty")
+                        ),
+                    )
+                )
         stats["deferred"] = deferred
         stats["stopped_early"] = deferred
         for level in reversed(levels):

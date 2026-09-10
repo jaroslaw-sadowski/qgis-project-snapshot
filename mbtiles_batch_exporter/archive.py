@@ -31,6 +31,7 @@ from qgis.core import (
     QgsVectorFileWriter,
     QgsVectorLayer,
 )
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtXml import QDomDocument
 
 from .archive_resources import ProjectResources, audit_local_layers
@@ -409,6 +410,38 @@ def _local_project(snapshot, destination, records, resources=None):
     return resource_report
 
 
+def _ready_records(records, parallel, cancelled, progress):
+    """Consume ready work without blocking other layers behind one slow host."""
+    pending = [r for r in records if r["status"] != "excluded"]
+    while pending:
+        if cancelled() and parallel:
+            parallel.stop.set()
+        index = next(
+            (
+                i
+                for i, record in enumerate(pending)
+                if not parallel
+                or record["id"] not in parallel.futures
+                or parallel.futures[record["id"]][0].done()
+            ),
+            None,
+        )
+        if index is not None:
+            yield pending.pop(index)
+        elif cancelled() and not any(
+            parallel.futures[r["id"]][0].running()
+            for r in pending
+            if parallel and r["id"] in parallel.futures
+        ):
+            # Supervisors settle first: a process may already have written its
+            # completed result while its Future is still being finalized.
+            yield pending.pop(0)
+        else:
+            QCoreApplication.processEvents()
+            progress(tr("Równoległe pobieranie map — oczekiwanie na warstwę…"))
+            time.sleep(0.05)
+
+
 def create_archive(
     project,
     selected_ids,
@@ -593,16 +626,24 @@ def create_archive(
                     per_server_limit,
                     adaptive,
                     diagnostic=diagnostic,
+                    cpu=resources["cpu"] if resources else None,
+                    cancelled=cancelled,
+                    progress=progress,
                 )
             )
-        for record in records:
+        indices = {
+            r["id"]: i + 1
+            for i, r in enumerate(r for r in records if r["status"] != "excluded")
+        }
+        for record in _ready_records(records, parallel, cancelled, progress):
+            layer_index = indices[record["id"]]
             if record["status"] == "excluded":
                 continue
             job = "layer_" + sha256(record["id"].encode()).hexdigest()[:24]
             network_monitor.context = job
             diagnostic.emit(
                 "layer_start",
-                layer_index=completed + 1,
+                layer_index=layer_index,
                 job=job,
                 provider=record["provider"],
             )
@@ -612,7 +653,8 @@ def create_archive(
                     completed + 1, total, record["name"], record["provider"]
                 )
             )
-            if cancelled():
+            completed_map = parallel and parallel.completed(record["id"])
+            if cancelled() and not completed_map:
                 record.update(
                     status="cancelled",
                     reason=tr("Nie zapisano — archiwizacja została przerwana."),
@@ -658,7 +700,7 @@ def create_archive(
                             )
                             diagnostic.emit(
                                 "vector_read",
-                                layer_index=completed + 1,
+                                layer_index=layer_index,
                                 provider=record["provider"],
                                 features=count,
                                 empty=count == 0,
@@ -682,7 +724,7 @@ def create_archive(
                             diagnostic.error(
                                 "layer_attempt_exception",
                                 error,
-                                layer_index=completed + 1,
+                                layer_index=layer_index,
                                 provider=record["provider"],
                             )
                             _remove_table(database, table)
@@ -734,7 +776,7 @@ def create_archive(
                             diagnostic.error(
                                 "layer_attempt_exception",
                                 error,
-                                layer_index=completed + 1,
+                                layer_index=layer_index,
                                 provider=record["provider"],
                             )
                             record["attempts"].append(
@@ -766,7 +808,11 @@ def create_archive(
                         if parallel and layer.id() in parallel.futures:
                             try:
                                 result = parallel.take(
-                                    layer.id(), database, cancelled, progress
+                                    layer.id(),
+                                    database,
+                                    cancelled,
+                                    progress,
+                                    preserve_completed=True,
                                 )
                             except InterruptedError:
                                 raise
@@ -774,7 +820,7 @@ def create_archive(
                                 diagnostic.error(
                                     "layer_attempt_exception",
                                     error,
-                                    layer_index=completed + 1,
+                                    layer_index=layer_index,
                                     provider=record["provider"],
                                 )
                                 if adaptive:
@@ -854,7 +900,7 @@ def create_archive(
                 except WorkerError as error:
                     diagnostic.emit(
                         "worker_failure",
-                        layer_index=completed + 1,
+                        layer_index=layer_index,
                         details=error.details,
                     )
                     _remove_table(database, table)
@@ -862,9 +908,7 @@ def create_archive(
                         status="failed", reason=str(error), worker_error=error.details
                     )
                 except Exception as error:
-                    diagnostic.error(
-                        "layer_exception", error, layer_index=completed + 1
-                    )
+                    diagnostic.error("layer_exception", error, layer_index=layer_index)
                     _remove_table(database, table)
                     record.update(
                         status="failed",
@@ -874,7 +918,7 @@ def create_archive(
                     )
             diagnostic.emit(
                 "layer_result",
-                layer_index=completed + 1,
+                layer_index=layer_index,
                 provider=record["provider"],
                 status=record["status"],
                 feature_count=record.get("feature_count"),
@@ -891,6 +935,8 @@ def create_archive(
         diagnostic.emit("adaptive_summary", details=adaptive_report)
         if adaptive and parallel:
             server_activity(parallel.server_activity())
+        peak_workers = parallel.peak_workers if parallel else workers
+        final_workers = parallel.workers if parallel else workers
         processes.close()
         parallel = None
         worker_activity([])
@@ -934,6 +980,8 @@ def create_archive(
                 "mode": "adaptive" if adaptive else "fixed",
                 "detected_resources": resources,
                 "workers": workers,
+                "peak_worker_budget": peak_workers,
+                "final_worker_budget": final_workers,
                 "per_server_limit": per_server_limit,
                 "completed_in_workers": sum("worker_pid" in r for r in records),
             },

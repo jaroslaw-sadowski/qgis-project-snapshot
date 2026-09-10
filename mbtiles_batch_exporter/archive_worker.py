@@ -134,6 +134,10 @@ def main():
             ],
             stopped_early=raster_stats.get("stopped_early"),
             retries=raster_stats.get("retries"),
+            raw_empty=raster_stats.get("raw_empty"),
+            raw_nonempty=raster_stats.get("raw_nonempty"),
+            masked_out=raster_stats.get("masked_out"),
+            timing_seconds=raster_stats.get("timing_seconds"),
         )
         result["worker_pid"] = os.getpid()
         result["started_at"] = started

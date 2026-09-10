@@ -1,6 +1,6 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 10 września 2026. Wersja **0.9.3** — rozszerzona diagnostyka sieci i odczytu wektorów.
+Aktualizacja: 10 września 2026. Wersja **0.9.4** — odbiór gotowych map, dynamiczny budżet i timeouty QGIS.
 Test firmowy 0.9.0 wykazał niekompletny wynik: zapisano 39/211 warstw,
 172 mapy nieudane, wszystkie trzy WFS puste, coordinator_failed=true.
 Nie uznawaj wcześniejszych testów Ubuntu za potwierdzenie działania na Windows.
@@ -9,12 +9,49 @@ w `_coordinate → write_state → Path.replace`, podczas podmiany control.json.
 Następstwem było anulowanie pracownika i kolejki 171 map (CancelledError).
 To nie błąd sterownika GeoPackage. Nie ustalono, kto blokował plik na Windows;
 konflikt równoczesnego odczytu/podmiany pozostaje hipotezą. Poprawka 0.9.2
-ponawia atomową podmianę przy błędach 5/32/33; wymaga testu na tym Windows.
+ponawia atomową podmianę przy błędach 5/32/33; kolejne logi potwierdziły
+198 skutecznych ponowień bez awarii koordynatora.
 Trzy WFS nadal puste, bez zgłoszonych błędów dostawcy — przyczyna nieustalona.
 Proxy aktywne i przekazane do procesu; sama konfiguracja nie potwierdza trasy.
 Po tej analizie ponownie przeszły 3 testy (11,893 s): WMS do GeoPackage i odczyt
 po wyłączeniu serwera, scalanie dwóch map w procesach oraz PNG RGBA/EPSG:2180.
 Testy wykonano na Ubuntu; nie stanowią odbioru Windows ani osobnego testu WMTS.
+
+## Audyt przebiegu 0.9.3 i zmiany 0.9.4
+
+Najnowszy raport firmowy: 3 h 42 min, anulowany. Koordynator działał, wszystkie
+198 ponowień blokad IPC zakończyły się powodzeniem. Dziewięć procesów ukończyło
+mapy, ale stara pętla scaliła tylko pierwszy wynik. Osiem gotowych map usunięto
+przy anulowaniu, mimo 5422 kafelków z treścią w tych wynikach. Cztery mapy były
+całkowicie przezroczyste; jedna miała treść tylko na części zoomów. Nie uznawaj
+każdego przezroczystego WMS za awarię sieci. Wszystkie trzy WFS anulowano przed
+odczytem — ten przebieg nie sprawdza firmowego WFS.
+
+Jeden proces był zgodny z 3,83 GiB dostępnego RAM. Limit pozostawał jednak
+zamrożony z chwili startu. Dodatkowo QGIS raportował timeouty po 5 sekundach
+jako Qt 5: 927 takich odpowiedzi jednego hosta zajęło łącznie ponad 77 minut.
+Brakowało korelacji z natywnym sygnałem timeoutu; automat nie robił przerw.
+
+0.9.4:
+- gotowe future są odbierane bez blokowania za wcześniejszą mapą; oryginalna
+  kolejność manifestu/drzewa pozostaje zachowana;
+- anulowanie kończy nadzorców i scala gotowe mapy, również wynik opublikowany
+  przez nadzorcę już po naciśnięciu Przerwij;
+- RAM i budżet przeliczane co 5 s, globalny limit nowych procesów, pula
+  nadzorców ograniczona min(32,2CPU); spadek RAM nie zabija działających procesów;
+- GUI pokazuje RAM, wyjaśnienie budżetu i stany pobierania/czekania;
+- native requestTimedOut rozpoznawany także po przekierowaniu i przy Qt 5;
+  zwykły Qt 5 bez sygnału timeoutu nie jest automatycznie timeoutem;
+- postęp pokazuje fragment/całość, podsumowania zoomów i diagnostykę maski/czasów;
+- ciężkie XML warstw usuwane raz ze wspólnego szablonu procesu; przygotowanie
+  pompuje Qt i obsługuje anulowanie.
+
+Testy źródeł: 98/98 (80,347 s), bez pominięć. Dodatkowa regresja rozliczenia
+kończącego się nadzorcy po Cancel przeszła osobno w zestawie trzech testów kolejki.
+Nowe próby potwierdzają zachowanie ośmiu gotowych map, pracę dwóch procesów
+po odzyskaniu RAM i timeout lokalnego WMS po przekierowaniu 127.0.0.1→localhost.
+Gotowy ZIP: **99/99 testów**, 78,994 s, bez pominięć; ładowanie QGIS poprawne.
+Odbiór i szczegóły: [0.9.4](validation-0.9.4.md). Test Windows pozostaje potrzebny.
 
 ## Zmiana 0.9.3
 

@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import QCoreApplication, QUrl
 
 from .adaptive import PROTOCOL, HostPolicy, WorkerGate, write_state
 from .i18n import language, tr
-from .resources import available_memory
+from .resources import MEMORY_RESERVE, available_memory, recommend
 from .worker_network import network_snapshot
 
 
@@ -159,14 +159,23 @@ class RasterWorkers:
         per_server_limit=2,
         adaptive=False,
         diagnostic=None,
+        cpu=None,
+        cancelled=lambda: False,
+        progress=lambda message: None,
     ):
         self.diagnostic = diagnostic
+        self.cancelled = cancelled
+        self.progress = progress
         self.network = network_snapshot()
         self.folder = staging / ".workers"
         self.folder.mkdir(mode=0o700)
         self.stop = Event()
+        self.cpu = cpu or max(1, workers)
+        self.ceiling = min(32, 2 * self.cpu) if adaptive else workers
+        self.peak_workers = workers
+        self.memory_available = None
         self.pool = ThreadPoolExecutor(
-            max_workers=workers, thread_name_prefix="archive-process"
+            max_workers=self.ceiling, thread_name_prefix="archive-process"
         )
         self.futures = {}
         self.parameters = (snapshot, project, records, area, crs, levels)
@@ -198,6 +207,24 @@ class RasterWorkers:
                         next(n for n in archive.namelist() if n.endswith(".qgs"))
                     )
                 )
+            # Strip shared heavy layer XML once, instead of copying every source
+            # definition for every worker (quadratic for large projects).
+            layer_xml = {
+                element.findtext("id"): element
+                for element in root.find("projectlayers")
+            }
+            tree_xml = {
+                element.get("id"): element for element in root.iter("layer-tree-layer")
+            }
+            for element in list(root.find("projectlayers")):
+                root.find("projectlayers").remove(element)
+            for parent in root.iter():
+                for child in list(parent):
+                    if child.tag == "layer-tree-layer":
+                        parent.remove(child)
+            macros = root.find("./properties/Macros")
+            if macros is not None:
+                root.find("properties").remove(macros)
             # Interleave servers so a long queue from one host cannot occupy
             # every supervising thread while other servers remain idle.
             queues = {}
@@ -222,25 +249,30 @@ class RasterWorkers:
                 for host, queue in queues.items():
                     if queue:
                         ordered.append((host, queue.popleft()))
+            last_pump = 0.0
             for host, record in ordered:
+                if self.cancelled():
+                    self.stop.set()
+                    break
+                if time.monotonic() - last_pump >= 0.1:
+                    self.progress(
+                        tr("Przygotowanie kolejki map dla osobnych procesów QGIS…")
+                    )
+                    QCoreApplication.processEvents()
+                    last_pump = time.monotonic()
                 layer = project.mapLayer(record["id"])
                 table = "layer_" + sha256(layer.id().encode()).hexdigest()[:24]
                 folder = self.folder / table
                 folder.mkdir(mode=0o700)
                 isolated = deepcopy(root)
-                for element in list(isolated.find("projectlayers")):
-                    if element.findtext("id") != layer.id():
-                        isolated.find("projectlayers").remove(element)
-                for parent in isolated.iter():
-                    for child in list(parent):
-                        if (
-                            child.tag == "layer-tree-layer"
-                            and child.get("id") != layer.id()
-                        ):
-                            parent.remove(child)
-                macros = isolated.find("./properties/Macros")
-                if macros is not None:
-                    isolated.find("properties").remove(macros)
+                isolated.find("projectlayers").append(deepcopy(layer_xml[layer.id()]))
+                if (
+                    layer.id() in tree_xml
+                    and isolated.find("layer-tree-group") is not None
+                ):
+                    isolated.find("layer-tree-group").append(
+                        deepcopy(tree_xml[layer.id()])
+                    )
                 (folder / "source.qgs").write_bytes(
                     ET.tostring(isolated, encoding="utf-8")
                 )
@@ -267,7 +299,7 @@ class RasterWorkers:
                     target=self._coordinate, name="archive-coordinator", daemon=True
                 )
                 self.coordinator.start()
-            for _ in range(min(self.workers, len(self.queue))):
+            for _ in range(min(self.ceiling, len(self.queue))):
                 self.pool.submit(self._work_loop)
             return self
         except Exception:
@@ -336,11 +368,24 @@ class RasterWorkers:
                     now = time.monotonic()
                     if now >= self.next_memory_check:
                         memory = available_memory()
-                        ok = memory is None or memory >= 2 * 1024**3
-                        if ok != self.memory_ok:
+                        self.memory_available = memory
+                        budget = recommend(
+                            getattr(self, "cpu", self.workers), memory, True
+                        )
+                        ok = memory is None or memory >= MEMORY_RESERVE
+                        if ok != self.memory_ok or budget != self.workers:
                             self.memory_history.append(
-                                {"at": now - self.origin, "memory_ok": ok}
+                                {
+                                    "at": now - self.origin,
+                                    "memory_ok": ok,
+                                    "available": memory,
+                                    "budget": budget,
+                                }
                             )
+                        self.workers = budget
+                        self.peak_workers = max(
+                            getattr(self, "peak_workers", 0), budget
+                        )
                         self.memory_ok = ok
                         self.next_memory_check = now + 5
                     for job in self.jobs.values():
@@ -404,10 +449,16 @@ class RasterWorkers:
                             if not self.memory_ok
                             else "repairing"
                             if any(j["state"].get("repairing") for j in jobs)
+                            else "capacity"
+                            if queued
+                            and sum(self.active_hosts.values()) >= self.workers
+                            and not jobs
                             else "stable"
                             if policy.frozen or policy.limit >= policy.ceiling
                             else "increasing"
                             if policy.limit > 1
+                            else "running"
+                            if jobs and policy.total_successes
                             else "starting"
                         )
                         rows.append(
@@ -420,6 +471,8 @@ class RasterWorkers:
                                 "limit": policy.limit,
                                 "queued": queued,
                                 "budget": self.workers,
+                                "memory_available": self.memory_available,
+                                "cpu": self.cpu,
                                 "rate": (
                                     policy.successes
                                     / max(0.001, now - policy.window_started)
@@ -528,6 +581,12 @@ class RasterWorkers:
                     self.queue.clear()
                 if not self.queue:
                     return
+                if self.adaptive and (
+                    not self.memory_ok
+                    or sum(self.active_hosts.values()) >= self.workers
+                ):
+                    self.condition.wait(0.1)
+                    continue
                 index = next(
                     (
                         i
@@ -690,7 +749,9 @@ class RasterWorkers:
                 self.diagnostic.emit(
                     "worker_exit", job=folder.name, exit_code=process.returncode
                 )
-            if self.stop.is_set():
+            if self.stop.is_set() and (
+                process.returncode or not (folder / "result.json").exists()
+            ):
                 if self.coordinator_failed:
                     raise WorkerError("coordinator")
                 raise InterruptedError()
@@ -719,7 +780,15 @@ class RasterWorkers:
             result["worker_error"] = failure.details
         return result
 
-    def take(self, layer_id, destination, cancelled, progress):
+    def completed(self, layer_id):
+        if layer_id not in self.futures:
+            return False
+        future = self.futures[layer_id][0]
+        return future.done() and not future.cancelled() and future.exception() is None
+
+    def take(
+        self, layer_id, destination, cancelled, progress, preserve_completed=False
+    ):
         future, folder = self.futures[layer_id]
         while not future.done():
             QCoreApplication.processEvents()
@@ -728,9 +797,11 @@ class RasterWorkers:
                 raise InterruptedError()
             progress(tr("Równoległe pobieranie map — oczekiwanie na warstwę…"))
             time.sleep(0.05)
+        preserve_completed = preserve_completed and self.completed(layer_id)
         if cancelled():
             self.stop.set()
-            raise InterruptedError()
+            if not preserve_completed:
+                raise InterruptedError()
         if self.coordinator_failed and future.cancelled():
             raise WorkerError("coordinator")
         result = future.result()
@@ -745,7 +816,7 @@ class RasterWorkers:
                     folder / "raster.gpkg",
                     destination,
                     result["table"],
-                    self.stop.is_set,
+                    (lambda: False) if preserve_completed else self.stop.is_set,
                 )
                 while not merging.done():
                     QCoreApplication.processEvents()
@@ -753,7 +824,7 @@ class RasterWorkers:
                         self.stop.set()
                     progress(tr("Scalanie gotowej mapy do GeoPackage…"))
                     time.sleep(0.05)
-                if self.stop.is_set():
+                if self.stop.is_set() and not preserve_completed:
                     raise InterruptedError()
                 merging.result()
         shutil.rmtree(folder)

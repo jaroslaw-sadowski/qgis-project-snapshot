@@ -193,6 +193,8 @@ class PolicyTests(unittest.TestCase):
         coordinator.active_hosts = {}
         coordinator.workers = 4
         coordinator.coordinator_failed = False
+        coordinator.cpu = 2
+        coordinator.diagnostic = None
         with (
             patch(
                 "mbtiles_batch_exporter.parallel_archive.time.monotonic",

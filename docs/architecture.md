@@ -171,3 +171,39 @@ każdego żądania, jeśli inne zadania QGIS pracują równocześnie.
 _write_vector otrzymuje opcjonalną diagnostykę. Liczniki pochodzą z istniejącej
 iteracji, bez dodatkowego odczytu źródła. Stan iteratora logujemy przed jego
 zamknięciem; read_complete opisuje odczyt, a stage/writer_error osobno zapis.
+
+## Kolejka, pamięć i timeouty (0.9.4)
+
+`_ready_records` wybiera gotowe future lub warstwę obsługiwaną w głównym QGIS,
+bez blokowania za pierwszą niedokończoną mapą. Kolejność listy manifestu i drzewa
+pozostaje oryginalna; diagnostyczny layer_index jest stałym indeksem zaznaczenia.
+Po anulowaniu kończą się nadzorcy aktywnych procesów, a gotowe wyniki są scalane.
+`take(preserve_completed=True)` kończy scalenie ukończonej mapy mimo anulowania.
+Nie wznawia pobierania. GeoPackage nadal ma jednego zapisującego w danej chwili.
+
+Pula wątków nadzorujących może obsłużyć min(32, 2×CPU); faktyczne procesy
+ogranicza globalny licznik active_hosts i aktualny budżet RAM. Co pięć sekund
+budżet przeliczany jest przez recommend na podstawie bieżącego wolnego RAM,
+z rezerwą 2 GiB i szacunkiem 1 GiB/proces. Nie dodajemy pamięci zajętej przez
+pracujące procesy do MemAvailable, więc reguła jest konserwatywna. Budżet może
+spaść poniżej liczby istniejących procesów; blokowane są tylko nowe uruchomienia.
+Manifest zachowuje workers jako limit początkowy, dodaje peak_worker_budget oraz
+final_worker_budget. Historia RAM i wiersze GUI pokazują kolejne limity.
+
+Izolowane projekty procesów powstają z szablonu, z którego ciężkie definicje
+warstw usunięto raz. Kopiowana jest tylko definicja potrzebnej warstwy. Ogranicza
+to kwadratowy koszt wcześniejszego kopiowania całego projektu dla każdej mapy.
+Przygotowanie regularnie obsługuje zdarzenia Qt i anulowanie.
+
+Renderer koreluje natywny requestTimedOut QGIS z identyfikatorem żądania.
+OperationCanceledError nie jest sam w sobie dowodem timeoutu. Przekierowania
+śledzimy przez originatingThreadId renderera po pierwszym żądaniu źródła.
+Timeout trafia do istniejących przerw/napraw zamiast natychmiastowych powtórzeń
+oraz podziałów. Diagnostyka zapisuje timeouty i poprawnie dekoduje CRS z URL.
+Postęp to licznik zakończonych fragmentów/całość, a nie kolumna/wiersz.
+
+raw_empty/raw_nonempty opisują wyrenderowany obraz przed maską obszaru,
+masked_out — utratę całej treści przez maskę. Nie są analizą samych odpowiedzi
+HTTP PNG. timing_seconds mierzy fazy oczekiwania/renderowania/maski/zapisu;
+nie stanowi pełnego profilu CPU ani całkowitego czasu mapy. Nie zmieniono
+kompresji PNG, jakości, reguł pustych map ani formatu GeoPackage.

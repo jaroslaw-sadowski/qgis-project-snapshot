@@ -144,14 +144,18 @@ class NetworkDiagnostics:
         self.context = None
         self.pending = {}
         self.groups = {}
+        self.timed_out_requests = set()
+        self.timeout_groups = {}
         self.last_error = {}
         manager = QgsNetworkAccessManager.instance()
         self.started_signal = manager.requestAboutToBeCreated[
             QgsNetworkRequestParameters
         ]
         self.finished_signal = manager.finished[QgsNetworkReplyContent]
+        self.timeout_signal = manager.requestTimedOut[QgsNetworkRequestParameters]
         self.started_signal.connect(self.started)
         self.finished_signal.connect(self.finished)
+        self.timeout_signal.connect(self.timed_out)
 
     def started(self, parameters):
         import time
@@ -159,7 +163,36 @@ class NetworkDiagnostics:
         if len(self.pending) >= 4096:
             self.diagnostic.emit("network_timing_overflow", count=len(self.pending))
             self.pending.clear()
+            self.timed_out_requests.clear()
         self.pending[parameters.requestId()] = (time.monotonic(), self.context)
+
+    def timed_out(self, parameters):
+        """QGIS can report its request timeout as Qt OperationCanceledError."""
+        import time
+
+        try:
+            request_id = parameters.requestId()
+            if request_id in self.timed_out_requests:
+                return
+            if len(self.timed_out_requests) >= 4096:
+                self.timed_out_requests.clear()
+            self.timed_out_requests.add(request_id)
+            started, context = self.pending.get(request_id, (None, None))
+            elapsed = None if started is None else max(0.0, time.monotonic() - started)
+            host = parameters.request().url().host()
+            summary = self.timeout_groups.setdefault(
+                (context, host), {"count": 0, "timed_count": 0, "seconds": 0.0}
+            )
+            summary["count"] += 1
+            if elapsed is not None:
+                summary["timed_count"] += 1
+                summary["seconds"] += elapsed
+            if summary["count"] <= 3:
+                self.diagnostic.emit(
+                    "network_timeout", context=context, host=host, seconds=elapsed
+                )
+        except Exception as error:
+            self.diagnostic.error("network_observer_error", error)
 
     def finished(self, reply):
         try:
@@ -172,14 +205,14 @@ class NetworkDiagnostics:
         import re
         import time
 
-        from qgis.PyQt.QtCore import QUrlQuery
+        from qgis.PyQt.QtCore import QUrl, QUrlQuery
 
         started, context = self.pending.pop(reply.requestId(), (None, None))
         url = reply.request().url()
         operation = "other"
         request_crs = None
         bbox_present = False
-        for key, value in QUrlQuery(url).queryItems():
+        for key, value in QUrlQuery(url).queryItems(QUrl.FullyDecoded):
             if key.lower() == "request" and value.lower() in (
                 "getmap",
                 "gettile",
@@ -196,12 +229,19 @@ class NetworkDiagnostics:
             if key.lower() == "bbox":
                 bbox_present = True
         details = response_details(reply)
-        details.update(request_crs=request_crs, bbox_present=bbox_present)
+        details.update(
+            request_crs=request_crs,
+            bbox_present=bbox_present,
+            qgis_timeout=reply.requestId() in self.timed_out_requests,
+        )
+        self.timed_out_requests.discard(reply.requestId())
         if details["qt_error"] or (
             details["http_status"] and details["http_status"] >= 400
         ):
             self.last_error.update(
-                http_status=details["http_status"], qt_error=details["qt_error"]
+                http_status=details["http_status"],
+                qt_error=details["qt_error"],
+                qgis_timeout=details["qgis_timeout"],
             )
         key = (context, url.host(), operation, json.dumps(details, sort_keys=True))
         summary = self.groups.setdefault(
@@ -225,6 +265,11 @@ class NetworkDiagnostics:
     def close(self):
         self.started_signal.disconnect(self.started)
         self.finished_signal.disconnect(self.finished)
+        self.timeout_signal.disconnect(self.timed_out)
+        for (context, host), summary in self.timeout_groups.items():
+            self.diagnostic.emit(
+                "network_timeout_summary", context=context, host=host, **summary
+            )
         for (context, host, operation, details), summary in self.groups.items():
             self.diagnostic.emit(
                 "network_summary",

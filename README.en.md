@@ -18,7 +18,7 @@ share the code under the [licence](LICENSE).
 ## How to use
 
 Requires QGIS 3.40 with PyQt5 and GDAL 3.7 or newer. The interface selects Polish
-or English based on the QGIS language. Current version for testing: **0.9.3**.
+or English based on the QGIS language. Current version for testing: **0.9.4**.
 
 1. Install the package using **Plugins → Manage and Install Plugins → Install from ZIP**.
 2. Open your project and choose **Plugins → qgis-project-snapshot → Archive project…**
@@ -73,13 +73,13 @@ not QGIS certification or a guarantee for every project.
 
 ## Package and development
 
-The repository contains source code. To build the **0.9.3** ZIP, run:
+The repository contains source code. To build the **0.9.4** ZIP, run:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-This creates `qgis-project-snapshot-0.9.3.zip` and its SHA-256 checksum in `dist/`,
+This creates `qgis-project-snapshot-0.9.4.zip` and its SHA-256 checksum in `dist/`,
 which is not tracked in Git. Building a ZIP does not publish it in the QGIS plugin catalogue.
 
 [Build and tests](docs/development.md) · [Architecture](docs/architecture.md) ·

@@ -8,6 +8,8 @@ from pathlib import Path
 from qgis.PyQt.QtNetwork import QNetworkConfigurationManager
 
 MAX_WORKERS = 32
+MEMORY_RESERVE = 2 * 1024**3
+MEMORY_PER_WORKER = 1024**3
 
 
 def available_memory():
@@ -22,7 +24,7 @@ def available_memory():
         if sys.platform == "win32":
 
             class MemoryStatus(ctypes.Structure):
-                _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong)] + [
+                _fields_ = [("length", ctypes.c_uint32), ("load", ctypes.c_uint32)] + [
                     (name, ctypes.c_ulonglong)
                     for name in (
                         "total",
@@ -47,7 +49,9 @@ def available_memory():
 def recommend(cpu, memory, online, per_server=2, hosts=None):
     # Reserve room for the main QGIS and allow 1 GiB per additional process.
     memory_limit = (
-        max(1, int((memory - 2 * 1024**3) // 1024**3)) if memory is not None else 2
+        max(1, int((memory - MEMORY_RESERVE) // MEMORY_PER_WORKER))
+        if memory is not None
+        else 2
     )
     count = min(MAX_WORKERS, max(1, cpu * 2), memory_limit)
     if hosts is not None:
