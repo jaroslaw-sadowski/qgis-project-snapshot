@@ -1,94 +1,99 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-[Polski](README.md) · English
+[Polski](README.md) · English · Version **1.0.0**
 
-A QGIS plugin for preserving project data and appearance for later offline use.
-It helps document the maps and data behind an analysis, feasibility study or
-infrastructure project before the original services and databases change.
+## What it is and what it does
 
-Creates a separate project copy with layer groups, order, visibility and styles.
-Stores vector features with attributes and map images in GeoPackage, and copies
-source rasters and available project resources to local files. PNG preserves
-transparency with strong lossless compression. Maps can retain the project CRS,
-including EPSG:2180.
+QGIS Project Snapshot creates a local copy of a QGIS project for later offline
+use. It helps preserve project data and map appearance before the original
+databases or services change.
 
-The plugin is free and open source (GNU GPL v2). You can inspect, modify and
-share the code under the [licence](LICENSE).
+It saves a project copy, vector features with attributes, map images, local
+rasters and available resources, and a report in a separate folder. It preserves
+layer groups, order, visibility and styles. PNG maps retain transparency.
+You choose the layers, area and detail levels; the original project stays unchanged.
+
+## Installation requirements
+
+- **QGIS 3.40 or a later 3.x release**, with Qt5/PyQt5 and GDAL 3.7 or newer.
+  The plugin uses libraries supplied with QGIS; no separate Python installation
+  or additional packages are needed.
+- Access to the project's sources during export and enough disk space.
+- Permission to download and store the selected data and maps.
+
+The interface uses Polish or English according to the QGIS language.
+Tested with QGIS 3.40 on Ubuntu. Other environments, especially company databases
+and authentication, need checking on your own workstation.
+
+## How to install
+
+1. Obtain the **`qgis-project-snapshot-1.0.0.zip`** release package.
+   Use the plugin's installation ZIP, not a ZIP of the entire repository.
+2. In QGIS, choose **Plugins → Manage and Install Plugins → Install from ZIP**.
+3. Select the package and install it. Restart QGIS when upgrading.
+
+Once publication is approved in the [QGIS plugin catalogue](https://plugins.qgis.org/),
+you will be able to search for **QGIS Project Snapshot** directly in the plugin
+manager. Providing a ZIP does not mean catalogue approval.
 
 ## How to use
 
-Requires QGIS 3.40 with PyQt5 and GDAL 3.7 or newer. The interface selects Polish
-or English based on the QGIS language. Current package for local installation: **0.9.7**.
-
-1. Install the package using **Plugins → Manage and Install Plugins → Install from ZIP**.
-2. Open your project and choose **Plugins → QGIS Project Snapshot → Archive project…**
+1. Open a project and choose **Plugins → QGIS Project Snapshot → Archive project…**
    or the map-in-an-archive-box toolbar icon.
-3. Choose a folder, area (map view or polygons), layers and map detail.
-   Select **Create archive**. Hover over controls for explanations.
-4. Read the report, then open the project copy without internet or the company network.
-   Keep the **entire archive folder**, not just the `.qgz` file.
+2. Choose a folder, area (map view or polygons), layers and map detail.
+   Hover over an option for an explanation.
+3. Select **Create archive**, then read the report when the export finishes.
+4. Open the project copy without access to the original services and databases.
+   Check its data and appearance. Keep the **entire archive folder**, not just
+   the `.qgz` file.
 
-Downloads use the active QGIS proxy configuration, exclusions and available
-saved credentials. No separate proxy setup is needed in the plugin.
-Concurrency is adjusted using CPU, RAM and each server's responses. After initial
-downloads, measured process memory determines further concurrency, with startup
-and growth headroom and a 768 MiB free-memory reserve. It starts
-with one task per server and gradually increases the load while this improves
-download speed and the computer has spare resources. Scheduling prioritizes
-different servers running together. The window shows active tasks, limits, pauses
-and a log; “Queued layers” counts layers waiting to download from the server in that row.
-During export, only missing tiles are repaired in the same archive. The manual
-retry on the result screen creates a new archive of the selected layers.
+The report identifies missing data, empty results and dependencies that need
+checking. Not all fonts, forms and expressions can be transferred automatically.
+The archive date describes acquisition time, not a simultaneous state of all
+sources. Archives and reports may contain confidential data; inspect them before sharing.
 
-The [team guide](docs/team-guide.md), also included in the ZIP, provides detailed
-Polish instructions and an English quick start.
+## Automatic parallel downloads
 
-## Data and limitations
+The plugin downloads maps in separate QGIS processes. It starts with one task
+per server and gradually increases concurrency using available RAM, CPU,
+download speed and server responses. Errors reduce the load or trigger a pause.
+You do not need to set the number of processes manually.
 
-The plugin connects to the databases and services referenced by your project
-to retrieve data. It does not replace the source project. It uses QGIS libraries
-and standard Python without extra installations. Archives and reports may contain
-company data and layer names.
+The window shows active tasks and limits. **Queued layers** counts layers waiting
+to download from the server in that row. Automatic adjustment helps speed up
+exports but does not guarantee maximum throughput. Downloads use the active
+QGIS network settings. Exports cannot resume after closing QGIS.
 
-Archive dates describe acquisition times, not a simultaneous snapshot of all
-sources. Map images preserve the chosen area and detail levels. The report
-identifies missing layers, empty images and dependencies requiring inspection.
-Fonts, form code and all expression dependencies are not automatically bundled.
-There is no resume after closing QGIS. Source providers' terms still apply,
-including restrictions on bulk downloads of standard OSM tiles.
+## Data licences and service terms
 
-Developed through vibe coding with AI assistance. Check completeness, appearance
-and offline access before relying on an archive. Distribution terms and the
-absence of warranty are described in the [licence](LICENSE).
+**Check and respect each layer's licence and its provider's terms before
+exporting.** This includes downloading, copying, offline storage, redistribution,
+required attribution and service limits. Being able to display a map in QGIS
+does not grant permission to archive it.
 
-## Checks performed
+For example, the standard **`tile.openstreetmap.org` service does not permit
+downloading maps for offline use**. Choose a source whose terms explicitly
+allow it; see the [OSMF tile policy](https://operations.osmfoundation.org/policies/tiles/).
 
-- 128 QGIS tests in 0.9.7 covering data storage and reading, maps, reporting, Polish/English,
-  cancellation, server limits and missing-tile repair.
-- Installation ZIP checks: native QGIS discovery and loading, the archive dialog,
-  unloading and tests running against the packaged code.
-- Ruff: PEP 8/pycodestyle rules (E/W), Pyflakes (F), imports (I) and formatting
-  using the project configuration (88 characters).
-- Python syntax, ZIP integrity and package/source consistency checks.
+The plugin does not grant rights to third-party content or check its licence
+automatically. Users are responsible for choosing data and using it lawfully.
+To the extent permitted by applicable law, the author accepts no liability for
+users' unauthorized copying or distribution of content.
 
-Test environment: Ubuntu, QGIS 3.40.15. Windows, MSSQL and complete company
-projects still need acceptance on the user's workstation. These are local checks,
-not QGIS certification or a guarantee for every project.
-[0.9.7 validation](docs/validation-0.9.7.md) · [Reports and documentation](docs/README.md).
+## Plugin licence and development
 
-## Package and development
+Author: **Jarosław Sadowski**. The plugin is free and open source under
+**GNU GPL version 2 (GPL-2.0-only)**; see [LICENSE](LICENSE) for the terms
+and warranty disclaimer. This licence covers the plugin, not downloaded data.
 
-The repository contains source code. To build the **0.9.7** ZIP, run:
+The project was developed through **vibe coding with AI assistance**.
+Check each archive's completeness and offline operation before relying on it.
 
-```bash
-python3 scripts/build_plugin.py
-```
+## Help and feedback
 
-This creates `qgis-project-snapshot-0.9.7.zip` and its SHA-256 checksum in `dist/`,
-which is not tracked in Git. Building a ZIP does not publish it in the QGIS plugin catalogue.
+[Detailed guide](docs/team-guide.md) ·
+[Bug reports and suggestions](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues) ·
+[Development documentation and ZIP build instructions](docs/development.md)
 
-[Build and tests](docs/development.md) · [Architecture](docs/architecture.md) ·
-[Session handover](docs/PROJECT_STATE.md) · [Agent instructions](AGENTS.md)
-
-Author: Jarosław Sadowski · Licence: GNU GPL v2 ·
-[Issues](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues)
+Include your QGIS and plugin versions and steps to reproduce the problem in a report.
+Do not publish passwords, confidential projects or company data.

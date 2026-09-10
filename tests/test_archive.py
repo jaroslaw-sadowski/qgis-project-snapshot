@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Integration checks using real QGIS providers and temporary local files.
 
 Run: QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests -v

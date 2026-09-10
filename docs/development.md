@@ -49,7 +49,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.9.7.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.0.0.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -121,7 +121,7 @@ Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
 
 Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
 procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
-przy anulowaniu. Wyniki wydania: [odbiór 0.9.7](validation-0.9.7.md).
+przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md). Bieżące wydanie: [1.0.0](validation-1.0.0.md).
 
 ## Tłumaczenia
 
@@ -163,3 +163,32 @@ Pominięte poświadczenia lub logowanie interaktywne nie są zastępowane obchod
 proxy. Nie wyłączamy walidacji TLS. Niestandardowe certyfikaty profilu, zewnętrzne
 fabryki proxy i firmowe logowanie interaktywne wymagają osobnego sprawdzenia;
 nie deklaruj pełnego odbioru wszystkich metod na podstawie testu HTTP Basic.
+
+## Kontrole katalogu QGIS
+
+Aktualne wymagania i ręczne kroki publikacji: [publishing.md](publishing.md).
+Metadane wydania wskazują zakres QGIS 3.40–3.99; testy Qt5 nie potwierdzają QGIS4.
+Test ZIP-a kontroluje wymagane pola, wersję, adres autora, licencję, HTTPS,
+rozmiar do 25 000 000 bajtów, prawa 0644 i brak obcych plików. Nie potwierdza
+publicznej dostępności GitHub — sprawdź ją osobno, bez logowania.
+
+Dodatkowe narzędzia są wyłącznie do rozwoju, w osobnym środowisku:
+
+```bash
+/tmp/snapshot-audit-venv/bin/pip install bandit==1.9.4 detect-secrets==1.5.0 flake8==7.3.0
+/tmp/snapshot-audit-venv/bin/bandit -r mbtiles_batch_exporter -f json -o /tmp/snapshot-bandit.json
+/tmp/snapshot-audit-venv/bin/detect-secrets scan --all-files --no-verify mbtiles_batch_exporter > /tmp/snapshot-secrets.json
+/tmp/snapshot-audit-venv/bin/flake8 mbtiles_batch_exporter --max-line-length=88 --extend-ignore=E203 --jobs=1
+```
+
+Bandit może zakończyć się kodem 1 dla ostrzeżeń wymagających przeglądu; nie uznawaj
+ich automatycznie za błąd ani za fałszywy alarm. Reguły krytyczne określa portal.
+Nie ukrywaj trafień wyłączeniami bez ustalenia przyczyny. detect-secrets zapisuje
+wynik JSON, którego pole results należy sprawdzić; sam kod wyjścia nie wystarcza.
+Opcja --no-verify zapobiega weryfikacji kandydatów przez sieć. Przy Pythonie 3.14
+skaner może wymagać dostępu do lokalnych gniazd dla procesów pomocniczych.
+
+Flake8/pycodestyle E203 dotyczące spacji w przekrojach koliduje z formatem Ruff;
+pominięcie jest jawne. Limit 88 znaków oraz E203 to konwencja projektu, nie deklaracja
+ścisłego zastosowania każdej reguły PEP 8. Kod produkcyjny nie wymaga wyłączenia E402.
+Pliki .qm to dane Qt, a dołączone .ts są ich źródłem; nie są bibliotekami binarnymi.

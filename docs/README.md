@@ -1,43 +1,47 @@
-# Dokumentacja
+# Dokumentacja QGIS Project Snapshot
 
-| Dokument | Odbiorca i zawartość |
-|---|---|
-| [Instrukcja zespołowa](team-guide.md) | Instalacja ZIP, archiwizacja i odbiór na stanowisku służbowym; kopia trafia do ZIP-a |
-| [Rozwój i testy](development.md) | Polecenia budowy, testów źródeł, testów paczki i benchmarku |
-| [Działanie i ograniczenia](architecture.md) | Architektura, formaty, równoległość i granice automatyzacji |
-| [Stan projektu](PROJECT_STATE.md) | Aktualny etap, sprawdzone wyniki i następne zadania; punkt startowy dla AI/LLM |
-| [Instrukcje agentów](../AGENTS.md) | Trwałe zasady pracy w repozytorium |
+## Instrukcje i bieżące wydanie 1.0.0
 
-## Raporty wykonanych prób
+| Dokument | Zawartość |
+| --- | --- |
+| [README po polsku](../README.md) / [English README](../README.en.md) | Krótkie wprowadzenie, wymagania, instalacja i licencje |
+| [Instrukcja użytkownika PL/EN](team-guide.md) | Opcje eksportu, kolejka, anulowanie i sprawdzenie kopii offline; w ZIP-ie jako INSTRUKCJA.md |
+| [Przygotowanie publikacji](publishing.md) | Wymagania plugins.qgis.org i czynności związane z wydaniem |
+| [Weryfikacja 1.0.0](validation-1.0.0.md) | Wyniki kontroli bieżącego wydania oraz ograniczenia odbioru |
 
-Raporty są zapisem historycznym; aktualne priorytety znajdują się w stanie projektu.
+## Rozwój i utrzymanie
 
-- [Odbiór 0.9.7 — równoległość według zmierzonego RAM](validation-0.9.7.md)
-- [Pomiar 0.9.7 — wiele procesów przy ograniczonej pamięci](benchmark-0.9.7.json)
-- [Odbiór 0.9.6 — równoległość, nazwa i przegląd wydania](validation-0.9.6.md)
-- [Pomiar 0.9.6 — identyczne dane, automat 1→4](benchmark-0.9.6.json)
-- [Odbiór 0.9.5 — powrót hosta i praca wielu serwerów](validation-0.9.5.md)
-- [Pomiar 0.9.5 — dane i różne budżety RAM](benchmark-0.9.5.json)
-- [Odbiór 0.9.4 — gotowe mapy, RAM i timeouty](validation-0.9.4.md)
-- [Odbiór 0.9.3 — diagnostyka sieci i odczytu](validation-0.9.3.md)
-- [Odbiór 0.9.2 — atomowe pliki sterujące na Windows](validation-0.9.2.md)
-- [Odbiór 0.9.1 — log diagnostyczny](validation-0.9.1.md)
-- [Krok 3 — zasoby i równoległość](validation-step3.md)
-- [Krok 4 — odbiór i wydajność](validation-step4.md)
-- [Surowe pomiary benchmarku](benchmark-step4.json)
-- [Krok 5 — paczka instalacyjna](validation-step5.md)
-- [Wersja 0.6.0 — postęp i nazwa wtyczki](validation-0.6.0.md)
-- [Wersja 0.7.0 — PL/EN, ponawianie i dobór równoległości](validation-0.7.0.md)
-- [Wersja 0.8.0 — automat i uzupełnianie kafelków](validation-0.8.0.md)
-- [Benchmark 0.8.0 — surowe pomiary](benchmark-0.8.0.json)
+| Dokument | Zawartość |
+| --- | --- |
+| [Rozwój i testy](development.md) | Budowanie ZIP-a, testy źródeł i paczki, jakość kodu |
+| [Architektura](architecture.md) | Format archiwum, moduły, równoległość i granice automatyzacji |
+| [Stan projektu](PROJECT_STATE.md) | Bieżący stan prac i punkt startowy dla kolejnych sesji |
+| [Instrukcje agentów](../AGENTS.md) | Trwałe zasady pracy z repozytorium |
 
-- [Odbiór i audyt 0.9.0 — proxy, jedna akcja, Ruff/PEP 8](validation-0.9.0.md)
+Źródła wtyczki są w `mbtiles_batch_exporter/`, testy w `tests/`, skrypt pakowania
+w `scripts/`. ZIP-y powstają w ignorowanym katalogu `dist/`.
 
-Kod nie znajduje się w dokumentacji: źródła wtyczki są w `mbtiles_batch_exporter/`,
-testy w `tests/`, a skrypt pakowania w `scripts/`. Paczki są generowane w `dist/`.
+## Historyczne raporty i pomiary
 
-- [Odbiór 0.8.1 — opisy PL/EN i ikony](validation-0.8.1.md)
+Poniższe dokumenty opisują wcześniejsze wersje i warunki ich sprawdzenia.
+Nie są instrukcją bieżącego wydania ani potwierdzeniem publikacji w katalogu QGIS.
 
-- [Odbiór 0.8.2 — procesy Windows bez konsoli](validation-0.8.2.md)
-
-- [Odbiór 0.8.3 — przeglądanie stanów podczas eksportu](validation-0.8.3.md)
+| Wersja / etap | Raport | Pomiary |
+| --- | --- | --- |
+| 0.9.7 | [Równoległość według zmierzonego RAM](validation-0.9.7.md) | [JSON](benchmark-0.9.7.json) |
+| 0.9.6 | [Równoległość, nazwa i przegląd wydania](validation-0.9.6.md) | [JSON](benchmark-0.9.6.json) |
+| 0.9.5 | [Powrót serwera i praca wielu serwerów](validation-0.9.5.md) | [JSON](benchmark-0.9.5.json) |
+| 0.9.4 | [Gotowe mapy, RAM i timeouty](validation-0.9.4.md) | — |
+| 0.9.3 | [Diagnostyka sieci i odczytu](validation-0.9.3.md) | — |
+| 0.9.2 | [Atomowe pliki sterujące na Windows](validation-0.9.2.md) | — |
+| 0.9.1 | [Log diagnostyczny](validation-0.9.1.md) | — |
+| 0.9.0 | [Proxy, jedna akcja, Ruff/PEP 8](validation-0.9.0.md) | — |
+| 0.8.3 | [Przeglądanie stanów podczas eksportu](validation-0.8.3.md) | — |
+| 0.8.2 | [Procesy Windows bez konsoli](validation-0.8.2.md) | — |
+| 0.8.1 | [Opisy PL/EN i ikony](validation-0.8.1.md) | — |
+| 0.8.0 | [Automat i uzupełnianie kafelków](validation-0.8.0.md) | [JSON](benchmark-0.8.0.json) |
+| 0.7.0 | [PL/EN, ponawianie i dobór równoległości](validation-0.7.0.md) | — |
+| 0.6.0 | [Postęp i nazwa wtyczki](validation-0.6.0.md) | — |
+| Krok 5 | [Paczka instalacyjna](validation-step5.md) | — |
+| Krok 4 | [Odbiór i wydajność](validation-step4.md) | [JSON](benchmark-step4.json) |
+| Krok 3 | [Zasoby i równoległość](validation-step3.md) | — |

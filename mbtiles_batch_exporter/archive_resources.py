@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Copy known project resources and report dependencies requiring review."""
 
 import os

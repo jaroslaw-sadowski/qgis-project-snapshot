@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Deterministic control decisions and real QGIS tile repair invariants."""
 
 import json

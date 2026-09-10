@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Controlled fixed/adaptive comparison, using real QGIS and loopback WMS only."""
 
 import argparse

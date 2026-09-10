@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Qt translation catalog, using the QGIS locale override before the OS locale."""
 
 import os

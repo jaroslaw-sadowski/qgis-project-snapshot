@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Real worker downloads through a local proxy, with no corporate configuration."""
 
 import base64

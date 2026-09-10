@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 # -*- coding: utf-8 -*-
 """Bounded-memory raster capture using QGIS rendering and GDAL GeoPackage."""
 

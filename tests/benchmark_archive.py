@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Optional Linux acceptance benchmark; real QGIS, two disposable local WMS servers.
 
 Run separately from unittest using the command in docs/development.md.

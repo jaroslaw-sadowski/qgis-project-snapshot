@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Bounded host scheduling and real requests to four loopback WMS servers."""
 
 import json

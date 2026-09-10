@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Real QGIS/GDAL raster tests; WMS uses a disposable loopback HTTP server."""
 
 import atexit

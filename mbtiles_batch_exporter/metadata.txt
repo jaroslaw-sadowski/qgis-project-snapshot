@@ -2,42 +2,27 @@
 name=QGIS Project Snapshot
 qgisMinimumVersion=3.40
 qgisMaximumVersion=3.99
-description=PL: Archiwizuje projekt QGIS z lokalnymi danymi i mapami do późniejszego odczytu bez sieci.
-    | EN: Archives a QGIS project with local data and maps for later offline use.
-version=0.9.7
+description=Save a QGIS project copy with local vector data, map images and an archive report for offline use.
+version=1.0.0
 author=Jarosław Sadowski
-email=
-about=PL
-    Zachowaj dane wykorzystane w analizie, zanim zmienią się w źródłowych bazach i usługach. Wtyczka tworzy kopię projektu z grupami, kolejnością i stylami warstw, zapisuje wektory z atrybutami oraz obrazy map z przezroczystością. Pomaga dokumentować stan prac nad studium wykonalności lub inwestycją liniową.
-    Wskaż obszar, warstwy i szczegółowość map. Pobieranie dobiera obciążenie serwerów do wyników i zasobów CPU/RAM, uzupełnia brakujące kafelki i zapisuje raport. Przenoś cały folder archiwum; po eksporcie sprawdź go bez sieci. Data oznacza czas pobierania, nie jednoczesny stan wszystkich źródeł.
-    Korzysta z proxy aktywnego QGIS, wyjątków i dostępnych zapisanych poświadczeń. Interfejs PL/EN. QGIS 3.40 z PyQt5 i GDAL co najmniej 3.7; sprawdzono Ubuntu. Wtyczka łączy się ze źródłami projektu w celu pobrania danych. Nie zastępuje oryginalnego projektu. Korzysta z QGIS i standardowej biblioteki Pythona, bez dodatkowych instalacji.
-    Projekt rozwijany metodą vibe coding z pomocą AI, bezpłatny i otwartoźródłowy (GNU GPL v2). Lokalne testy QGIS i paczki nie zastępują odbioru własnych danych. Więcej informacji i ograniczenia w repozytorium GitHub.
-    EN
-    Preserve the data used in an analysis before the source databases and services change. The plugin creates a project copy with layer groups, order and styles, stores vector features with attributes, and saves map images with transparency. It helps document feasibility studies and linear infrastructure projects.
-    Choose an area, layers and map detail. Downloads adjust server concurrency using successful results and CPU/RAM resources, repair missing tiles and produce a report. Keep the entire archive folder and check it offline after export. Dates describe acquisition times, not a simultaneous snapshot of all sources.
-    Uses the active QGIS proxy configuration, exclusions and available saved credentials. Polish/English interface. Requires QGIS 3.40 with PyQt5 and GDAL 3.7 or newer; tested on Ubuntu. The plugin connects to project sources to retrieve data and does not replace the original project. Uses QGIS and standard Python libraries without additional installations.
-    Developed through vibe coding with AI assistance. Free and open source (GNU GPL v2). Local QGIS and package tests do not replace validation of your own data. See the GitHub repository for details and limitations.
-category=Raster
+email=github.com.amenity983@passfwd.com
+about=Choose an area, layers and map detail to create a separate project archive. Preserves the layer tree, styles and vector attributes; saves map images as lossless PNG with transparency. Produces an HTML report and a manifest describing saved data and missing results. Keep the entire archive folder and verify it offline. Some fonts, forms and external resources require manual checks.
+    Automatically downloads maps in separate QGIS processes, adjusting concurrency to available CPU, measured memory use and server responses. Uses the active QGIS proxy configuration and available credentials. No maximum download speed is guaranteed.
+    Requires QGIS 3.40–3.x with Qt5/PyQt5, Python 3.10 or newer and GDAL 3.7 or newer, supplied with a compatible QGIS installation. No extra Python packages or plugin dependencies. Tested on Ubuntu; Windows and macOS need platform validation. QGIS 4/Qt6 is not supported. Access to the selected project sources and sufficient disk space are required. Interface and documentation: English and Polish.
+    Respect each layer's license, attribution requirements and service terms for downloading, copying, offline use and redistribution. The plugin grants no rights to third-party content. To the extent permitted by law, the author accepts no liability for prohibited copying or redistribution by users. Do not archive services that prohibit offline downloads.
+    Developed through vibe coding with AI assistance, with automated tests and code review. Free software under GNU GPL version 2 (GPL-2.0-only), without warranty. License: https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/main/LICENSE
+    PL: Zapisuje osobną kopię projektu, lokalne dane i mapy z raportem. Automatycznie dobiera równoległość pobierania. Sprawdź całe archiwum bez sieci oraz licencje warstw i warunki usług. Autor nie udziela praw do cudzych treści i w granicach prawa nie odpowiada za ich niedozwolone kopiowanie przez użytkownika. Wtyczka powstała metodą vibe coding z pomocą AI; kod jest na licencji GNU GPL v2. Instrukcja PL/EN w repozytorium i paczce.
+license=GPL-2.0-only
 icon=icon.svg
-homepage=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
+homepage=https://github.com/jaroslaw-sadowski/qgis-project-snapshot#readme
 repository=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 tracker=https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues
-tags=archiwizacja,archive,snapshot,offline,projekt,project,geopackage,gpkg,wms,wfs,png
-changelog=0.9.7: Measure map process memory to increase parallel downloads, reserve startup and growth headroom, show the learned process estimate.
-    0.9.6: Grow server concurrency within CPU/RAM resources, account for running processes, measure full load, clarify PL/EN labels and display name, stop a map on proxy authentication refusal.
-    0.9.5: Recover hosts using the next missing tile, cap retries, prioritize different servers with at most two tasks per host.
-    0.9.4: Preserve completed maps on cancellation, consume ready results, refresh RAM budget, detect native QGIS timeouts.
-    0.9.3: Network timing, response summaries and detailed vector read diagnostics.
-    0.9.2: Retry Windows IPC file locks, preserve atomic commands, report coordinator failures.
-    0.9.1: Persistent developer diagnostics for archives, workers and proxy configuration.
-    0.9.0: Proxy aktywnego QGIS w procesach map, bezpieczna diagnostyka, jedna akcja archiwizacji, audyt Ruff/PEP 8.
-    0.9.0: Desktop QGIS proxy in map workers, safe diagnostics, one archive action, Ruff/PEP 8 audit.
-    0.8.3: Przeglądanie listy warstw podczas eksportu. / Browse layer status during export.
-    0.8.2: Procesy pomocnicze bez okien konsoli w Windows. / Background workers without console windows on Windows.
-    0.8.1: PL/EN opisy i dokumentacja, piktogram archiwum oraz ikony CPU/RAM i działań w oknie.
-    0.8.1: Polish/English descriptions and documentation, archive pictogram and CPU/RAM and action icons.
-    0.8.0: Automatyczny dobór obciążenia hostów, przerwy i uzupełnianie brakujących kafelków.
-    0.8.0: Adaptive per-host concurrency, cooldowns and missing-tile repair.
+tags=archive,snapshot,offline,project,geopackage,wms,wfs,raster,vector
+changelog=1.0.0: Prepare the stable distribution for the QGIS Plugin Directory, simplify English/Polish instructions, clarify data licenses and AI-assisted development, validate release metadata and package contents.
+    0.9.7: Measure map process memory to adjust parallel downloads and reserve startup and growth headroom.
+    0.9.6: Grow server concurrency within CPU/RAM limits, measure full load, clarify labels and display name, stop on proxy authentication refusal.
+    0.9.5: Recover deferred hosts and prioritize downloads across servers.
 experimental=False
 deprecated=False
-hasProcessingProvider=no
+server=False
+hasProcessingProvider=False

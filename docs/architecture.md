@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (0.9.7)
+# Działanie i ograniczenia archiwizacji (1.0.0)
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny

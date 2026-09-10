@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Diagnostics retain actionable code locations without serializing secrets."""
 
 import json

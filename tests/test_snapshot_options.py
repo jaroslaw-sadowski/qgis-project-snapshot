@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Locale, retry selection and process scheduling behavior."""
 
 import ast

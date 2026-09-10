@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Regression coverage for QGIS timeouts, transparent maps and progress."""
 
 import json

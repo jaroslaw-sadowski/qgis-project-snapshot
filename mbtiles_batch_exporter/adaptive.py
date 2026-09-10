@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Per-host feedback control and disposable, versioned worker IPC (stdlib only)."""
 
 import json

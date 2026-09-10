@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Bounded process workers; threads supervise processes, never QGIS objects."""
 
 import json

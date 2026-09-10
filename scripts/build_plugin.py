@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Build a reproducible QGIS plugin ZIP using only the Python standard library."""
 
 import argparse

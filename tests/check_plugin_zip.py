@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Check the built ZIP in an isolated QGIS profile and run integration tests from it.
 
 Run with isolation using the command in docs/development.md.
@@ -6,10 +8,14 @@ Run with isolation using the command in docs/development.md.
 import argparse
 import importlib
 import os
+import re
+import stat
 import sys
 import unittest
+from configparser import ConfigParser
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 
@@ -32,11 +38,70 @@ def check(filename):
         plugins = profile / "python" / "plugins"
         plugins.mkdir(parents=True)
         with ZipFile(filename) as archive:
+            assert filename.stat().st_size <= 25_000_000
             assert archive.testzip() is None
+            assert len(archive.namelist()) == len(set(archive.namelist()))
             for name in archive.namelist():
                 path = Path(name)
                 assert not path.is_absolute() and ".." not in path.parts
                 assert path.parts[0] == "mbtiles_batch_exporter"
+                assert len(path.parts) == 2 and not path.name.startswith(".")
+                assert path.name == "LICENSE" or path.suffix in {
+                    ".py",
+                    ".svg",
+                    ".txt",
+                    ".qm",
+                    ".ts",
+                    ".md",
+                }
+                mode = archive.getinfo(name).external_attr >> 16
+                assert stat.S_ISREG(mode) and stat.S_IMODE(mode) == 0o644
+            metadata = ConfigParser(interpolation=None)
+            metadata.read_string(
+                archive.read("mbtiles_batch_exporter/metadata.txt").decode("utf-8")
+            )
+            general = metadata["general"]
+            for field in (
+                "name",
+                "qgisMinimumVersion",
+                "qgisMaximumVersion",
+                "description",
+                "about",
+                "version",
+                "author",
+                "email",
+                "homepage",
+                "repository",
+                "tracker",
+                "license",
+                "icon",
+                "changelog",
+            ):
+                assert general.get(field, "").strip(), f"Missing metadata: {field}"
+            assert re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", general["email"])
+            assert re.fullmatch(r"\d+\.\d+\.\d+", general["version"])
+            assert general["qgisMinimumVersion"] == "3.40"
+            assert general["qgisMaximumVersion"] == "3.99"
+            assert general["license"] == "GPL-2.0-only"
+            for field in ("homepage", "repository", "tracker"):
+                url = urlsplit(general[field])
+                assert url.scheme == "https" and url.hostname
+            for field in (
+                "experimental",
+                "deprecated",
+                "server",
+                "hasProcessingProvider",
+            ):
+                assert general[field] == "False"
+            for name in (
+                "__init__.py",
+                "LICENSE",
+                "README.txt",
+                "en.ts",
+                "en.qm",
+                general["icon"],
+            ):
+                assert archive.read("mbtiles_batch_exporter/" + name)
             archive.extractall(plugins)
         sys.path.insert(0, str(plugins))
         app = QgsApplication([], True, str(profile))
@@ -86,6 +151,7 @@ def check(filename):
         assert Path(module.__file__).resolve().is_relative_to(plugins)
         assert len(interface.menu) == len(interface.toolbar) == 1
         assert interface.menu[0].text() == "Archiwizuj projekt…"
+        assert interface.menu[0].objectName() == "QgisProjectSnapshotArchive"
         assert (
             qgis.utils.pluginMetadata("mbtiles_batch_exporter", "name")
             == "QGIS Project Snapshot"

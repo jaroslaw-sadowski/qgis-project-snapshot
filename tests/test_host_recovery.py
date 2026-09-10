@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """A host recovers using missing data even after one tile exhausts its budget."""
 
 import json

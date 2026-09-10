@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """One project archive action in the QGIS Plugins menu and toolbar."""
 
 from pathlib import Path
@@ -21,6 +23,7 @@ class ProjectSnapshotPlugin:
             tr("Archiwizuj projekt…"),
             self.iface.mainWindow(),
         )
+        self.archive_action.setObjectName("QgisProjectSnapshotArchive")
         self.archive_action.triggered.connect(self.run_archive)
         self.archive_action.setToolTip(
             tr(

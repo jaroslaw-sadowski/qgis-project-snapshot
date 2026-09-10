@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Out-of-order completed maps must be merged and retained on cancellation."""
 
 import json

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Exercise measured RAM budgets through real coordinator and supervisor threads."""
 
 import unittest

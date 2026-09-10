@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Native process memory measurement, platform units and unavailable readings."""
 
 import ctypes

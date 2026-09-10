@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Native QGIS checks for portable symbols, attachments and relations."""
 
 import json

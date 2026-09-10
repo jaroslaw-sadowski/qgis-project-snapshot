@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Transfer QGIS proxy configuration as plain data over a private stdin pipe."""
 
 from qgis.core import QgsNetworkAccessManager, QgsSettings

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Persistent structured diagnostics without source URLs or exception messages."""
 
 import json

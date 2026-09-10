@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Real dialog/backend checks for progress and understandable terminal states."""
 
 import unittest

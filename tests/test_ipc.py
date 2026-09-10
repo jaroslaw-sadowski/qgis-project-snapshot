@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Reproduce Windows replacement failures without relying on the test OS."""
 
 import json

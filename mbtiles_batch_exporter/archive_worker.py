@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Private process entry point: no live desktop QGIS objects cross processes."""
 
 import json

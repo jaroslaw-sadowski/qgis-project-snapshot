@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 """Real supervisor threads with controlled RAM and disposable fake map jobs."""
 
 import unittest
