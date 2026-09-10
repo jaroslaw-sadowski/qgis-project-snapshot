@@ -24,7 +24,13 @@ from qgis.PyQt.QtCore import QCoreApplication, QUrl
 
 from .adaptive import PROTOCOL, HostPolicy, WorkerGate, write_state
 from .i18n import language, tr
-from .resources import MEMORY_RESERVE, available_memory, recommend
+from .resources import (
+    MEMORY_PER_WORKER,
+    MEMORY_RESERVE,
+    MIN_WORKER_MEMORY,
+    available_memory,
+    recommend,
+)
 from .worker_network import network_snapshot
 
 
@@ -174,6 +180,9 @@ class RasterWorkers:
         self.ceiling = min(32, 2 * self.cpu) if adaptive else workers
         self.peak_workers = workers
         self.memory_available = None
+        self.worker_memory = MEMORY_PER_WORKER
+        self.worker_peak_memory = 0
+        self.reserved_growth = 0
         self.pool = ThreadPoolExecutor(
             max_workers=self.ceiling, thread_name_prefix="archive-process"
         )
@@ -183,7 +192,8 @@ class RasterWorkers:
         self.queue = []
         self.condition = Condition()
         self.workers = workers
-        self.per_server_limit = per_server_limit
+        self.launch_slots = workers
+        self.per_server_limit = self.ceiling if adaptive else per_server_limit
         self.language = language()
         self.started = set()
         self.merged = set()
@@ -366,31 +376,85 @@ class RasterWorkers:
             while not self.stop.is_set():
                 with self.condition:
                     now = time.monotonic()
+                    for job in self.jobs.values():
+                        if job["active"]:
+                            self._read_job(job, now)
                     if now >= self.next_memory_check:
                         memory = available_memory()
                         self.memory_available = memory
+                        process_jobs = [
+                            j
+                            for name, j in self.jobs.items()
+                            if not name.startswith("local_")
+                        ]
+                        for job in process_jobs:
+                            sample = job["state"].get("memory", {})
+                            peak = sample.get("peak")
+                            if isinstance(peak, int) and peak > 0:
+                                self.worker_peak_memory = max(
+                                    self.worker_peak_memory, peak
+                                )
+                        estimate = (
+                            max(
+                                MIN_WORKER_MEMORY,
+                                math.ceil(self.worker_peak_memory * 1.5),
+                            )
+                            if self.worker_peak_memory
+                            else MEMORY_PER_WORKER
+                        )
+                        self.reserved_growth = 0
+                        for job in process_jobs:
+                            if not job["active"]:
+                                continue
+                            rss = job["state"].get("memory", {}).get("rss")
+                            # Unknown startup still owns its full launch budget.
+                            # A measured worker can release its initial excess,
+                            # but reserves room to grow to the learned estimate.
+                            self.reserved_growth += (
+                                max(0, estimate - rss)
+                                if isinstance(rss, int) and rss > 0
+                                else max(
+                                    estimate,
+                                    job.get("memory_budget", MEMORY_PER_WORKER),
+                                )
+                            )
                         budget = recommend(
-                            getattr(self, "cpu", self.workers), memory, True
+                            self.cpu,
+                            memory,
+                            True,
+                            active_workers=sum(self.active_hosts.values()),
+                            worker_memory=estimate,
+                            reserved_growth=self.reserved_growth,
+                        )
+                        # A sample grants a finite number of new starts. Do not
+                        # reuse the same free RAM until the OS is sampled again.
+                        self.launch_slots = max(
+                            0, budget - sum(self.active_hosts.values())
                         )
                         ok = memory is None or memory >= MEMORY_RESERVE
-                        if ok != self.memory_ok or budget != self.workers:
+                        if (
+                            ok != self.memory_ok
+                            or budget != self.workers
+                            or estimate != self.worker_memory
+                        ):
                             self.memory_history.append(
                                 {
                                     "at": now - self.origin,
                                     "memory_ok": ok,
                                     "available": memory,
                                     "budget": budget,
+                                    "worker_memory": estimate,
+                                    "worker_peak_memory": self.worker_peak_memory,
+                                    "reserved_growth": self.reserved_growth,
                                 }
                             )
                         self.workers = budget
+                        self.worker_memory = estimate
                         self.peak_workers = max(
                             getattr(self, "peak_workers", 0), budget
                         )
                         self.memory_ok = ok
                         self.next_memory_check = now + 5
-                    for job in self.jobs.values():
-                        if job["active"]:
-                            self._read_job(job, now)
                     rows = []
                     for host, policy in self.policies.items():
                         jobs = [
@@ -402,8 +466,20 @@ class RasterWorkers:
                         policy.evaluate(
                             now,
                             queued > 0
-                            and sum(self.active_hosts.values()) < self.workers,
+                            and sum(self.active_hosts.values()) < self.workers
+                            and self.launch_slots > 0,
                             self.memory_ok,
+                            active=sum(
+                                bool(
+                                    not j["state"].get("done")
+                                    and (
+                                        j["state"].get("running")
+                                        or j["state"].get("waiting")
+                                        or j["counts"]
+                                    )
+                                )
+                                for j in jobs
+                            ),
                         )
                         allowed = jobs[: policy.limit]
                         if policy.recovering:
@@ -451,7 +527,6 @@ class RasterWorkers:
                             else "capacity"
                             if queued
                             and sum(self.active_hosts.values()) >= self.workers
-                            and not jobs
                             else "stable"
                             if policy.frozen or policy.limit >= policy.ceiling
                             else "increasing"
@@ -471,6 +546,10 @@ class RasterWorkers:
                                 "queued": queued,
                                 "budget": self.workers,
                                 "memory_available": self.memory_available,
+                                "memory_reserve": MEMORY_RESERVE,
+                                "worker_memory": self.worker_memory,
+                                "worker_memory_measured": bool(self.worker_peak_memory),
+                                "reserved_growth": self.reserved_growth,
                                 "cpu": self.cpu,
                                 "rate": (
                                     policy.successes
@@ -530,6 +609,9 @@ class RasterWorkers:
                 "protocol": PROTOCOL,
                 "coordinator_failed": self.coordinator_failed,
                 "memory": list(self.memory_history),
+                "memory_reserve": MEMORY_RESERVE,
+                "worker_peak_memory": self.worker_peak_memory,
+                "worker_memory": self.worker_memory,
                 "hosts": [
                     {
                         "host": p.host,
@@ -583,6 +665,7 @@ class RasterWorkers:
                 if self.adaptive and (
                     not self.memory_ok
                     or sum(self.active_hosts.values()) >= self.workers
+                    or not self.launch_slots
                 ):
                     self.condition.wait(0.1)
                     continue
@@ -655,6 +738,8 @@ class RasterWorkers:
                 self.active_hosts[host] = self.active_hosts.get(host, 0) + 1
                 future.set_running_or_notify_cancel()
                 if self.adaptive:
+                    self.launch_slots -= 1
+                    self.jobs[folder.name]["memory_budget"] = self.worker_memory
                     self.jobs[folder.name]["active"] = True
             error = None
             result = None

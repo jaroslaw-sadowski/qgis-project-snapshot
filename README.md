@@ -1,4 +1,4 @@
-# <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> qgis-project-snapshot
+# <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
 Polski · [English](README.en.md)
 
@@ -17,10 +17,10 @@ modyfikować i udostępniać na warunkach [licencji](LICENSE).
 ## Jak używać
 
 Wymaga QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7. Interfejs wybiera polski
-lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.5**.
+lub angielski według języka QGIS. Aktualna paczka do lokalnej instalacji: **0.9.7**.
 
 1. Zainstaluj paczkę przez **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Otwórz projekt i wybierz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**
+2. Otwórz projekt i wybierz **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**
    lub ikonę mapy w pudełku na pasku wtyczek.
 3. Wskaż folder, obszar (widok mapy lub poligony), warstwy i szczegółowość map.
    Wybierz **Utwórz archiwum**. Podpowiedzi opcji są dostępne po najechaniu kursorem.
@@ -30,8 +30,12 @@ lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.5**.
 Pobieranie korzysta z proxy skonfigurowanego w aktywnym QGIS, jego wyjątków
 i dostępnych zapisanych poświadczeń. Nie trzeba wpisywać ich we wtyczce.
 Automatycznie dobiera liczbę zadań do CPU, RAM i odpowiedzi każdego serwera.
-Preferuje pracę na różnych serwerach równocześnie, z jednym lub najwyżej dwoma
-zadaniami na host. Okno pokazuje aktywne zadania, limity, kolejki, przerwy i dziennik.
+Po pierwszych pobraniach mierzy pamięć procesów i dobiera dalszą równoległość
+z zapasem na rozruch oraz wzrost zużycia, pozostawiając 768 MiB wolnego RAM.
+Zaczyna od jednego zadania na serwer i stopniowo zwiększa obciążenie, jeśli
+przyspiesza to pobieranie i pozwalają zasoby komputera. Preferuje równoczesną pracę
+różnych serwerów. Okno pokazuje aktywne zadania, limity, przerwy i dziennik;
+„Warstwy w kolejce” to warstwy czekające na pobranie z serwera w danym wierszu.
 Podczas eksportu uzupełnia tylko brakujące kafelki w tym samym archiwum.
 Ręczne ponowienie z końcowego ekranu tworzy nowe archiwum wybranych warstw.
 
@@ -58,29 +62,28 @@ oprogramowania i brak gwarancji opisuje [licencja](LICENSE).
 
 ## Wykonane kontrole
 
-- 108 testów QGIS w wersji 0.9.5: zapis i odczyt danych, mapy, raport, PL/EN, anulowanie,
+- 128 testów QGIS w wersji 0.9.7: zapis i odczyt danych, mapy, raport, PL/EN, anulowanie,
   ograniczenia serwerów i uzupełnianie braków.
 - Test instalacyjnego ZIP-a: natywne wykrywanie i ładowanie w QGIS, okno archiwizacji,
   wyłączenie wtyczki oraz uruchomienie testów na kodzie z paczki.
 - Ruff: reguły PEP 8/pycodestyle (E/W), Pyflakes (F), importy (I) i formatowanie
   według konfiguracji projektu (88 znaków).
 - Kontrola składni, integralności ZIP-a i zgodności jego zawartości ze źródłami.
-- Kontrolowany benchmark trybu stałego i automatycznego z identycznymi kafelkami wynikowymi.
 
 Środowisko testowe: Ubuntu, QGIS 3.40.15. Windows, MSSQL i kompletny projekt
 firmowy wymagają odbioru na stanowisku użytkownika. To kontrole lokalne,
 nie certyfikat QGIS ani gwarancja poprawności dowolnego projektu.
-[Odbiór 0.9.5](docs/validation-0.9.5.md) · [Raporty i dokumentacja](docs/README.md).
+[Odbiór 0.9.7](docs/validation-0.9.7.md) · [Raporty i dokumentacja](docs/README.md).
 
 ## Paczka i rozwój
 
-Repozytorium zawiera źródła. Aby przygotować ZIP **0.9.5**, uruchom:
+Repozytorium zawiera źródła. Aby przygotować ZIP **0.9.7**, uruchom:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-Paczka `qgis-project-snapshot-0.9.5.zip` i suma SHA-256 powstaną w `dist/`.
+Paczka `qgis-project-snapshot-0.9.7.zip` i suma SHA-256 powstaną w `dist/`.
 Ten katalog nie jest przechowywany w Git. Samo przygotowanie ZIP-a nie oznacza
 publikacji w katalogu wtyczek QGIS.
 

@@ -34,6 +34,7 @@ class ProxyTests(unittest.TestCase):
         self.proxy_requests = []
         self.auth_required = False
         self.reject_auth = False
+        self.reject_map_auth = False
         owner = self
         original = self.server.RequestHandlerClass
 
@@ -47,6 +48,10 @@ class ProxyTests(unittest.TestCase):
                     )
                     if owner.auth_required and (
                         owner.reject_auth
+                        or (
+                            owner.reject_map_auth
+                            and "request=getmap" in self.path.lower()
+                        )
                         or self.headers.get("Proxy-Authorization") != wanted
                     ):
                         self.send_response(407)
@@ -187,6 +192,20 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(record["worker_error"]["http_status"], 407)
         self.assertIn("proxy", record["reason"].lower())
         self.assertEqual(rows[-1]["state"], "failed")
+
+    def test_proxy_refusal_during_render_stops_after_first_tile(self):
+        self.configure(credentials=True)
+        layer = self.map_layer("http://snapshot-proxy-test.invalid/rejected-map")
+        self.auth_required = self.reject_map_auth = True
+        manifest, _ = self.capture(layer)
+        record = manifest["layers"][0]
+        self.assertEqual(record["status"], "failed")
+        self.assertEqual(record["worker_error"]["http_status"], 407)
+        self.assertEqual(record["raster"]["stop_http_status"], 407)
+        self.assertEqual(
+            sum(level["attempted"] for level in record["raster"]["levels"]), 1
+        )
+        self.assertIn("proxy", record["reason"].lower())
 
     def test_disabled_proxy_snapshot_omits_stale_credentials(self):
         self.configure(enabled=False, credentials=True)

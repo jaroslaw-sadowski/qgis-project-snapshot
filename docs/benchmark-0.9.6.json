@@ -1,0 +1,153 @@
+{
+  "scenario": "6 map layers on one loopback WMS; 1.2 km square; EPSG:2180; zoom18; 120ms server delay",
+  "baseline_commit": "58f057ec84e09d051da63a91c70bb45d07f08f6a",
+  "resources": "Both runs: injected CPU4 and initial4.66GiB, subsequent3.60GiB MemAvailable; actual worker RSS monitored, not used for scheduling",
+  "note": "Synthetic local comparison, not production service performance. Total RSS sums shared pages per process. local_audit_passed checks sources, not all offline dependencies.",
+  "identical_png": true,
+  "results": [
+    {
+      "version": "0.9.5",
+      "seconds": 174.06,
+      "requests": 1014,
+      "peak_processes": 1,
+      "peak_http_requests": 1,
+      "png_sha256": [
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3"
+      ],
+      "local_audit_passed": true,
+      "adaptive": {
+        "protocol": 1,
+        "coordinator_failed": false,
+        "memory": [
+          {
+            "at": 0.025566581999555638,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 1
+          }
+        ],
+        "hosts": [
+          {
+            "host": "127.0.0.1",
+            "limit": 1,
+            "frozen": false,
+            "deferred": false,
+            "successes": 1014,
+            "history": []
+          }
+        ]
+      },
+      "peak_total_rss_bytes": 544481280,
+      "peak_worker_rss_bytes": 270667776
+    },
+    {
+      "version": "0.9.6",
+      "seconds": 79.786,
+      "requests": 1014,
+      "peak_processes": 4,
+      "peak_http_requests": 4,
+      "png_sha256": [
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3"
+      ],
+      "local_audit_passed": true,
+      "adaptive": {
+        "protocol": 1,
+        "coordinator_failed": false,
+        "memory": [
+          {
+            "at": 0.03784265099966433,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 1
+          },
+          {
+            "at": 5.046586614000262,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 2
+          },
+          {
+            "at": 20.079160240999954,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 3
+          },
+          {
+            "at": 35.116683735999686,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 4
+          },
+          {
+            "at": 55.16978271300013,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 5
+          },
+          {
+            "at": 60.18083398700037,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 4
+          },
+          {
+            "at": 65.1949638570004,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 3
+          },
+          {
+            "at": 75.21555986299973,
+            "memory_ok": true,
+            "available": 3865470566,
+            "budget": 2
+          }
+        ],
+        "hosts": [
+          {
+            "host": "127.0.0.1",
+            "limit": 4,
+            "frozen": false,
+            "deferred": false,
+            "successes": 1014,
+            "history": [
+              {
+                "at": 16.071571612000298,
+                "limit": 2,
+                "generation": 1,
+                "reason": "increase",
+                "pause_seconds": 0
+              },
+              {
+                "at": 33.612056056000256,
+                "limit": 3,
+                "generation": 2,
+                "reason": "increase",
+                "pause_seconds": 0
+              },
+              {
+                "at": 50.65834425600042,
+                "limit": 4,
+                "generation": 3,
+                "reason": "increase",
+                "pause_seconds": 0
+              }
+            ]
+          }
+        ]
+      },
+      "peak_total_rss_bytes": 1355890688,
+      "peak_worker_rss_bytes": 270721024
+    }
+  ]
+}

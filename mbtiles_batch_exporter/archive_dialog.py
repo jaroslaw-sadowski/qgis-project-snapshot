@@ -55,7 +55,7 @@ class ArchiveDialog(QDialog):
         self._worker_messages = {}
         self._finished_ids = set()
         self._items = {}
-        self.setWindowTitle(tr("qgis-project-snapshot — Archiwizuj projekt"))
+        self.setWindowTitle(tr("QGIS Project Snapshot — Archiwizuj projekt"))
         self.setWindowIcon(QIcon(str(Path(__file__).with_name("icon.svg"))))
         self.setWindowModality(Qt.ApplicationModal)
         self.resize(860, 790)
@@ -129,7 +129,7 @@ class ArchiveDialog(QDialog):
             [
                 tr("Serwer"),
                 tr("Aktywne / limit"),
-                tr("Kolejka"),
+                tr("Warstwy w kolejce"),
                 tr("Kafelki/s"),
                 tr("Stan"),
                 tr("Przerwa"),
@@ -138,19 +138,28 @@ class ArchiveDialog(QDialog):
         self.servers.headerItem().setIcon(
             0, self.style().standardIcon(QStyle.SP_ComputerIcon)
         )
+        self.servers.headerItem().setToolTip(
+            2,
+            tr(
+                "Liczba warstw czekających na rozpoczęcie pobierania z serwera "
+                "w tym wierszu. Nie obejmuje warstw już pobieranych."
+            ),
+        )
         self.servers.setMaximumHeight(145)
         self.servers.setRootIsDecorated(False)
-        for column, width in enumerate((215, 130, 70, 85, 210, 65)):
+        for column, width in enumerate((215, 130, 160, 85, 210, 65)):
             self.servers.setColumnWidth(column, width)
         self.servers.setToolTip(
             tr(
                 (
-                    "Automat zaczyna od 1 zadania na serwer i może zwiększyć "
-                    "limit do 2 po udanych pobraniach. Pierwszeństwo mają "
+                    "Automat zaczyna od 1 zadania na serwer. Po udanych "
+                    "pobraniach stopniowo sprawdza wyższe limity, dopóki rośnie "
+                    "szybkość i komputer ma wolne zasoby. Pierwszeństwo mają "
                     "serwery z mniejszą liczbą aktywnych procesów. Błędy lub "
-                    "brak przyspieszenia zmniejszają obciążenie. CPU i RAM "
-                    "ograniczają łączną liczbę procesów. Limity dotyczą map, "
-                    "nie dokładnej liczby żądań HTTP."
+                    "brak przyspieszenia zmniejszają obciążenie. Łączny limit "
+                    "wynosi maks. 32 procesy i nie więcej niż dwukrotność "
+                    "liczby dostępnych CPU. Dalszy wzrost ogranicza wolny RAM. "
+                    "Limity dotyczą map, nie dokładnej liczby żądań HTTP."
                 )
             )
         )
@@ -206,15 +215,16 @@ class ArchiveDialog(QDialog):
         ram_icon.setPixmap(
             QIcon(str(Path(__file__).with_name("ram.svg"))).pixmap(22, 22)
         )
-        self.ram_hint = QLabel(tr("Rezerwa RAM: 2 GiB"))
+        self.ram_hint = QLabel(tr("Rezerwa RAM: 768 MiB"))
         self.ram_hint.setWordWrap(True)
         self.ram_hint.setToolTip(
             tr(
                 (
-                    "Automat pozostawia 2 GiB pamięci dla QGIS i systemu. "
-                    "Sprawdza dostępny RAM co 5 sekund; przy niedoborze "
-                    "wstrzymuje uruchamianie nowych procesów. To rezerwa "
-                    "planowania, nie pomiar zużycia RAM."
+                    "Automat pozostawia 768 MiB wolnej pamięci oraz zapas "
+                    "na rozruch i wzrost działających procesów. Po pierwszych "
+                    "pobraniach dobiera koszt kolejnego procesu do pomiarów "
+                    "zużycia RAM. Sprawdza pamięć co 5 sekund; przy niedoborze "
+                    "wstrzymuje uruchamianie nowych procesów."
                 )
             )
         )
@@ -473,7 +483,7 @@ class ArchiveDialog(QDialog):
             "failed": tr("Zakończono z błędami"),
             "starting": tr("Rozpoczynanie"),
             "running": tr("Pobieranie"),
-            "capacity": tr("Czeka na wolny proces"),
+            "capacity": tr("Limit procesów komputera"),
             "increasing": tr("Zwiększanie"),
             "stable": tr("Ustalony limit"),
             "cooldown": tr("Przerwa serwera"),
@@ -497,6 +507,12 @@ class ArchiveDialog(QDialog):
             for column, value in enumerate(values):
                 item.setText(column, value)
                 item.setToolTip(column, value)
+            item.setToolTip(
+                2,
+                tr("Warstwy czekające na pobranie z serwera {0}: {1}.").format(
+                    row["host"], row["queued"]
+                ),
+            )
         self.resource_hint.setText(
             tr(
                 "Procesy map: {0}/{1}; aktywne zadania: {2}. Dobór automatyczny."
@@ -509,16 +525,27 @@ class ArchiveDialog(QDialog):
         if rows and "memory_available" in rows[0]:
             memory = rows[0]["memory_available"]
             self.ram_hint.setText(
-                tr("Dostępny RAM: {0:.1f} GiB; rezerwa: 2 GiB").format(memory / 1024**3)
+                tr("Dostępny RAM: {0:.1f} GiB; rezerwa: 768 MiB").format(
+                    memory / 1024**3
+                )
                 if memory is not None
                 else tr("Dostępny RAM: nieznany; maks. 2 procesy")
             )
             explanation = tr(
                 "Dostępne CPU: {0}. Budżet procesów: {1}. "
-                "Na proces przyjmujemy 1 GiB RAM po pozostawieniu rezerwy 2 GiB. "
-                "Budżet sprawdzamy co 5 sekund. Spadek budżetu nie kończy "
-                "działających procesów; wstrzymuje uruchamianie kolejnych."
-            ).format(rows[0].get("cpu", "?"), rows[0]["budget"])
+                "Planowany RAM kolejnego procesu: {2:.0f} MiB ({3}). "
+                "Po pobraniach używamy najwyższego zmierzonego zużycia z zapasem "
+                "50%, co najmniej 384 MiB. Pozostawiamy 768 MiB wolnej pamięci "
+                "oraz zapas na rozruch i wzrost działających procesów. Odczyt "
+                "co 5 sekund. Niedobór pamięci wstrzymuje nowe procesy."
+            ).format(
+                rows[0].get("cpu", "?"),
+                rows[0]["budget"],
+                rows[0].get("worker_memory", 1024**3) / 1024**2,
+                tr("pomiar z zapasem")
+                if rows[0].get("worker_memory_measured")
+                else tr("szacunek początkowy"),
+            )
             self.resource_hint.setToolTip(explanation)
             self.ram_hint.setToolTip(explanation)
 
@@ -695,7 +722,7 @@ class ArchiveDialog(QDialog):
             tr("Równoległość dobierana automatycznie podczas pobierania.")
         )
         self.resource_hint.setToolTip("")
-        self.ram_hint.setText(tr("Rezerwa RAM: 2 GiB"))
+        self.ram_hint.setText(tr("Rezerwa RAM: 768 MiB"))
         self.servers.clear()
         self._server_items.clear()
         self._server_warnings.clear()

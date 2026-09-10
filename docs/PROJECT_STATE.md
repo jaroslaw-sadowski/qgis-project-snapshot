@@ -1,8 +1,102 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 10 września 2026. Wersja **0.9.5** — powrót po przerwie i pierwszeństwo różnych serwerów.
+Aktualizacja: 10 września 2026. Wersja **0.9.7** — równoległość według zmierzonego RAM.
 
-## Najnowszy ukończony przebieg 0.9.4 i poprawka 0.9.5
+## Zmiana 0.9.7
+
+Po potwierdzeniu jednego procesu w przebiegu 0.9.6 użytkownik zlecił pełniejsze
+wykorzystanie komputera i równoczesną pracę kilku map jednego serwera.
+Zastąpiono rezerwę 2 GiB wartością 768 MiB, a stały koszt procesu 1 GiB pomiarem
+po pierwszym renderowaniu. Koszt nowego procesu to max(384 MiB, 1,5 × największy
+szczyt RSS z eksportu); 1 GiB pozostaje wartością początkową bez pomiaru.
+
+Aktywne procesy rezerwują wzrost do tej estymaty. Proces w rozruchu bez odczytu
+RSS zachowuje pełny budżet startowy. Spadek RSS nie kasuje szczytu ani rezerwy
+na ponowny wzrost; zakończone procesy także pozostawiają pomiar szczytu.
+Linux odczytuje /proc/self/status, Windows używa GetProcessMemoryInfo przez ctypes,
+pozostałe Unix — peak z resource. Bez nowych zależności. Główny QGIS nie służy
+do estymacji procesów mapowych. Telemetria jest czytana przed próbką RAM co 5 s.
+
+Wzrost hosta 1→2→3→… nadal wymaga poprawnych pobrań, wolnego RAM i wzrostu
+przepustowości; sufit min(32, 2 × CPU), bez arbitralnego limitu czterech na host.
+Nowa podpowiedź RAM PL/EN podaje bieżący koszt procesu i pochodzenie estymaty.
+Nagły wzrost zużycia może przekroczyć zapas; to adaptacyjna heurystyka.
+Nie podmieniono kodu załadowanego w trwającym eksporcie użytkownika.
+
+Źródła: **128/128 testów**, 107,487 s, bez pominięć. Ruff, formatowanie, AST i diff
+poprawne. ZIP: **128/128 testów**, 116,790 s, bez pominięć; wykrywanie, ładowanie,
+okno PL/EN i wyłączenie poprawne. Paczka 112 229 bajtów / 22 pliki ma zgodne
+źródła i jest powtarzalna. SHA-256:
+7c0220ddb630cd15231677705a0f6c3e56e145ddb8cc889760939e5b9c4b19c2.
+
+Porównanie 0.9.6→0.9.7: 190,378→80,609 s, jeden→cztery procesy tego samego
+lokalnego WMS i cztery równoczesne GetMap; PNG wszystkich sześciu map identyczne.
+Obie próby: CPU 4, 2,5 GiB początkowo, dostępny RAM zmniejszany o rzeczywisty
+RSS pracowników. Estymata wtyczki pochodzi z natywnych pomiarów. To kontrolowany
+scenariusz, nie gwarancja przyspieszenia serwerów użytkownika. Cztery nie są limitem
+w kodzie. Raport: [validation-0.9.7.md](validation-0.9.7.md),
+[pomiary](benchmark-0.9.7.json).
+
+## Historia: obserwacja trwającej próby 0.9.6 — 21:26
+
+Odczyt bieżącego przebiegu rozpoczętego 10 września o 21:24:09 potwierdził
+wersję 0.9.6, CPU 4 i 2,34 GiB wolnego RAM przy starcie. Do chwili odczytu
+log zawierał tylko jeden worker_started; z 10 zarejestrowanych map tylko jedna
+miała telemetrię (ponad 400 poprawnych kafelków), pozostałe 9 nie wystartowało.
+Bieżące próbki sieci miały HTTP 200 / Qt 0. To obserwacja w trakcie, nie odbiór
+całego eksportu ani pełne podsumowanie błędów.
+
+Zrzut pokazywał 2,2 GiB wolnego RAM. Próg rezerwy 2 GiB plus szacunek 1 GiB
+na dodatkowy proces nie dopuszcza nowego procesu poniżej 3 GiB. To ograniczenie
+heurystyki, nie zmierzony sufit serwera ani udowodniony brak pamięci na drugi QGIS.
+Odczyt systemowy o 21:26:11: proces mapowy RSS około 305 MiB, główny QGIS około
+1,12 GiB RSS. RSS to chwilowy pomiar, nie gwarancja maksymalnego zużycia. Reguła
+1 GiB pozostaje konserwatywna mimo naprawy podwójnego liczenia procesów w 0.9.6.
+Analiza tylko do odczytu; bieżącego eksportu i kodu wtyczki nie zmieniono.
+
+## Historia: zmiana 0.9.6 i wcześniejsza próba użytkownika
+
+Próba 0.9.5 na Ubuntu z 10 września 19:49–20:36 trwała 47 min 35,44 s.
+Start: CPU 4, 4,66 GiB dostępnego RAM, dwa procesy globalnie. Po 55,39 s stara
+reguła obniżyła budżet do jednego przy 3,60 GiB RAM. Oba hosty pozostały przy
+limicie 1 bez zamrożenia i błędów; wszystkie 11601 zarejestrowanych GetMap miały
+HTTP 200 / Qt 0. To ograniczenie lokalnego planowania, nie dowód sufitu serwera.
+
+Udostępniony tym razem GeoPackage sprawdzono tylko w odczycie: SQLite i klucze
+poprawne, wszystkie cztery sumy manifestu zgodne. 5968 PNG 256², 8-bit RGBA,
+poprawne CRC i dekompresja, 10 tabel rastra odczytuje GDAL. Dwa WFS zawierają
+696 i 1022 obiekty bez błędów. Spośród dziewięciu empty tylko jedna mapa była
+całkowicie przezroczysta; osiem miało treść na części zoomów. Nie ma failed
+ani partial warstw. To nie rozstrzyga wcześniejszych trzech pustych firmowych WFS.
+Nie kopiowano danych użytkownika do repozytorium ani nie odpytywano jego usług.
+
+0.9.6 używa istniejącej automatyki, bez nowych zależności:
+
+- zamiast sztywnego 2/host sufit min(32, 2 × CPU), w ramach wspólnego budżetu RAM;
+- dostępny RAM po rezerwie 2 GiB daje 1 GiB na DODATKOWY proces; już działające
+  procesy są doliczane osobno, także podczas rozruchu/przerw. MemAvailable już
+  uwzględnia ich zużycie. Każda próbka co 5 s przyznaje skończone launch_slots;
+  zakończenie mapy nie odnawia przydziału przed kolejną próbką;
+- wzrost o 1 po 15 s pomiaru i 10 sukcesach. Mierzymy tylko okresy, kiedy gotowa jest
+  docelowa liczba map. Rozruch następnej mapy wstrzymuje pomiar, zachowując
+  poprawne próbki; przerwa między zdarzeniami kafelków nie zeruje okna;
+- HTTP 407 kończy bieżącą mapę po pierwszej odmowie, zachowuje ukończone PNG
+  i opisuje braki; nie odpytuje wszystkich kolejnych kafelków. Inne kody bez zmian;
+- widoczna nazwa QGIS Project Snapshot; techniczny ID i prefiks ZIP bez zmian;
+- Warstwy w kolejce / Queued layers: opis nagłówka oraz liczby odnosi się do
+  serwera w tym wierszu. Limit procesów komputera wyjaśnia lokalne ograniczenie.
+
+Źródła: **115/115 testów**, 102,161 s, bez pominięć; Ruff i formatowanie OK.
+ZIP: **115/115 testów**, 103,852 s, bez pominięć; ładowanie QGIS i PL/EN OK.
+Paczka dist/qgis-project-snapshot-0.9.6.zip: 110 549 bajtów, 22 pliki;
+powtarzalność i zgodność ze źródłami potwierdzone. SHA-256 w raporcie odbioru.
+Benchmark: 174,060 s → 79,786 s, identyczne
+PNG sześciu map. Jeden host wzrósł 1→2→3→4, cztery równoczesne GetMap.
+Wymuszone zasoby były takie same w obu próbach; to pomiar lokalny, nie gwarancja
+szybkości serwerów produkcyjnych. Wyniki: [benchmark-0.9.6.json](benchmark-0.9.6.json).
+Szczegóły: [validation-0.9.6.md](validation-0.9.6.md).
+
+## Historia: przebieg 0.9.4 i poprawka 0.9.5
 
 Eksport firmowy z 10 września, 16:53–17:22, trwał 28 min 49,545 s; nie anulowano
 pracy, coordinator_failed=false. 211 warstw: 61 saved, 116 empty, 33 failed,
@@ -167,7 +261,7 @@ lokalnego źródła z pełnym odbiorem offline.
 
 - Jedna akcja archiwizacji w menu i na pasku. Usunięto dialog.py, utils.py,
   klasę/akcję dawnego eksportera i jego tłumaczenia. Nie przywracaj starego okna.
-- Nazwa produktu: qgis-project-snapshot; klasa: ProjectSnapshotPlugin.
+- Od 0.9.6 widoczna nazwa produktu: QGIS Project Snapshot; klasa: ProjectSnapshotPlugin.
   Katalog/ID `mbtiles_batch_exporter` pozostaje wyłącznie dla zgodności aktualizacji.
 - Proxy: odczyt z aktywnego QGIS i przesłanie zwykłych danych przez stdin procesu.
   Prywatny profil procesu zawiera ustawienia bez hasła/loginu/authcfg. Zapisane,
@@ -199,14 +293,17 @@ ma korzystać z konfiguracji QGIS.
 
 `create_archive(adaptive=False)` zachowuje API stałych limitów; GUI używa wyłącznie
 automatyki. Start 1 mapa/host, wzrost po 15 s i 10 sukcesach przy kolejce i zasobach.
-Dwa okna bez 10% poprawy cofają limit i kończą wzrost. HTTP 429/503 i trzy kolejne
+Dwa okna bez 10% poprawy cofają limit i kończą wzrost; pomiar obejmuje
+tylko czas z docelową liczbą gotowych map, zachowany również przy zmianie mapy. HTTP 429/503 i trzy kolejne
 timeouty zmniejszają limit i rozpoczynają przerwę. Retry-After sekundy/data,
 inaczej 30/60/120 s; po przerwie jedna próba rzeczywiście brakującego kafelka.
 Trzy nieudane powroty lub oczekiwanie ponad pięć minut odkładają host.
 
-Sufit 2 map/host w trybie adaptacyjnym; globalnie min(32, 2 × CPU, RAM po rezerwie 2 GiB przy
-1 GiB/proces), minimum 1. Nieznany RAM ogranicza do 2. RAM sprawdzamy co pięć sekund;
-presja pamięci blokuje wzrost i nowe procesy. Czekające procesy też liczą się do RAM.
+Sufit min(32,2CPU) na host i globalnie. Budżet RAM to istniejące procesy plus
+miejsca dla nowych po1GiB z dostępnego RAM po rezerwie2GiB, minimum1. Nieznany
+RAM ogranicza do2. Co5s nowa próbka przyznaje launch_slots zużywane przez starty;
+nie odnawia ich koniec mapy. Presja pamięci blokuje wzrost i nowe procesy.
+Czekające procesy też liczą się do budżetu.
 To zadania mapowe, nie dokładna liczba HTTP/s, pomiar łącza czy gwarancja maksimum.
 WFS, MSSQL, rastry źródłowe i wektory z edycjami nie są zrównoleglane przez automat.
 
@@ -224,7 +321,7 @@ Końcowy ręczny przycisk ponowienia zaznacza failed/cancelled/empty/partial,
 odznacza saved/excluded i tworzy nowe archiwum wybranych warstw. Nie myl go
 z automatycznym uzupełnianiem kafelków w bieżącym eksporcie.
 
-PL/EN: i18n.py + en.ts/en.qm, 278 tłumaczeń. Po zmianach uruchom lrelease.
+PL/EN: i18n.py + en.ts/en.qm, 282 tłumaczenia. Po zmianach uruchom lrelease.
 Szacunek jednej mapy: 0,2–2 s i 10–250 KiB PNG/kafelek; nie jest to gwarancja.
 Ikony SVG: archive icon.svg, cpu.svg, ram.svg; inne przyciski używają QStyle.
 
@@ -243,7 +340,10 @@ Ikony SVG: archive icon.svg, cpu.svg, ram.svg; inne przyciski używają QStyle.
 
 ## Następny krok i pliki
 
-Odbiór ZIP-a 0.9.5 na komputerze użytkownika z już skonfigurowanym proxy QGIS.
+Kod i paczka 0.9.7 przeszły końcowe kontrole lokalne opisane wyżej.
+Aktualizacja wymaga instalacji nowego ZIP-a oraz restartu QGIS po zakończeniu
+trwającej pracy. Nie podmieniano kodu aktywnego eksportu użytkownika.
+Odbiór na firmowym Windows pozostaje po stronie stanowiska z skonfigurowanym QGIS.
 MSSQL działa tylko w sieci firmowej, trzy rastry projektu są tu nieobecne.
 Nie zgaduj adresów ani nie proś ponownie o poświadczenia. Sprawdzenie wszystkich
 warstw, uwierzytelniania, stylów, formularzy, relacji i wydruków wymaga stanowiska

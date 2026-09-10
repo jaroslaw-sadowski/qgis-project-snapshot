@@ -25,19 +25,19 @@ class ProjectSnapshotPlugin:
         self.archive_action.setToolTip(
             tr(
                 (
-                    "qgis-project-snapshot: zapisz kopię projektu, dane i mapy do "
+                    "QGIS Project Snapshot: zapisz kopię projektu, dane i mapy do "
                     "pracy bez sieci."
                 )
             )
         )
-        self.iface.addPluginToMenu("qgis-project-snapshot", self.archive_action)
+        self.iface.addPluginToMenu("QGIS Project Snapshot", self.archive_action)
         self.iface.addToolBarIcon(self.archive_action)
 
     def unload(self):
         if self.archive_dlg:
             self.archive_dlg.reject()
         if self.archive_action:
-            self.iface.removePluginMenu("qgis-project-snapshot", self.archive_action)
+            self.iface.removePluginMenu("QGIS Project Snapshot", self.archive_action)
             self.iface.removeToolBarIcon(self.archive_action)
             self.archive_action.deleteLater()
         self.archive_action = None

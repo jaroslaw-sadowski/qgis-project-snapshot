@@ -158,8 +158,8 @@ class OptionsTests(unittest.TestCase):
 
     def test_live_memory_budget_and_waiting_status_in_both_languages(self):
         for language, waiting, downloading, unknown in (
-            ("pl", "Czeka na wolny proces", "Pobieranie", "nieznany"),
-            ("en", "Waiting for a free process", "Downloading", "unknown"),
+            ("pl", "Limit procesów komputera", "Pobieranie", "nieznany"),
+            ("en", "Computer process limit", "Downloading", "unknown"),
         ):
             with self.subTest(language=language):
                 with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE=language):
@@ -184,13 +184,16 @@ class OptionsTests(unittest.TestCase):
                         )
                         self.assertIn("3.8 GiB", dialog.ram_hint.text())
                         self.assertIn("14", dialog.resource_hint.toolTip())
-                        self.assertIn("1 GiB", dialog.ram_hint.toolTip())
+                        self.assertIn("1024 MiB", dialog.ram_hint.toolTip())
+                        self.assertIn("768 MiB", dialog.ram_hint.text())
                         row.update(
                             state="running",
                             active=1,
                             processes=1,
                             budget=3,
                             memory_available=5 * 1024**3,
+                            worker_memory=450 * 1024**2,
+                            worker_memory_measured=True,
                         )
                         dialog._server_activity([row])
                         self.assertEqual(
@@ -198,6 +201,7 @@ class OptionsTests(unittest.TestCase):
                         )
                         self.assertIn("1/3", dialog.resource_hint.text())
                         self.assertIn("5.0 GiB", dialog.ram_hint.text())
+                        self.assertIn("450 MiB", dialog.ram_hint.toolTip())
                         row.update(memory_available=None, budget=2)
                         dialog._server_activity([row])
                         self.assertIn(unknown, dialog.ram_hint.text())
@@ -251,15 +255,23 @@ class ResourceTests(unittest.TestCase):
 
     def test_budget_can_recover_without_exceeding_cpu_or_memory(self):
         gib = 1024**3
-        self.assertEqual(recommend(14, 4111540224, True), 1)
-        self.assertEqual(recommend(14, 5 * gib, True), 3)
-        self.assertEqual(recommend(14, 3 * gib, True), 1)
+        self.assertEqual(recommend(14, 4111540224, True), 3)
+        self.assertEqual(recommend(14, 5 * gib, True), 4)
+        self.assertEqual(recommend(14, 3 * gib, True), 2)
         self.assertEqual(recommend(14, None, True), 2)
         self.assertEqual(recommend(14, 40 * gib, True), 28)
 
+    def test_available_ram_budgets_only_additional_processes(self):
+        gib = 1024**3
+        self.assertEqual(recommend(4, 4 * gib, True, active_workers=1), 4)
+        self.assertEqual(recommend(4, 3865907200, True, active_workers=2), 4)
+        self.assertEqual(recommend(4, gib, True, active_workers=2), 2)
+        self.assertEqual(recommend(2, 40 * gib, True, active_workers=3), 4)
+        self.assertEqual(recommend(4, None, True, active_workers=3), 2)
+
     def test_budgets_respect_ram_cpu_and_server_capacity(self):
         gb = 1024**3
-        self.assertEqual(recommend(32, 3 * gb, True), 1)
+        self.assertEqual(recommend(32, 3 * gb, True), 2)
         self.assertEqual(recommend(32, 64 * gb, True), 32)
         self.assertEqual(recommend(2, 64 * gb, True), 4)
         self.assertEqual(recommend(32, None, True), 2)

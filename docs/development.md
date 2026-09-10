@@ -49,7 +49,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.9.5.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.9.7.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -83,10 +83,45 @@ Uaktualnij [stan projektu](PROJECT_STATE.md). Testy firmowe prowadź według
 
 ## Nazwa i zgodność instalacji
 
-Widoczna nazwa oraz prefiks ZIP-a to `qgis-project-snapshot`. Techniczny katalog
-Pythona/identyfikator QGIS pozostaje `mbtiles_batch_exporter`, aby aktualizacja
-zastępowała poprzednią instalację. Nie zmieniaj go razem z etykietami interfejsu
+Widoczna nazwa to **QGIS Project Snapshot**. Prefiks ZIP-a pozostaje
+`qgis-project-snapshot`, a katalog Pythona/identyfikator QGIS —
+`mbtiles_batch_exporter`, aby aktualizacja zastępowała poprzednią instalację.
+Nie zmieniaj go razem z etykietami interfejsu
 bez osobnego planu migracji. Menu tworzy natywne `iface.addPluginToMenu`.
+
+## Kontrole automatyki 0.9.7
+
+Wzrost limitu hosta wymaga kolejki, wolnych miejsc w budżecie oraz okna co najmniej
+15 s i 10 sukcesów. Limit rośnie o jeden, do mniejszej z wartości 32 i `2 × CPU`.
+Brak 10% zysku oceniamy wyłącznie w pełnym oknie, podczas którego gotowe procesy
+map rzeczywiście osiągały badany limit. Opóźniony start QGIS lub brak wolnych
+procesów nie oznacza braku przyspieszenia serwera. Okno zbiera 15 s pracy przy
+badanym obciążeniu; przejście do następnej mapy wyłącza tylko czas rozruchu,
+bez kasowania poprawnych próbek. Krótka przerwa pomiędzy zapisem wyniku kafelka
+a pobraniem następnego pozwolenia nie oznacza niegotowości procesu.
+
+`process_memory()` odczytuje bieżący i szczytowy RSS własnego procesu: Linux
+`/proc/self/status`, Windows `GetProcessMemoryInfo`, pozostałe Unix — peak z `resource`.
+Brak odczytu daje None, bez dodatkowej zależności. WorkerGate publikuje pomiary
+dopiero po renderowaniu, co najwyżej raz na 5 s oraz na końcu. Główny QGIS
+(`local_gate`) nie jest używany do szacowania kosztu procesu pomocniczego.
+
+E = max(384 MiB, 1,5 × największy dotychczasowy peak) albo początkowo 1 GiB.
+Od MemAvailable odejmujemy 768 MiB oraz sumę zapasów wzrostu aktywnych procesów:
+max(0, E − RSS). Proces bez RSS zachowuje pełną rezerwację ze startu (lub E,
+jeżeli estymata wzrosła). Nowe miejsca to pozostały RAM podzielony przez E.
+Spadek bieżącego RSS nie usuwa zapasu na jego ponowny wzrost. Historyczny peak
+pozostaje do końca eksportu, również po zakończeniu procesu, który go zmierzył.
+
+Telemetria jest czytana przed obliczeniem budżetu. Próbka co 5 s przyznaje
+`launch_slots = max(0, budget − active)`; każdy start zużywa jedno miejsce.
+Zakończenie procesu nie odnawia przydziału. CPU/32, minimum jednego i limit
+dwóch przy nieznanym dostępnym RAM pozostają. Niedobór pamięci nie zabija map.
+Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
+
+Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
+procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
+przy anulowaniu. Wyniki wydania: [odbiór 0.9.7](validation-0.9.7.md).
 
 ## Tłumaczenia
 

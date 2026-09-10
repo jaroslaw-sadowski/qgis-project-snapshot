@@ -1,10 +1,10 @@
 [general]
-name=qgis-project-snapshot
+name=QGIS Project Snapshot
 qgisMinimumVersion=3.40
 qgisMaximumVersion=3.99
 description=PL: Archiwizuje projekt QGIS z lokalnymi danymi i mapami do późniejszego odczytu bez sieci.
     | EN: Archives a QGIS project with local data and maps for later offline use.
-version=0.9.5
+version=0.9.7
 author=Jarosław Sadowski
 email=
 about=PL
@@ -23,7 +23,9 @@ homepage=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 repository=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 tracker=https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues
 tags=archiwizacja,archive,snapshot,offline,projekt,project,geopackage,gpkg,wms,wfs,png
-changelog=0.9.5: Recover hosts using the next missing tile, cap retries, prioritize different servers with at most two tasks per host.
+changelog=0.9.7: Measure map process memory to increase parallel downloads, reserve startup and growth headroom, show the learned process estimate.
+    0.9.6: Grow server concurrency within CPU/RAM resources, account for running processes, measure full load, clarify PL/EN labels and display name, stop a map on proxy authentication refusal.
+    0.9.5: Recover hosts using the next missing tile, cap retries, prioritize different servers with at most two tasks per host.
     0.9.4: Preserve completed maps on cancellation, consume ready results, refresh RAM budget, detect native QGIS timeouts.
     0.9.3: Network timing, response summaries and detailed vector read diagnostics.
     0.9.2: Retry Windows IPC file locks, preserve atomic commands, report coordinator failures.

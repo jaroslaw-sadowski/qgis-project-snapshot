@@ -50,6 +50,49 @@ class PolicyTests(unittest.TestCase):
         p.evaluate(60, True)
         self.assertEqual(p.limit, 1)
 
+    def test_unfilled_limit_does_not_misidentify_a_server_ceiling(self):
+        p = HostPolicy("test", ceiling=8)
+        p.success(20, 15, 0)
+        p.evaluate(15, True, active=1)
+        self.assertEqual(p.limit, 2)
+        # The second process cannot start yet (RAM/CPU/startup). Two slow
+        # windows at the old concurrency are not evidence against the server.
+        for now in (30, 45):
+            p.success(20, now, p.generation)
+            p.evaluate(now, True, active=1)
+        self.assertFalse(p.frozen)
+        self.assertEqual(p.limit, 2)
+        p.success(50, 60, p.generation)
+        p.evaluate(60, True, active=2)
+        self.assertEqual(p.limit, 3)
+
+    def test_draining_queue_does_not_lower_a_successful_limit(self):
+        p = HostPolicy("test", ceiling=3)
+        for now, count in ((15, 20), (30, 50)):
+            p.success(count, now, p.generation)
+            p.evaluate(now, True, active=p.limit)
+        self.assertEqual(p.limit, 3)
+        for now in (45, 60):
+            p.success(20, now, p.generation)
+            p.evaluate(now, False, active=1)
+        self.assertFalse(p.frozen)
+        self.assertEqual(p.limit, 3)
+
+    def test_map_handoffs_pause_measurement_without_losing_full_load_samples(self):
+        p = HostPolicy("test", ceiling=8)
+        p.success(20, 15, 0)
+        p.evaluate(15, True, active=1)
+        self.assertEqual(p.limit, 2)
+        for now, active, count in ((20, 2, 20), (25, 1, 1), (30, 2, 20)):
+            p.success(count, now, p.generation)
+            p.evaluate(now, True, active=active)
+        self.assertEqual(p.limit, 2)
+        self.assertEqual(p.successes, 40)
+        p.success(20, 35, p.generation)
+        p.evaluate(35, True, active=2)
+        self.assertEqual(p.limit, 3)
+        self.assertEqual(p.rate, 4.0)  # 60 successes / 15 seconds at full load.
+
     def test_backoff_probe_exhaustion_and_old_wave_errors(self):
         p = HostPolicy("a", limit=4)
         p.failure(429, None, 0, 0)
@@ -192,6 +235,9 @@ class PolicyTests(unittest.TestCase):
         coordinator.queue = []
         coordinator.active_hosts = {}
         coordinator.workers = 4
+        coordinator.worker_memory = 1024**3
+        coordinator.worker_peak_memory = 0
+        coordinator.reserved_growth = 0
         coordinator.coordinator_failed = False
         coordinator.cpu = 2
         coordinator.diagnostic = None
@@ -202,7 +248,7 @@ class PolicyTests(unittest.TestCase):
             ),
             patch(
                 "mbtiles_batch_exporter.parallel_archive.available_memory",
-                side_effect=[1024**3, 3 * 1024**3],
+                side_effect=[512 * 1024**2, 3 * 1024**3],
             ) as memory,
         ):
             coordinator._coordinate()
@@ -315,6 +361,51 @@ class RepairTests(unittest.TestCase):
         self.assertTrue(all(v == 1 for v in calls.values()))
         self.assertEqual(result["raster"]["repair_attempts"], 0)
 
+    def test_proxy_refusal_stops_map_and_preserves_completed_tiles(self):
+        for saved_tiles in (0, 1):
+            with self.subTest(saved_tiles=saved_tiles):
+
+                def render(*args):
+                    if drawing.call_count <= saved_tiles:
+                        return fixtures._render_image(*args)
+                    raise DownloadError("HTTP 407", 407)
+
+                table = f"proxy_{saved_tiles}"
+                with patch(
+                    "mbtiles_batch_exporter.raster_archive._render_image",
+                    side_effect=render,
+                ) as drawing:
+                    result = fixtures.write_rendered_raster(
+                        self.layer,
+                        self.project,
+                        self.area,
+                        self.crs,
+                        self.database,
+                        table,
+                        fixtures.zoom_levels(self.project, self.area, self.crs, 16, 17),
+                        lambda: False,
+                        lambda _: None,
+                        gate=self.gate(),
+                    )
+                self.assertEqual(drawing.call_count, saved_tiles + 1)
+                self.assertEqual(
+                    result["status"], "partial" if saved_tiles else "failed"
+                )
+                self.assertEqual(result["tile_count"], saved_tiles)
+                self.assertEqual("local_source" in result, bool(saved_tiles))
+                self.assertIn("proxy", result["reason"].lower())
+                self.assertEqual(result["raster"]["stop_http_status"], 407)
+                self.assertTrue(result["raster"]["stopped_early"])
+                self.assertFalse(result["raster"]["deferred"])
+                self.assertEqual(result["raster"]["repair_attempts"], 0)
+                with closing(sqlite3.connect(self.database)) as database:
+                    self.assertEqual(
+                        database.execute(f'SELECT count(*) FROM "{table}"').fetchone()[
+                            0
+                        ],
+                        saved_tiles,
+                    )
+
     def test_repair_budget_is_three_total_attempts_per_tile(self):
         calls = Counter()
 
@@ -408,10 +499,17 @@ class AdaptiveWmsTests(unittest.TestCase):
         return layer
 
     def capture(self, layers, **kwargs):
-        # Enough budget for test subprocesses, independent of the desktop load.
-        with patch(
-            "mbtiles_batch_exporter.archive.detect_resources",
-            return_value={"cpu": 2, "memory": 8 * 1024**3, "online": True},
+        # Fix both the initial and live RAM samples. Resource-pressure behavior
+        # is covered separately by DynamicWorkerTests with a controlled clock.
+        with (
+            patch(
+                "mbtiles_batch_exporter.archive.detect_resources",
+                return_value={"cpu": 2, "memory": 8 * 1024**3, "online": True},
+            ),
+            patch(
+                "mbtiles_batch_exporter.parallel_archive.available_memory",
+                return_value=8 * 1024**3,
+            ),
         ):
             result = fixtures.create_archive(
                 self.project,

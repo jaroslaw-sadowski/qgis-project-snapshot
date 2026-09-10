@@ -771,6 +771,10 @@ def write_rendered_raster(
             else tr("Zapisano obraz z przezroczystością; każdy zoom pobrano osobno.")
         ),
     }
+    if stats.get("stop_http_status") == 407:
+        result["reason"] += " " + tr(
+            "Proxy odrzuciło uwierzytelnianie. Sprawdź konfigurację proxy w QGIS."
+        )
     if status == "failed":
         result.pop("local_source")
     return result
@@ -793,6 +797,7 @@ def _capture_adaptive(
     """Three bounded passes; never redraw durable successes or empty tiles."""
     ledger_path = gate.folder / (table + ".tiles.sqlite")
     deferred = False
+    stop_http_status = None
     with closing(sqlite3.connect(ledger_path)) as ledger:
         ledger.execute(
             (
@@ -828,10 +833,10 @@ def _capture_adaptive(
             ledger.commit()
         stats.update(repair_attempts=0, repaired=0, deferred=False)
         for round_number in range(3):
-            if deferred:
+            if deferred or stop_http_status:
                 break
             for level in reversed(levels):
-                if deferred:
+                if deferred or stop_http_status:
                     break
                 zoom, resolution = level["zoom"], level["resolution"]
                 total, pending = ledger.execute(
@@ -986,6 +991,11 @@ def _capture_adaptive(
                                 )
                                 ledger.commit()
                                 gate.outcome(error, recoverable=retryable)
+                                if getattr(error, "status", None) == 407:
+                                    # Repeating the same rejected proxy credentials
+                                    # cannot retrieve another tile of this map.
+                                    stop_http_status = 407
+                                    break
                                 if layer.dataProvider() is not None:
                                     layer.dataProvider().reloadData()
                                 overload = getattr(error, "status", None) in (
@@ -995,7 +1005,7 @@ def _capture_adaptive(
                                 if not overload or not retryable:
                                     break
                         completed += 1
-                        if deferred:
+                        if deferred or stop_http_status:
                             break
                 finally:
                     cursor.close()
@@ -1025,7 +1035,9 @@ def _capture_adaptive(
                     )
                 )
         stats["deferred"] = deferred
-        stats["stopped_early"] = deferred
+        stats["stopped_early"] = deferred or stop_http_status is not None
+        if stop_http_status is not None:
+            stats["stop_http_status"] = stop_http_status
         for level in reversed(levels):
             zoom = level["zoom"]
             counts = dict(
@@ -1048,12 +1060,17 @@ def _capture_adaptive(
                     ),
                 }
             )
+        missing_reason = (
+            tr("Proxy odrzuciło uwierzytelnianie. Sprawdź konfigurację proxy w QGIS.")
+            if stop_http_status == 407
+            else tr("Serwer odłożony do późniejszej próby.")
+        )
         stats["failures"] = [
             dict(
                 zoom=z,
                 column=c,
                 row=r,
-                reason=reason or tr("Serwer odłożony do późniejszej próby."),
+                reason=reason or missing_reason,
             )
             for z, c, r, reason in ledger.execute(
                 (

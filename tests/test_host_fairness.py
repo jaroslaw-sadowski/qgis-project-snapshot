@@ -27,6 +27,8 @@ class HostQueueTests(unittest.TestCase):
             queue.adaptive = adaptive
             queue.memory_ok = True
             queue.workers = 4
+            queue.worker_memory = 1024**3
+            queue.launch_slots = 4
             queue.per_server_limit = 2
             queue.active_hosts = {}
             queue.policies = {}
@@ -67,6 +69,9 @@ class HostQueueTests(unittest.TestCase):
                         )
                     first_wave = list(claimed)
                 finally:
+                    with queue.condition:
+                        # Grant the second wave a fresh resource allowance.
+                        queue.launch_slots = 4
                     release.set()
                 for runner in runners:
                     runner.result(timeout=5)
@@ -167,7 +172,7 @@ class FourHostWmsTests(unittest.TestCase):
         self.assertEqual(len({r["worker_pid"] for r in records}), 8)
         self.assertEqual(len(first_requests), 4)
         self.assertFalse(together.broken)
-        self.assertEqual(manifest["parallel"]["per_server_limit"], 2)
+        self.assertEqual(manifest["parallel"]["per_server_limit"], 4)
         self.assertTrue(all(case.server.peak <= 2 for case in cases))
         self.assertTrue(manifest["local_layer_audit"]["passed"])
 

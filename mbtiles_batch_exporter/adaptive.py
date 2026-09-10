@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
 
+from .resources import process_memory
+
 PROTOCOL = 1
 
 
@@ -90,6 +92,8 @@ class HostPolicy:
     probe_failures: int = 0
     timeouts: int = 0
     window_started: float = 0.0
+    sampled_at: float | None = None
+    measured_successes: int = 0
     successes: int = 0
     total_successes: int = 0
     rate: float = 0.0
@@ -100,6 +104,8 @@ class HostPolicy:
     def change(self, now, reason):
         self.generation += 1
         self.window_started = now
+        self.sampled_at = now
+        self.measured_successes = 0
         self.successes = 0
         self.history.append(
             {
@@ -145,6 +151,8 @@ class HostPolicy:
             # Broken windows cannot justify a concurrency increase.
             self.successes = 0
             self.window_started = now
+            self.sampled_at = now
+            self.measured_successes = 0
             return
         self.limit = max(1, self.limit - 1)
         self.frozen = True
@@ -165,12 +173,22 @@ class HostPolicy:
             else str(status),
         )
 
-    def evaluate(self, now, backlog, memory_ok=True):
+    def evaluate(self, now, backlog, memory_ok=True, active=None):
+        previous = self.window_started if self.sampled_at is None else self.sampled_at
+        self.sampled_at = now
+        if active is not None and active < self.limit:
+            # Exclude underfilled intervals, retaining measured work across map
+            # handoffs. Frequent short startups must not prevent a full window.
+            self.window_started += max(0, now - previous)
+            self.successes = self.measured_successes
+            return
+        self.measured_successes = self.successes
         elapsed = now - self.window_started
         if self.recovering or self.blocked or elapsed < 15 or self.successes < 10:
             return
         self.rate = self.successes / elapsed
         self.successes = 0
+        self.measured_successes = 0
         self.window_started = now
         if self.frozen or not memory_ok:
             return
@@ -211,9 +229,15 @@ class WorkerGate:
             "seconds": 0.0,
         }
         self.started = 0.0
+        self.next_memory_check = 0.0
         self.publish()
 
     def publish(self, closing=False):
+        if self.state["seconds"] > 0:
+            now = time.monotonic()
+            if closing or now >= self.next_memory_check:
+                self.state["memory"] = process_memory()
+                self.next_memory_check = now + 5
         write_state(
             self.folder / "telemetry.json",
             dict(self.state, counts=self.counts, events=self.events),

@@ -62,7 +62,7 @@ def check(filename):
                 return self.canvas
 
             def addPluginToMenu(self, menu, action):
-                assert menu == "qgis-project-snapshot"
+                assert menu == "QGIS Project Snapshot"
                 self.menu.append(action)
 
             def removePluginMenu(self, menu, action):
@@ -88,7 +88,7 @@ def check(filename):
         assert interface.menu[0].text() == "Archiwizuj projekt…"
         assert (
             qgis.utils.pluginMetadata("mbtiles_batch_exporter", "name")
-            == "qgis-project-snapshot"
+            == "QGIS Project Snapshot"
         )
         QgsProject.instance().setCrs(QgsCoordinateReferenceSystem("EPSG:2180"))
         opened = []
@@ -97,7 +97,7 @@ def check(filename):
             dialog = plugin.archive_dlg
             opened.append(dialog is not None and dialog.isVisible())
             if dialog is not None:
-                assert dialog.windowTitle().startswith("qgis-project-snapshot")
+                assert dialog.windowTitle().startswith("QGIS Project Snapshot")
                 dialog.reject()
 
         QTimer.singleShot(0, close_archive)

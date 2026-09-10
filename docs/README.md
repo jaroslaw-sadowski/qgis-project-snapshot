@@ -12,6 +12,10 @@
 
 Raporty są zapisem historycznym; aktualne priorytety znajdują się w stanie projektu.
 
+- [Odbiór 0.9.7 — równoległość według zmierzonego RAM](validation-0.9.7.md)
+- [Pomiar 0.9.7 — wiele procesów przy ograniczonej pamięci](benchmark-0.9.7.json)
+- [Odbiór 0.9.6 — równoległość, nazwa i przegląd wydania](validation-0.9.6.md)
+- [Pomiar 0.9.6 — identyczne dane, automat 1→4](benchmark-0.9.6.json)
 - [Odbiór 0.9.5 — powrót hosta i praca wielu serwerów](validation-0.9.5.md)
 - [Pomiar 0.9.5 — dane i różne budżety RAM](benchmark-0.9.5.json)
 - [Odbiór 0.9.4 — gotowe mapy, RAM i timeouty](validation-0.9.4.md)

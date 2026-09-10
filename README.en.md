@@ -1,4 +1,4 @@
-# <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> qgis-project-snapshot
+# <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
 [Polski](README.md) · English
 
@@ -18,10 +18,10 @@ share the code under the [licence](LICENSE).
 ## How to use
 
 Requires QGIS 3.40 with PyQt5 and GDAL 3.7 or newer. The interface selects Polish
-or English based on the QGIS language. Current version for testing: **0.9.5**.
+or English based on the QGIS language. Current package for local installation: **0.9.7**.
 
 1. Install the package using **Plugins → Manage and Install Plugins → Install from ZIP**.
-2. Open your project and choose **Plugins → qgis-project-snapshot → Archive project…**
+2. Open your project and choose **Plugins → QGIS Project Snapshot → Archive project…**
    or the map-in-an-archive-box toolbar icon.
 3. Choose a folder, area (map view or polygons), layers and map detail.
    Select **Create archive**. Hover over controls for explanations.
@@ -30,9 +30,13 @@ or English based on the QGIS language. Current version for testing: **0.9.5**.
 
 Downloads use the active QGIS proxy configuration, exclusions and available
 saved credentials. No separate proxy setup is needed in the plugin.
-Concurrency is adjusted using CPU, RAM and each server's responses. Scheduling
-prioritizes different servers running together, with one or at most two tasks
-per host. The window shows active tasks, limits, queues, pauses and a log.
+Concurrency is adjusted using CPU, RAM and each server's responses. After initial
+downloads, measured process memory determines further concurrency, with startup
+and growth headroom and a 768 MiB free-memory reserve. It starts
+with one task per server and gradually increases the load while this improves
+download speed and the computer has spare resources. Scheduling prioritizes
+different servers running together. The window shows active tasks, limits, pauses
+and a log; “Queued layers” counts layers waiting to download from the server in that row.
 During export, only missing tiles are repaired in the same archive. The manual
 retry on the result screen creates a new archive of the selected layers.
 
@@ -59,29 +63,28 @@ absence of warranty are described in the [licence](LICENSE).
 
 ## Checks performed
 
-- 108 QGIS tests in 0.9.5 covering data storage and reading, maps, reporting, Polish/English,
+- 128 QGIS tests in 0.9.7 covering data storage and reading, maps, reporting, Polish/English,
   cancellation, server limits and missing-tile repair.
 - Installation ZIP checks: native QGIS discovery and loading, the archive dialog,
   unloading and tests running against the packaged code.
 - Ruff: PEP 8/pycodestyle rules (E/W), Pyflakes (F), imports (I) and formatting
   using the project configuration (88 characters).
 - Python syntax, ZIP integrity and package/source consistency checks.
-- A controlled fixed/adaptive concurrency benchmark with identical output tiles.
 
 Test environment: Ubuntu, QGIS 3.40.15. Windows, MSSQL and complete company
 projects still need acceptance on the user's workstation. These are local checks,
 not QGIS certification or a guarantee for every project.
-[0.9.5 validation](docs/validation-0.9.5.md) · [Reports and documentation](docs/README.md).
+[0.9.7 validation](docs/validation-0.9.7.md) · [Reports and documentation](docs/README.md).
 
 ## Package and development
 
-The repository contains source code. To build the **0.9.5** ZIP, run:
+The repository contains source code. To build the **0.9.7** ZIP, run:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-This creates `qgis-project-snapshot-0.9.5.zip` and its SHA-256 checksum in `dist/`,
+This creates `qgis-project-snapshot-0.9.7.zip` and its SHA-256 checksum in `dist/`,
 which is not tracked in Git. Building a ZIP does not publish it in the QGIS plugin catalogue.
 
 [Build and tests](docs/development.md) · [Architecture](docs/architecture.md) ·

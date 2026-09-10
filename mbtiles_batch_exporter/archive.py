@@ -39,7 +39,7 @@ from .diagnostics import Diagnostics, NetworkDiagnostics, network_details
 from .i18n import tr
 from .parallel_archive import RasterWorkers, WorkerError
 from .raster_archive import write_raster_data, write_rendered_raster, zoom_levels
-from .resources import detect_resources, recommend
+from .resources import MAX_WORKERS, detect_resources, recommend
 from .worker_network import network_snapshot
 
 ARCHIVE_LIMITATIONS = [
@@ -468,7 +468,7 @@ def create_archive(
     if adaptive:
         resources = detect_resources()
         workers = recommend(resources["cpu"], resources["memory"], True)
-        per_server_limit = 2
+        per_server_limit = min(MAX_WORKERS, max(1, 2 * resources["cpu"]))
         memory_text = (
             f"{resources['memory'] / 1024**3:.1f} GiB"
             if resources["memory"] is not None
@@ -478,12 +478,14 @@ def create_archive(
             tr(
                 (
                     "Zasoby przy starcie: CPU {0}; dostępny RAM {1}; limit procesów "
-                    "map {2}. Rezerwa RAM: 2 GiB."
+                    "map {2}. Rezerwa RAM: 768 MiB."
                 )
             ).format(resources["cpu"], memory_text, workers)
         )
     output_folder = Path(output_folder)
-    if not isinstance(per_server_limit, int) or not 1 <= per_server_limit <= 8:
+    if not adaptive and (
+        not isinstance(per_server_limit, int) or not 1 <= per_server_limit <= 8
+    ):
         raise ValueError(tr("Limit zadań na serwer musi wynosić od 1 do 8."))
     if not isinstance(workers, int) or not 1 <= workers <= 32:
         raise ValueError(tr("Wybierz od 1 do 32 równoległych procesów."))
@@ -1046,11 +1048,11 @@ def create_archive(
             tr(
                 (
                     '<!doctype html><html lang="pl"><meta '
-                    'charset="utf-8"><title>qgis-project-snapshot — '
+                    'charset="utf-8"><title>QGIS Project Snapshot — '
                     "raport</title><style>body{font-family:sans-serif;margin:2em}"
                     "table{border-collapse:collapse}td,th{border:1px solid "
-                    "#aaa;padding:.5em;text-align:left}</style><h1>qgis-project-s"
-                    "napshot — wynik archiwizacji</h1><p>Sprawdź archiwum bez "
+                    "#aaa;padding:.5em;text-align:left}</style><h1>QGIS Project "
+                    "Snapshot — wynik archiwizacji</h1><p>Sprawdź archiwum bez "
                     "dostępu do sieci.</p>"
                 )
             )

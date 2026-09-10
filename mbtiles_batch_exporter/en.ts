@@ -1,4 +1,5 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TS>
 <TS version="2.1" language="en" sourcelanguage="pl">
   <context>
     <name>qgis-project-snapshot</name>
@@ -267,8 +268,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Cancelling… Completed layers will be kept in a partial archive.</translation>
     </message>
     <message>
-      <source>qgis-project-snapshot: zapisz kopię projektu, dane i mapy do pracy bez sieci.</source>
-      <translation>qgis-project-snapshot: save a project copy, data and maps for offline use.</translation>
+      <source>QGIS Project Snapshot: zapisz kopię projektu, dane i mapy do pracy bez sieci.</source>
+      <translation>QGIS Project Snapshot: save a project copy, data and maps for offline use.</translation>
     </message>
     <message>
       <source>Obrazy usług mapowych odtwarzają tylko wybrany obszar i poziomy zoomu.</source>
@@ -495,8 +496,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Partial image</translation>
     </message>
     <message>
-      <source>&lt;!doctype html&gt;&lt;html lang="pl"&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;qgis-project-snapshot — raport&lt;/title&gt;&lt;style&gt;body{font-family:sans-serif;margin:2em}table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:.5em;text-align:left}&lt;/style&gt;&lt;h1&gt;qgis-project-snapshot — wynik archiwizacji&lt;/h1&gt;&lt;p&gt;Sprawdź archiwum bez dostępu do sieci.&lt;/p&gt;</source>
-      <translation>&lt;!doctype html&gt;&lt;html lang="en"&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;qgis-project-snapshot — report&lt;/title&gt;&lt;style&gt;body{font-family:sans-serif;margin:2em}table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:.5em;text-align:left}&lt;/style&gt;&lt;h1&gt;qgis-project-snapshot — archive results&lt;/h1&gt;&lt;p&gt;Check the archive without network access.&lt;/p&gt;</translation>
+      <source>&lt;!doctype html&gt;&lt;html lang="pl"&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;QGIS Project Snapshot — raport&lt;/title&gt;&lt;style&gt;body{font-family:sans-serif;margin:2em}table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:.5em;text-align:left}&lt;/style&gt;&lt;h1&gt;QGIS Project Snapshot — wynik archiwizacji&lt;/h1&gt;&lt;p&gt;Sprawdź archiwum bez dostępu do sieci.&lt;/p&gt;</source>
+      <translation>&lt;!doctype html&gt;&lt;html lang="en"&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;QGIS Project Snapshot — report&lt;/title&gt;&lt;style&gt;body{font-family:sans-serif;margin:2em}table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:.5em;text-align:left}&lt;/style&gt;&lt;h1&gt;QGIS Project Snapshot — archive results&lt;/h1&gt;&lt;p&gt;Check the archive without network access.&lt;/p&gt;</translation>
     </message>
     <message>
       <source>&lt;p&gt;Zakres obrazów: zoom {0}–{1}. PNG: kompresja bezstratna 9, pełna przezroczystość.&lt;/p&gt;</source>
@@ -743,8 +744,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Cannot open local layer: {0}</translation>
     </message>
     <message>
-      <source>qgis-project-snapshot — Archiwizuj projekt</source>
-      <translation>qgis-project-snapshot — Archive project</translation>
+      <source>QGIS Project Snapshot — Archiwizuj projekt</source>
+      <translation>QGIS Project Snapshot — Archive project</translation>
     </message>
     <message>
       <source>Wybierz…</source>
@@ -991,8 +992,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Active / limit</translation>
     </message>
     <message>
-      <source>Kolejka</source>
-      <translation>Queued</translation>
+      <source>Warstwy w kolejce</source>
+      <translation>Queued layers</translation>
     </message>
     <message>
       <source>Kafelki/s</source>
@@ -1003,8 +1004,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Pause</translation>
     </message>
     <message>
-      <source>Automat zaczyna od 1 zadania na serwer i może zwiększyć limit do 2 po udanych pobraniach. Pierwszeństwo mają serwery z mniejszą liczbą aktywnych procesów. Błędy lub brak przyspieszenia zmniejszają obciążenie. CPU i RAM ograniczają łączną liczbę procesów. Limity dotyczą map, nie dokładnej liczby żądań HTTP.</source>
-      <translation>Starts with 1 task per server and may increase the limit to 2 after successful downloads. Servers with fewer active processes get priority. Errors or no speed gain reduce the load. CPU and RAM constrain the total process count. Limits apply to map tasks, not exact HTTP request counts.</translation>
+      <source>Automat zaczyna od 1 zadania na serwer. Po udanych pobraniach stopniowo sprawdza wyższe limity, dopóki rośnie szybkość i komputer ma wolne zasoby. Pierwszeństwo mają serwery z mniejszą liczbą aktywnych procesów. Błędy lub brak przyspieszenia zmniejszają obciążenie. Łączny limit wynosi maks. 32 procesy i nie więcej niż dwukrotność liczby dostępnych CPU. Dalszy wzrost ogranicza wolny RAM. Limity dotyczą map, nie dokładnej liczby żądań HTTP.</source>
+      <translation>Starts with 1 task per server. Successful downloads lead to gradual trials of higher limits while speed improves and the computer has spare resources. Servers with fewer active processes get priority. Errors or no speed gain reduce the load. The total is capped at 32 processes, twice the available CPU count and available RAM. Limits apply to map tasks, not exact HTTP request counts.</translation>
     </message>
     <message>
       <source>Rozpoczynanie</source>
@@ -1059,12 +1060,12 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>CPU: maps are processed in separate processes that can use multiple cores. The counter shows processes, not CPU usage percentage.</translation>
     </message>
     <message>
-      <source>Rezerwa RAM: 2 GiB</source>
-      <translation>RAM reserve: 2 GiB</translation>
+      <source>Rezerwa RAM: 768 MiB</source>
+      <translation>RAM reserve: 768 MiB</translation>
     </message>
     <message>
-      <source>Automat pozostawia 2 GiB pamięci dla QGIS i systemu. Sprawdza dostępny RAM co 5 sekund; przy niedoborze wstrzymuje uruchamianie nowych procesów. To rezerwa planowania, nie pomiar zużycia RAM.</source>
-      <translation>Automatic scheduling reserves 2 GiB of memory for QGIS and the system. Available RAM is checked every 5 seconds; low memory pauses new process launches. This is a planning reserve, not a RAM usage reading.</translation>
+      <source>Automat pozostawia 768 MiB wolnej pamięci oraz zapas na rozruch i wzrost działających procesów. Po pierwszych pobraniach dobiera koszt kolejnego procesu do pomiarów zużycia RAM. Sprawdza pamięć co 5 sekund; przy niedoborze wstrzymuje uruchamianie nowych procesów.</source>
+      <translation>The automatic control keeps 768 MiB of memory available, plus room for process startup and growth. After initial downloads, it uses measured RAM usage to estimate the next process. Memory is checked every 5 seconds; low memory pauses new processes.</translation>
     </message>
     <message>
       <source>Proxy odrzuciło uwierzytelnianie. Sprawdź konfigurację proxy w QGIS.</source>
@@ -1091,8 +1092,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Finished with errors</translation>
     </message>
     <message>
-      <source>Zasoby przy starcie: CPU {0}; dostępny RAM {1}; limit procesów map {2}. Rezerwa RAM: 2 GiB.</source>
-      <translation>Resources at startup: CPU {0}; available RAM {1}; map process limit {2}. RAM reserve: 2 GiB.</translation>
+      <source>Zasoby przy starcie: CPU {0}; dostępny RAM {1}; limit procesów map {2}. Rezerwa RAM: 768 MiB.</source>
+      <translation>Resources at startup: CPU {0}; available RAM {1}; map process limit {2}. RAM reserve: 768 MiB.</translation>
     </message>
     <message>
       <source>nie rozpoznano</source>
@@ -1103,20 +1104,36 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Downloading</translation>
     </message>
     <message>
-      <source>Czeka na wolny proces</source>
-      <translation>Waiting for a free process</translation>
+      <source>Limit procesów komputera</source>
+      <translation>Computer process limit</translation>
     </message>
     <message>
-      <source>Dostępny RAM: {0:.1f} GiB; rezerwa: 2 GiB</source>
-      <translation>Available RAM: {0:.1f} GiB; reserve: 2 GiB</translation>
+      <source>Dostępny RAM: {0:.1f} GiB; rezerwa: 768 MiB</source>
+      <translation>Available RAM: {0:.1f} GiB; reserve: 768 MiB</translation>
     </message>
     <message>
       <source>Dostępny RAM: nieznany; maks. 2 procesy</source>
       <translation>Available RAM: unknown; max. 2 processes</translation>
     </message>
     <message>
-      <source>Dostępne CPU: {0}. Budżet procesów: {1}. Na proces przyjmujemy 1 GiB RAM po pozostawieniu rezerwy 2 GiB. Budżet sprawdzamy co 5 sekund. Spadek budżetu nie kończy działających procesów; wstrzymuje uruchamianie kolejnych.</source>
-      <translation>Available CPUs: {0}. Process budget: {1}. We allow 1 GiB of RAM per process after keeping a 2 GiB reserve. The budget is checked every 5 seconds. A lower budget does not stop existing processes; it pauses the launch of new ones.</translation>
+      <source>Dostępne CPU: {0}. Budżet procesów: {1}. Planowany RAM kolejnego procesu: {2:.0f} MiB ({3}). Po pobraniach używamy najwyższego zmierzonego zużycia z zapasem 50%, co najmniej 384 MiB. Pozostawiamy 768 MiB wolnej pamięci oraz zapas na rozruch i wzrost działających procesów. Odczyt co 5 sekund. Niedobór pamięci wstrzymuje nowe procesy.</source>
+      <translation>Available CPUs: {0}. Process budget: {1}. Planned RAM for the next process: {2:.0f} MiB ({3}). After downloads, we use the highest measured usage plus 50%, with a minimum of 384 MiB. We keep 768 MiB available, plus room for process startup and growth. Readings are taken every 5 seconds. Low memory pauses new processes.</translation>
+    </message>
+    <message>
+      <source>Liczba warstw czekających na rozpoczęcie pobierania z serwera w tym wierszu. Nie obejmuje warstw już pobieranych.</source>
+      <translation>Number of layers waiting to start downloading from the server in this row. Does not include layers already downloading.</translation>
+    </message>
+    <message>
+      <source>Warstwy czekające na pobranie z serwera {0}: {1}.</source>
+      <translation>Layers waiting to download from server {0}: {1}.</translation>
+    </message>
+    <message>
+      <source>pomiar z zapasem</source>
+      <translation>measurement with headroom</translation>
+    </message>
+    <message>
+      <source>szacunek początkowy</source>
+      <translation>initial estimate</translation>
     </message>
   </context>
 </TS>

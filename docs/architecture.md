@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (0.9.5)
+# Działanie i ograniczenia archiwizacji (0.9.7)
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
@@ -36,7 +36,12 @@ Mapy z głównej ścieżki korzystają ze wspólnej bramki hosta.
 
 Start: jedno zadanie mapowe na host, niezależnie od ścieżek usług. Wzrost o jeden
 wymaga 15 s, 10 poprawnych kafelków, kolejki i wolnego budżetu. Dwa kolejne okna
-bez 10% poprawy przepustowości cofają limit i blokują wzrost. Sufit dwie mapy/host.
+bez 10% poprawy przepustowości cofają limit i blokują wzrost. Pomiar wymaga
+15 s pomiaru z docelową liczbą gotowych map. Przerwy na rozruch kolejnej mapy
+są wyłączane z czasu i liczby sukcesów, lecz nie kasują wcześniejszych próbek.
+Gotowy proces między publikacją wyniku kafelka a zgodą na następny pozostaje
+gotowy do pomiaru. Rozruch i kończąca się kolejka nie świadczą o suficie serwera. Sufit hosta to min(32, 2 × CPU), dodatkowo
+ograniczany wspólnym budżetem RAM i liczbą map.
 HTTP 429/503 i trzy kolejne timeouty zmniejszają obciążenie oraz blokują wzrost.
 503 oznacza możliwe przeciążenie lub niedostępność, nie dowód jednej przyczyny.
 
@@ -45,11 +50,24 @@ jedna próba rzeczywiście brakującego kafelka; jej sukces odblokowuje host.
 Trzy nieudane próby powrotu, brak kafelków dopuszczonych do ponowienia albo
 wymagane oczekiwanie ponad pięć minut odkładają pozostałe dane. Inne hosty pracują.
 
-Limit globalny: min(32, 2 × CPU, dostępny RAM po rezerwie 2 GiB przy 1 GiB/proces),
-co najmniej jeden; nieznany RAM ogranicza do dwóch. RAM sprawdzany co pięć sekund;
-spadek poniżej rezerwy blokuje wzrost i nowe procesy. Czekające procesy też liczą
-się do pamięci. Dziennik i manifest zapisują zasoby wykryte przy starcie.
-To heurystyka zadań mapowych, nie dokładny limit HTTP/s ani pomiar przepustowości.
+Limit globalny: min(32, 2 × CPU, budżet RAM), co najmniej jeden; nieznany dostępny
+RAM ogranicza do dwóch. Po renderowaniu każdy proces publikuje bieżący i szczytowy
+RSS z natywnego systemu, co 5 s i przy zamknięciu. Koszt następnego procesu E to
+max(384 MiB, 1,5 × największy szczyt z tego eksportu), początkowo 1 GiB. Główny
+QGIS z local_gate nie uczestniczy w tym pomiarze; jego zużycie jest w MemAvailable.
+
+Od dostępnej pamięci odejmujemy 768 MiB rezerwy i zapas wzrostu każdego aktywnego
+procesu max(0, E − bieżący RSS). Nieznany RSS zachowuje pełną rezerwację startową,
+co najmniej E. Pozostała pamięć daje miejsca dla nowych procesów po E bajtów.
+Zachowujemy największy peak również po końcu procesu. Zwolniony RSS może być
+ponownie potrzebny; samo jego obniżenie nie usuwa rezerwy na wzrost.
+
+Telemetria poprzedza próbkę RAM. `launch_slots` wyznacza skończony przydział startów
+na podstawie próbki co 5 s. Zakończenie mapy nie odnawia przydziału. Spadek poniżej
+rezerwy blokuje nowe procesy i wzrost, nie przerywa działających map. Przerwy
+serwerów także liczą się do aktywnych procesów. GUI pokazuje estymatę i rezerwę;
+historia pamięci oraz manifest zapisują też szczyt i zapas wzrostu. To heurystyka; nagły wzrost zużycia pamięci
+może przekroczyć zapas. Nie jest to gwarancja maksimum przepustowości ani RAM.
 
 Koordynator co 0,5 s czyta atomowe statystyki i zapisuje polecenia protokołu 1:
 generacja, pozwolenie, przerwa/próba powrotu, potwierdzenie zdarzeń i ważność 2 s.
@@ -184,9 +202,9 @@ Nie wznawia pobierania. GeoPackage nadal ma jednego zapisującego w danej chwili
 Pula wątków nadzorujących może obsłużyć min(32, 2×CPU); faktyczne procesy
 ogranicza globalny licznik active_hosts i aktualny budżet RAM. Co pięć sekund
 budżet przeliczany jest przez recommend na podstawie bieżącego wolnego RAM,
-z rezerwą 2 GiB i szacunkiem 1 GiB/proces. Nie dodajemy pamięci zajętej przez
-pracujące procesy do MemAvailable, więc reguła jest konserwatywna. Budżet może
-spaść poniżej liczby istniejących procesów; blokowane są tylko nowe uruchomienia.
+z rezerwą 768 MiB. Od 0.9.7 estymata dodatkowego procesu pochodzi z pomiaru,
+z zapasem wzrostu, zgodnie z regułą opisaną wyżej. Budżet może spaść
+poniżej liczby istniejących procesów (np. nieznany RAM); blokowane są nowe starty.
 Manifest zachowuje workers jako limit początkowy, dodaje peak_worker_budget oraz
 final_worker_budget. Historia RAM i wiersze GUI pokazują kolejne limity.
 
@@ -219,7 +237,8 @@ powroty, ack błędów/prób i wygasające pozwolenia pozostają obowiązujące.
 W trybie adaptacyjnym każdy błąd renderowania wraca bezpośrednio do rejestru:
 nie ma dodatkowych wewnętrznych retry/subdivision poza trzema próbami kafelka.
 
-GUI/adaptive ma sufit dwóch map na host. Przy przydzielaniu wolnego procesu
+0.9.5 wprowadziła sufit dwóch map na host; 0.9.6 zastępuje go limitem CPU
+i zasobów opisanym wyżej. Przy przydzielaniu wolnego procesu
 wybierany jest kwalifikujący się host z najmniejszą liczbą aktywnych procesów;
 przy remisie zachowana jest kolejność kolejki. Hosty czekające na termin przerwy
 nie kwalifikują się. Wszystkie uruchomione procesy, również czekające, nadal
@@ -229,3 +248,11 @@ parametr stałego limitu oraz kolejność wyboru jak wcześniej.
 Nie zmieniono interwału koordynatora 0,5 s. Zwykły sukces już nie wymaga ack
 przed kolejnym kafelkiem; potwierdzenia wymagają błędy i próby powrotu. Szybsze
 odświeżanie zwiększyłoby operacje IPC bez usunięcia głównego kosztu renderowania.
+
+## Odmowa proxy (0.9.6)
+
+HTTP 407 kończy pobieranie bieżącej mapy po pierwszej odmowie. Nie odpytujemy
+pozostałych kafelków i zoomów przy odrzuconym uwierzytelnianiu proxy. Zachowane
+PNG dają wynik partial; bez nich mapa ma status failed. Raport wskazuje proxy,
+`stop_http_status=407` i `stopped_early=true`; nie jest to odłożenie całego hosta.
+Pozostałe kody, w tym 403/404 pojedynczego kafelka, zachowują poprzednie reguły.
