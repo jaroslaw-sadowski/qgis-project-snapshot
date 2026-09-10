@@ -1290,5 +1290,109 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <source>Serwer {0}: usługa niedostępna lub przeciążona. Jeśli problem się powtarza, kliknij „Przerwij” i zmniejsz „Zadania na serwer”. HTTP 503 nie potwierdza, że przyczyną jest liczba zapytań.</source>
       <translation>Server {0}: service unavailable or overloaded. If the problem persists, click “Cancel” and reduce “Tasks per server”. HTTP 503 does not confirm that request volume is the cause.</translation>
     </message>
+    <message>
+      <source>Serwer odłożony do późniejszej próby.</source>
+      <translation>Server deferred until a later attempt.</translation>
+    </message>
+    <message>
+      <source>Przygotowanie rejestru kafelków: zoom {0}…</source>
+      <translation>Preparing the tile ledger: zoom {0}…</translation>
+    </message>
+    <message>
+      <source>{0} — zoom {1}, fragment {2}/{3}, próba {4}</source>
+      <translation>{0} — zoom {1}, tile {2}/{3}, attempt {4}</translation>
+    </message>
+    <message>
+      <source>Równoległość dobierana automatycznie podczas pobierania.</source>
+      <translation>Concurrency is adjusted automatically during downloads.</translation>
+    </message>
+    <message>
+      <source>Serwer</source>
+      <translation>Server</translation>
+    </message>
+    <message>
+      <source>Aktywne / limit</source>
+      <translation>Active / limit</translation>
+    </message>
+    <message>
+      <source>Kolejka</source>
+      <translation>Queued</translation>
+    </message>
+    <message>
+      <source>Kafelki/s</source>
+      <translation>Tiles/s</translation>
+    </message>
+    <message>
+      <source>Przerwa</source>
+      <translation>Pause</translation>
+    </message>
+    <message>
+      <source>Automat zaczyna od 1 zadania na serwer. Zwiększa obciążenie po sukcesach i cofa je przy błędach lub braku przyspieszenia. Limity dotyczą map, nie dokładnej liczby żądań HTTP.</source>
+      <translation>Starts with 1 task per server, increases after successful downloads and backs off on errors or no speed gain. Limits apply to map tasks, not exact HTTP request counts.</translation>
+    </message>
+    <message>
+      <source>Rozpoczynanie</source>
+      <translation>Starting</translation>
+    </message>
+    <message>
+      <source>Zwiększanie</source>
+      <translation>Increasing</translation>
+    </message>
+    <message>
+      <source>Ustalony limit</source>
+      <translation>Stable limit</translation>
+    </message>
+    <message>
+      <source>Przerwa serwera</source>
+      <translation>Server cooldown</translation>
+    </message>
+    <message>
+      <source>Ograniczenie pamięci</source>
+      <translation>Memory constraint</translation>
+    </message>
+    <message>
+      <source>Uzupełnianie braków</source>
+      <translation>Repairing missing tiles</translation>
+    </message>
+    <message>
+      <source>Odłożono do późniejszej próby</source>
+      <translation>Deferred until later</translation>
+    </message>
+    <message>
+      <source>{0} s</source>
+      <translation>{0} s</translation>
+    </message>
+    <message>
+      <source>Procesy map: {0}; aktywne zadania: {1}. Dobór automatyczny.</source>
+      <translation>Map processes: {0}; active tasks: {1}. Automatic control.</translation>
+    </message>
+    <message>
+      <source>Serwer {0}: zbyt wiele zapytań. Potrzebna jest przerwa przed ponownym pobieraniem.</source>
+      <translation>Server {0}: too many requests. A cooldown is needed before retrying.</translation>
+    </message>
+    <message>
+      <source>Serwer {0}: usługa niedostępna lub przeciążona. HTTP 503 nie potwierdza, że przyczyną jest liczba zapytań.</source>
+      <translation>Server {0}: service unavailable or overloaded. HTTP 503 does not confirm that request volume is the cause.</translation>
+    </message>
+    <message>
+      <source>Koordynator pobierania zakończył pracę z błędem.</source>
+      <translation>The download coordinator failed.</translation>
+    </message>
+    <message>
+      <source>Procesy map: {0}/{1}; aktywne zadania: {2}. Dobór automatyczny.</source>
+      <translation>Map processes: {0}/{1}; active tasks: {2}. Automatic control.</translation>
+    </message>
+    <message>
+      <source>CPU: mapy są przetwarzane w osobnych procesach, które mogą korzystać z wielu rdzeni. Licznik pokazuje procesy, nie procent użycia procesora.</source>
+      <translation>CPU: maps are processed in separate processes that can use multiple cores. The counter shows processes, not CPU usage percentage.</translation>
+    </message>
+    <message>
+      <source>Rezerwa RAM: 2 GiB</source>
+      <translation>RAM reserve: 2 GiB</translation>
+    </message>
+    <message>
+      <source>Automat pozostawia 2 GiB pamięci dla QGIS i systemu. Sprawdza dostępny RAM co 5 sekund; przy niedoborze wstrzymuje uruchamianie nowych procesów. To rezerwa planowania, nie pomiar zużycia RAM.</source>
+      <translation>Automatic scheduling reserves 2 GiB of memory for QGIS and the system. Available RAM is checked every 5 seconds; low memory pauses new process launches. This is a planning reserve, not a RAM usage reading.</translation>
+    </message>
   </context>
 </TS>

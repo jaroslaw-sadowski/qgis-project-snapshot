@@ -1,6 +1,6 @@
 """Check the built ZIP in an isolated QGIS profile and run integration tests from it.
 
-Run with isolation: python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.7.2.zip
+Run with isolation: python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.8.1.zip
 """
 import argparse
 import importlib

@@ -1,0 +1,76 @@
+{
+  "scenario": "6 maps, 2 host aliases, 1.2 km square, zoom 18; 120 ms server delay",
+  "resource_budget": "2 CPU / 8 GiB injected for repeatable initial cap; live RAM check enabled",
+  "results": [
+    {
+      "mode": "fixed",
+      "seconds": 57.706,
+      "getmap_requests": 1014,
+      "png_sha256": {
+        "Map_0_104f682f_ac3b_49d6_87e6_1d71e1a460be": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_1_171d6446_b177_4120_bb1c_da475cea8ffc": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_2_414ce8bf_363a_4a8d_8a45_2c701f0a2752": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_3_15979238_6002_44bb_a269_0b8d984d06ce": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_4_e7d3a753_5898_43fa_b68f_d4bae12ec1b5": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_5_f2118468_7f5c_4d09_8ce4_53040a5513d6": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3"
+      },
+      "offline_audit": true,
+      "peak_processes": 4,
+      "adaptive": null
+    },
+    {
+      "mode": "adaptive",
+      "seconds": 58.323,
+      "getmap_requests": 1014,
+      "png_sha256": {
+        "Map_0_104f682f_ac3b_49d6_87e6_1d71e1a460be": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_1_171d6446_b177_4120_bb1c_da475cea8ffc": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_2_414ce8bf_363a_4a8d_8a45_2c701f0a2752": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_3_15979238_6002_44bb_a269_0b8d984d06ce": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_4_e7d3a753_5898_43fa_b68f_d4bae12ec1b5": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3",
+        "Map_5_f2118468_7f5c_4d09_8ce4_53040a5513d6": "9b8d4e3efc0a3d1dcb8fc4533ad2e4ea15583d03a9612ae9248a572a692e85d3"
+      },
+      "offline_audit": true,
+      "peak_processes": 4,
+      "adaptive": {
+        "protocol": 1,
+        "coordinator_failed": false,
+        "memory": [],
+        "hosts": [
+          {
+            "host": "127.0.0.1",
+            "limit": 2,
+            "frozen": false,
+            "deferred": false,
+            "successes": 507,
+            "history": [
+              {
+                "at": 15.068991595995612,
+                "limit": 2,
+                "generation": 1,
+                "reason": "increase",
+                "pause_seconds": 0
+              }
+            ]
+          },
+          {
+            "host": "localhost",
+            "limit": 2,
+            "frozen": false,
+            "deferred": false,
+            "successes": 507,
+            "history": [
+              {
+                "at": 15.068991595995612,
+                "limit": 2,
+                "generation": 1,
+                "reason": "increase",
+                "pause_seconds": 0
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

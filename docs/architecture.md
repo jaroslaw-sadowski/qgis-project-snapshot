@@ -60,7 +60,8 @@ w takich przypadkach potrzebne jest również porównanie wizualne.
 
 ## Równoległe pobieranie i CPU
 
-Okno pozwala wybrać 1–32 procesy; rekomendacja uwzględnia CPU, RAM i dostępne zadania.
+Od 0.8.0 okno korzysta z automatu opisanego poniżej. Stałe limity 1–32 procesy
+i 1–8 na host pozostają dostępne przez API dla zgodności wcześniejszych wywołań.
 Mapy usług są pobierane i kompresowane równolegle w osobnych procesach QGIS,
 które mogą używać różnych rdzeni. Wątki Pythona nadzorują procesy; nie dotykają
 warstw ani projektu otwartego w interfejsie. Kolejka wybiera wolne serwery i ogranicza
@@ -174,3 +175,46 @@ ponowienia, ponieważ przyczyna może być inna niż obciążenie.
 Nie dodano limitera HTTP na sekundę. Istniejący osobny parametr `per_server_limit`
 pozostaje limitem równoległych map; wykrywanie dotyczy obserwowanych żądań renderera
 map, nie dowolnych błędów MSSQL, WFS, uwierzytelniania lub eksportera legacy.
+
+## Wersja 0.8.0: automat i uzupełnianie kafelków
+
+`adaptive.py` zawiera maszynę stanów HostPolicy i WorkerGate bez obiektów QGIS.
+Koordynator w kolejce procesów co 0,5 s czyta atomowe telemetry.json i zapisuje
+control.json (protokół 1, generacja, zgoda, próba powrotu, potwierdzenie zdarzeń,
+ważność 2 s). Sukcesy są licznikami na generację; błędy i wyniki prób powrotu są
+potwierdzanymi zdarzeniami. Brak aktualnego polecenia blokuje pobieranie; brak
+łączności z koordynatorem przez 10 s odkłada mapę. Czekanie obsługuje anulowanie.
+
+Polityka hosta startuje z limitem 1. Okno wymaga 15 s i 10 poprawnych kafelków.
+Zwiększenie +1 wymaga kolejki i globalnego miejsca. Dwa okna bez poprawy szybkości
+co najmniej 10% cofają limit i blokują wzrost. HTTP 429/503 lub trzy kolejne timeouty
+cofają limit i rozpoczynają przerwę. Zdarzenia z poprzedniej generacji nie liczą się
+jako kolejne nieudane próby powrotu; ich dłuższy Retry-After jest nadal respektowany.
+Przerwy: nagłówek w sekundach/dacie HTTP albo 30/60/120 s. Jedna brakująca porcja
+jest próbą powrotu. Trzy nieudane próby powrotu, wyczerpane kafelki do ponowienia
+lub wymagane oczekiwanie >300 s odkładają host do następnego eksportu.
+
+RAM jest odczytywany co 5 s. Poniżej 2 GiB dostępnej pamięci koordynator wstrzymuje
+nowe procesy i wzrost; istniejące mogą kończyć pracę. Limit początkowy wynika z
+minimum 32, 2 × CPU i (dostępny RAM − 2 GiB) / 1 GiB, co najmniej 1; nieznany RAM: 2.
+Jednostka sterowania to proces/zadanie mapy, nie pojedyncze żądanie dostawcy QGIS.
+
+W adaptacyjnym renderowaniu rejestr `<table>.tiles.sqlite` w prywatnym katalogu
+zawiera współrzędne, status, liczbę prób i przyczynę błędu. Zapis PNG jest opróżniany
+na dysk przed zatwierdzeniem sukcesu w rejestrze. Puste poprawne kafelki również
+są rejestrowane. Maksymalnie trzy podejścia do kafelka; przy przeciążeniu lub timeout
+pomijamy natychmiastowe ponowienia/podziały. Próba powrotu ma pierwszeństwo dla
+bieżącego brakującego kafelka. Inne błędy używają dotychczasowego renderera i dwóch
+rund uzupełniania. 401/403/404 są trwałe i nie są ponawiane.
+
+Gotowe tabele są scalane raz przez jednego zapisującego. Procesy mapowe są izolowane;
+źródła authcfg pozostają w głównym QGIS, korzystając z tej samej kontroli hosta.
+Awaria procesu w trybie adaptacyjnym nie uruchamia niekontrolowanego zastępstwa
+w głównym QGIS. Brak restart-resume; rejestry prywatne są sprzątane po eksporcie.
+
+API: `create_archive(..., adaptive=False, server_activity=callback)` zachowuje
+stały tryb domyślny; przy `adaptive=True` workers/per_server_limit zastępuje dobór
+zasobów i sufit 8 na host. Okno używa tego trybu. `server_activity` otrzymuje wiersze
+host/active/processes/budget/limit/queued/rate/state/pause/generation/successes. Manifest 4
+zawiera tryb parallel oraz raport adaptive z historią limitów, pauz i zdarzeń pamięci;
+raster zawiera liczby podejść naprawczych i uzupełnionych kafelków. Bez URL/poświadczeń.

@@ -7,20 +7,19 @@ import time
 from html import escape
 
 from qgis.PyQt.QtCore import QCoreApplication, Qt, QUrl, QTimer
-from qgis.PyQt.QtGui import QDesktopServices
+from qgis.PyQt.QtGui import QDesktopServices, QIcon
 from qgis.PyQt.QtWidgets import (
     QComboBox, QDialog, QFileDialog, QFormLayout, QHBoxLayout, QLabel,
     QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QTreeWidget,
-    QTreeWidgetItem, QTreeWidgetItemIterator, QVBoxLayout, QWidget,
+    QTreeWidgetItem, QTreeWidgetItemIterator, QVBoxLayout, QWidget, QStyle,
 )
 from qgis.core import (
     QgsCoordinateTransform, QgsGeometry, QgsLayerTreeGroup, QgsProject,
-    QgsUnitTypes, QgsVectorLayer, QgsWkbTypes, QgsDataSourceUri,
+    QgsUnitTypes, QgsVectorLayer, QgsWkbTypes,
 )
 
 from .archive import create_archive, polygon_area
 from .raster_archive import TILE_SIZE, zoom_levels
-from .resources import MAX_WORKERS, detect_resources, recommend
 
 
 class ArchiveDialog(QDialog):
@@ -38,6 +37,7 @@ class ArchiveDialog(QDialog):
         self._finished_ids = set()
         self._items = {}
         self.setWindowTitle(tr('qgis-project-snapshot — Archiwizuj projekt'))
+        self.setWindowIcon(QIcon(str(Path(__file__).with_name('icon.svg'))))
         self.setWindowModality(Qt.ApplicationModal)
         self.resize(860, 790)
         layout = QVBoxLayout(self)
@@ -45,7 +45,12 @@ class ArchiveDialog(QDialog):
             tr('Zapisz projekt do pracy bez sieci. Najedź na opcję, aby zobaczyć objaśnienie.')
         )
         notice.setWordWrap(True)
-        layout.addWidget(notice)
+        heading = QHBoxLayout()
+        emblem = QLabel()
+        emblem.setPixmap(self.windowIcon().pixmap(40, 40))
+        heading.addWidget(emblem)
+        heading.addWidget(notice, 1)
+        layout.addLayout(heading)
 
         self.options = QWidget()
         options_layout = QVBoxLayout(self.options)
@@ -55,6 +60,7 @@ class ArchiveDialog(QDialog):
         output = QHBoxLayout()
         output.addWidget(self.output_edit)
         browse = QPushButton(tr('Wybierz…'))
+        browse.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
         browse.setToolTip(tr('Wybierz istniejący folder. W nim powstanie nowy katalog archiwum z datą.'))
         browse.clicked.connect(self._browse)
         output.addWidget(browse)
@@ -78,23 +84,18 @@ class ArchiveDialog(QDialog):
             combo.currentIndexChanged.connect(self._ensure_zoom_order)
         form.addRow(tr('Najmniejsze zbliżenie:'), self.zoom_min)
         form.addRow(tr('Największe zbliżenie:'), self.zoom_max)
-        self.workers = QComboBox()
-        for count in range(1, MAX_WORKERS + 1):
-            self.workers.addItem(tr('1 — oszczędnie') if count == 1 else tr('{0} procesy').format(count) if count < 5 else tr('{0} procesów').format(count), count)
-        self.workers.setCurrentIndex(0)
-        form.addRow(tr('Równoległe zadania:'), self.workers)
-        self.server_limit = QComboBox()
-        for count in (1, 2, 4, 6, 8):
-            self.server_limit.addItem(str(count), count)
-        self.server_limit.setCurrentIndex(1)  # Keep 2 as the default; 1 allows backing off.
-        form.addRow(tr('Zadania na serwer:'), self.server_limit)
-        self.resource_hint = QLabel()
+        self.resource_hint = QLabel(tr('Równoległość dobierana automatycznie podczas pobierania.'))
         self.resource_hint.setWordWrap(True)
-        self.resource_hint.setMinimumHeight(self.fontMetrics().lineSpacing() * 3)
-        form.addRow(self.resource_hint)
-        self.recommend_button = QPushButton(tr('Dobierz do komputera i zaznaczonych warstw'))
-        self.recommend_button.clicked.connect(self._recommend_workers)
-        form.addRow(self.recommend_button)
+        self.servers = QTreeWidget()
+        self.servers.setHeaderLabels([tr('Serwer'), tr('Aktywne / limit'), tr('Kolejka'),
+                                     tr('Kafelki/s'), tr('Stan'), tr('Przerwa')])
+        self.servers.headerItem().setIcon(0, self.style().standardIcon(QStyle.SP_ComputerIcon))
+        self.servers.setMaximumHeight(145)
+        self.servers.setRootIsDecorated(False)
+        for column, width in enumerate((215, 130, 70, 85, 210, 65)):
+            self.servers.setColumnWidth(column, width)
+        self.servers.setToolTip(tr('Automat zaczyna od 1 zadania na serwer. Zwiększa obciążenie po sukcesach i cofa je przy błędach lub braku przyspieszenia. Limity dotyczą map, nie dokładnej liczby żądań HTTP.'))
+        self._server_items = {}
         self.zoom_hint = QLabel()
         self.zoom_hint.setWordWrap(True)
         form.addRow(self.zoom_hint)
@@ -116,6 +117,21 @@ class ArchiveDialog(QDialog):
         self.tree.setColumnWidth(1, 160)
         options_layout.addWidget(self.tree, 1)
         layout.addWidget(self.options, 1)
+        resources = QHBoxLayout()
+        cpu_icon = QLabel()
+        cpu_icon.setPixmap(QIcon(str(Path(__file__).with_name('cpu.svg'))).pixmap(22, 22))
+        cpu_icon.setToolTip(tr('CPU: mapy są przetwarzane w osobnych procesach, które mogą korzystać z wielu rdzeni. Licznik pokazuje procesy, nie procent użycia procesora.'))
+        resources.addWidget(cpu_icon)
+        resources.addWidget(self.resource_hint, 1)
+        ram_icon = QLabel()
+        ram_icon.setPixmap(QIcon(str(Path(__file__).with_name('ram.svg'))).pixmap(22, 22))
+        ram_hint = QLabel(tr('Rezerwa RAM: 2 GiB'))
+        ram_hint.setToolTip(tr('Automat pozostawia 2 GiB pamięci dla QGIS i systemu. Sprawdza dostępny RAM co 5 sekund; przy niedoborze wstrzymuje uruchamianie nowych procesów. To rezerwa planowania, nie pomiar zużycia RAM.'))
+        ram_icon.setToolTip(ram_hint.toolTip())
+        resources.addWidget(ram_icon)
+        resources.addWidget(ram_hint)
+        layout.addLayout(resources)
+        layout.addWidget(self.servers)
         self.status = QLabel(tr('Gotowe do wyboru obszaru i folderu.'))
         self.status.setTextFormat(Qt.PlainText)
         self.status.setWordWrap(True)
@@ -179,6 +195,13 @@ class ArchiveDialog(QDialog):
         self.close_button = QPushButton(tr('Zamknij'))
         self.close_button.clicked.connect(self.reject)
         buttons.addWidget(self.close_button)
+        for button, standard_icon in (
+                (self.report_button, QStyle.SP_FileIcon),
+                (self.copy_button, QStyle.SP_FileDialogDetailedView),
+                (self.cancel_button, QStyle.SP_MediaStop),
+                (self.retry_button, QStyle.SP_BrowserReload)):
+            button.setIcon(self.style().standardIcon(standard_icon))
+        self.start_button.setIcon(self.windowIcon())
         layout.addLayout(buttons)
         tips = {
             notice: tr('Powstaje osobna kopia projektu, dane lokalne i raport. Oryginał nie jest zastępowany. Po eksporcie sprawdź raport i otwórz kopię bez internetu oraz sieci firmowej.'),
@@ -187,7 +210,6 @@ class ArchiveDialog(QDialog):
             self.polygon_combo: tr('Wskaż warstwę z obszarem opracowania. Jeśli zaznaczono w niej obiekty, użyjemy tylko zaznaczonych; w przeciwnym razie wszystkich. Mapy będą przycięte do ich kształtu.'),
             self.zoom_min: tr('Najmniejsze zbliżenie zapisanych map. Niski numer obejmuje większy teren z mniejszą szczegółowością. Zapisujemy każdy poziom między minimum i maksimum; wektory zachowują pełne dane.'),
             self.zoom_max: tr('Największe zbliżenie zapisanych map. Wyższy numer pokazuje więcej szczegółów, ale może mocno zwiększyć czas i rozmiar archiwum. Na pierwszą próbę pozostaw 17.'),
-            self.workers: tr('Liczba map przetwarzanych równocześnie w osobnych procesach. 1 oszczędza pamięć; Dobór uwzględnia CPU, wolną pamięć i liczbę serwerów. Wektory z niezapisanymi edycjami są odczytywane w głównym QGIS.'),
             self.zoom_hint: tr('Model dla prostokąta obszaru, jednej mapy i wszystkich wybranych zoomów: 0,2–2 s oraz 10–250 KiB skompresowanego PNG na kafelek 256 × 256. To założenia, nie pomiar łącza ani serwera; wynik może wyjść poza podany przedział. Długi pas i puste kafelki zwykle zmniejszają rozmiar. Błędy i ponowienia wydłużają czas. Szacunek nie obejmuje wektorów, oryginalnych rastrów, zasobów projektu, scalania i kontroli plików. Na pliki tymczasowe przewidź dodatkowe miejsce. Równoległość dotyczy wielu map, nie dzieli czasu jednej mapy. Skale obliczono dla środka obszaru przy 96 DPI.'),
             self.tree: tr('Zaznacz warstwy do archiwum. Wyłączone na mapie warstwy też można zapisać. Kolumna Stan pokazuje kolejkę, pobieranie, zapis lub problem. Najedź na stan, aby przeczytać szczegóły.'),
             self.progress: tr('Licznik zakończonych warstw, nie prognoza czasu. Warstwy mają różne rozmiary. Po zapisie danych trzeba jeszcze sprawdzić pliki i przygotować raport.'),
@@ -209,28 +231,25 @@ class ArchiveDialog(QDialog):
             if label and label.widget() and field:
                 widget = field.widget() or self.output_edit
                 label.widget().setToolTip(widget.toolTip())
-        self.server_limit.setToolTip(tr('Zacznij od 2. Zwiększ do 4–8 przy szybkim łączu i serwerze, który obsługuje wiele zapytań. Większa liczba może powodować błędy lub spowolnienie.'))
-        self.recommend_button.setToolTip(tr('Odświeża dostępne zasoby i ustawia rekomendację. Rezerwuje 2 GiB dla QGIS i około 1 GiB na proces. To punkt startowy, nie pomiar maksymalnej wydajności.'))
         self._update_area()
-        self._recommend_workers()
 
-    def _recommend_workers(self):
-        resources = detect_resources()
-        hosts = {}
-        for layer_id in self._selected_ids():
-            layer = self.project.mapLayer(layer_id)
-            if (not layer or not layer.isValid() or isinstance(layer, QgsVectorLayer)
-                    or layer.providerType() == 'gdal' or 'authcfg=' in layer.source()):
-                continue
-            uri = QgsDataSourceUri()
-            uri.setEncodedUri(layer.source())
-            host = QUrl(uri.param('url')).host() or layer.providerType()
-            hosts[host] = hosts.get(host, 0) + 1
-        count = recommend(**resources, per_server=self.server_limit.currentData(), hosts=hosts)
-        self.workers.setCurrentIndex(count - 1)
-        memory = f"{resources['memory'] / 1024**3:.1f} GiB" if resources['memory'] is not None else tr('brak odczytu')
-        network = tr('aktywne połączenie') if resources['online'] else tr('brak potwierdzonego połączenia')
-        self.resource_hint.setText(tr('CPU: {0} • wolny RAM: {1} • sieć: {2}. Rekomendacja: {3}. Przepustowość internetu i serwerów: niezmierzona.').format(resources['cpu'], memory, network, count))
+    def _server_activity(self, rows):
+        states = {'starting': tr('Rozpoczynanie'), 'increasing': tr('Zwiększanie'),
+                  'stable': tr('Ustalony limit'), 'cooldown': tr('Przerwa serwera'),
+                  'memory': tr('Ograniczenie pamięci'), 'repairing': tr('Uzupełnianie braków'),
+                  'deferred': tr('Odłożono do późniejszej próby')}
+        for row in rows:
+            item = self._server_items.get(row['host'])
+            if item is None:
+                item = QTreeWidgetItem(self.servers)
+                self._server_items[row['host']] = item
+            values = [row['host'], f"{row['active']} / {row['limit']}", str(row['queued']),
+                      f"{row['rate']:.2f}", states[row['state']], tr('{0} s').format(row['pause'])]
+            for column, value in enumerate(values):
+                item.setText(column, value)
+                item.setToolTip(column, value)
+        self.resource_hint.setText(tr('Procesy map: {0}/{1}; aktywne zadania: {2}. Dobór automatyczny.').format(
+            sum(r['processes'] for r in rows), rows[0]['budget'] if rows else 0, sum(r['active'] for r in rows)))
 
     def _populate_tree(self, node, parent):
         for child in node.children():
@@ -354,6 +373,9 @@ class ArchiveDialog(QDialog):
         self._finished_ids.clear()
         self._worker_messages.clear()
         self.log.clear()
+        self.resource_hint.setText(tr('Równoległość dobierana automatycznie podczas pobierania.'))
+        self.servers.clear()
+        self._server_items.clear()
         self._server_warnings.clear()
         self.server_warning.clear()
         self.server_warning.hide()
@@ -379,7 +401,7 @@ class ArchiveDialog(QDialog):
                 self.project, selected_ids, area, crs, folder,
                 cancelled=lambda: self._cancelled, progress=self._update_progress,
                 zoom_min=self.zoom_min.currentData(), zoom_max=self.zoom_max.currentData(),
-                workers=self.workers.currentData(), per_server_limit=self.server_limit.currentData(),
+                adaptive=True, server_activity=self._server_activity,
                 layer_status=self._layer_status, worker_activity=self._worker_activity,
             )
             self._finished_at = time.monotonic()

@@ -25,6 +25,7 @@ from qgis.core import (
 
 from .raster_archive import write_raster_data, write_rendered_raster, zoom_levels
 from .parallel_archive import RasterWorkers
+from .resources import detect_resources, recommend
 from .archive_resources import ProjectResources, audit_local_layers
 
 
@@ -290,12 +291,17 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                    cancelled=lambda: False, progress=lambda message: None,
                    zoom_min=13, zoom_max=17, workers=1, per_server_limit=2,
                    layer_status=lambda record, completed, total: None,
-                   worker_activity=lambda rows: None):
+                   worker_activity=lambda rows: None, adaptive=False,
+                   server_activity=lambda rows: None):
     """Create a partial archive; return its published directory.
 
     Called on the QGIS main thread. The dialog is modal and its progress callback
     handles events at bounded intervals; live layers are never used by a worker.
     """
+    if adaptive:
+        resources = detect_resources()
+        workers = recommend(resources['cpu'], resources['memory'], True)
+        per_server_limit = 8
     output_folder = Path(output_folder)
     if not isinstance(per_server_limit, int) or not 1 <= per_server_limit <= 8:
         raise ValueError(tr('Limit zadań na serwer musi wynosić od 1 do 8.'))
@@ -355,6 +361,8 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
         if parallel and time.monotonic() - last_activity >= 0.5:
             last_activity = time.monotonic()
             worker_activity(parallel.activity())
+            if adaptive:
+                server_activity(parallel.server_activity())
 
     with TemporaryDirectory(prefix='.archive-', dir=output_folder) as temporary, ExitStack() as processes:
         staging = Path(temporary)
@@ -364,12 +372,12 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
         database = staging / 'dane.gpkg'
         levels = None
         parallel = None
-        if workers > 1 and any(r['status'] == 'pending' and r['provider'] not in ('gdal', 'memory', 'ogr', 'mssql', 'WFS')
+        if (adaptive or workers > 1) and any(r['status'] == 'pending' and r['provider'] not in ('gdal', 'memory', 'ogr', 'mssql', 'WFS')
                                for r in records):
             progress(tr('Przygotowanie kolejki map dla osobnych procesów QGIS…'))
             levels = zoom_levels(project, area, area_crs, zoom_min, zoom_max)
             parallel = processes.enter_context(RasterWorkers(snapshot, staging, project, records,
-                                                              area, area_crs, levels, workers, per_server_limit))
+                                                              area, area_crs, levels, workers, per_server_limit, adaptive))
         for record in records:
             if record['status'] == 'excluded':
                 continue
@@ -424,11 +432,20 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                             except InterruptedError:
                                 raise
                             except Exception:
+                                if adaptive:
+                                    raise  # Never bypass a host policy with an unrestricted main-thread retry.
                                 _remove_table(database, table)
                                 record['attempts'].append({'method': 'parallel', 'reason': tr('Proces pomocniczy nie zakończył zapisu; ponowiono w głównym QGIS.')})
                                 progress(tr('{0}: proces pomocniczy zawiódł. Ponawiam zapis w głównym QGIS.').format(layer.name()))
-                        record.update(result if result is not None else write_rendered_raster(
-                            layer, project, area, area_crs, database, table, levels, cancelled, progress))
+                        gate = None
+                        try:
+                            if adaptive and parallel and result is None and not isinstance(layer, QgsVectorLayer):
+                                gate = parallel.local_gate(layer, cancelled)
+                            record.update(result if result is not None else write_rendered_raster(
+                                layer, project, area, area_crs, database, table, levels, cancelled, progress, gate=gate))
+                        finally:
+                            if gate:
+                                parallel.finish_local(gate)
                         if record['status'] == 'failed':
                             _remove_table(database, table)
                         if isinstance(layer, QgsVectorLayer):
@@ -445,6 +462,9 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
             progress(f'{record["name"]}: {record["reason"]}')
 
         progress(tr('Kończenie zadań pomocniczych i porządkowanie plików tymczasowych…'))
+        adaptive_report = parallel.adaptive_report() if adaptive and parallel else None
+        if adaptive and parallel:
+            server_activity(parallel.server_activity())
         processes.close()
         parallel = None
         worker_activity([])
@@ -460,14 +480,15 @@ def create_archive(project, selected_ids, area, area_crs, output_folder,
                 if connection.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                     raise RuntimeError(tr('Kontrola integralności GeoPackage nie powiodła się.'))
         manifest = {
-            'schema_version': 3, 'implementation_step': 3, 'status': 'partial',
+            'schema_version': 4, 'implementation_step': 3, 'status': 'partial',
             'cancelled': cancelled(), 'started_at': started.isoformat(),
             'finished_at': datetime.now().astimezone().isoformat(),
             'qgis_version': Qgis.QGIS_VERSION, 'gdal_version': gdal.VersionInfo('RELEASE_NAME'),
             'project_crs': project.crs().authid(),
             'area': {'crs': area_crs.authid(), 'wkt': area.asWkt()},
             'zoom_min': zoom_min, 'zoom_max': zoom_max, 'raster_levels': levels or [],
-            'parallel': {'workers': workers, 'per_server_limit': per_server_limit,
+            'adaptive': adaptive_report,
+            'parallel': {'mode': 'adaptive' if adaptive else 'fixed', 'workers': workers, 'per_server_limit': per_server_limit,
                          'completed_in_workers': sum('worker_pid' in r for r in records)},
             'resources': resource_report, 'local_layer_audit': {'passed': not local_failures, 'failures': local_failures},
             'limitations': [tr(text) for text in ARCHIVE_LIMITATIONS], 'layers': records, 'sha256': {},

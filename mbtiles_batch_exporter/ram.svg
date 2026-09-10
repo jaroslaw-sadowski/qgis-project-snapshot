@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>RAM</title>
+  <rect x="2" y="5" width="20" height="12" rx="2" fill="#e4f3eb" stroke="#246b50" stroke-width="2"/>
+  <path d="M5 17v3m4-3v3m6-3v3m4-3v3" stroke="#246b50" stroke-width="2"/>
+  <rect x="5" y="8" width="5" height="6" rx="1" fill="#37976d"/>
+  <rect x="14" y="8" width="5" height="6" rx="1" fill="#37976d"/>
+</svg>

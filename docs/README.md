@@ -18,6 +18,10 @@ Raporty są zapisem historycznym; aktualne priorytety znajdują się w stanie pr
 - [Krok 5 — paczka instalacyjna](validation-step5.md)
 - [Wersja 0.6.0 — postęp i nazwa wtyczki](validation-0.6.0.md)
 - [Wersja 0.7.0 — PL/EN, ponawianie i dobór równoległości](validation-0.7.0.md)
+- [Wersja 0.8.0 — automat i uzupełnianie kafelków](validation-0.8.0.md)
+- [Benchmark 0.8.0 — surowe pomiary](benchmark-0.8.0.json)
 
 Kod nie znajduje się w dokumentacji: źródła wtyczki są w `mbtiles_batch_exporter/`,
 testy w `tests/`, a skrypt pakowania w `scripts/`. Paczki są generowane w `dist/`.
+
+- [Odbiór 0.8.1 — opisy PL/EN i ikony](validation-0.8.1.md)

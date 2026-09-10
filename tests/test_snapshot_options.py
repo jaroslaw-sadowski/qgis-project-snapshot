@@ -68,6 +68,15 @@ class OptionsTests(unittest.TestCase):
             try:
                 self.assertIn('Archive project', dialog.windowTitle())
                 self.assertEqual(dialog.close_button.text(), 'Close')
+                self.assertFalse(hasattr(dialog, 'workers'))
+                self.assertFalse(hasattr(dialog, 'server_limit'))
+                dialog.options.setEnabled(False)
+                self.assertTrue(dialog.servers.isEnabled())
+                dialog.options.setEnabled(True)
+                dialog._server_activity([{'host': 'test', 'active': 1, 'processes': 2, 'limit': 1,
+                                          'queued': 5, 'rate': 0.0, 'state': 'cooldown', 'pause': 30, 'budget': 4}])
+                self.assertEqual(dialog._server_items['test'].text(4), 'Server cooldown')
+                self.assertIn('2/4', dialog.resource_hint.text())
                 dialog.start()
                 self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
                 self.assertIn('Layer 1/1', dialog.log.toPlainText())
@@ -127,6 +136,7 @@ class ResourceTests(unittest.TestCase):
 
     def test_busy_host_does_not_block_another_host(self):
         workers = RasterWorkers.__new__(RasterWorkers)
+        workers.adaptive = False
         workers.stop = Event()
         workers.condition = Condition()
         workers.per_server_limit = 1

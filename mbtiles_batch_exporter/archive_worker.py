@@ -41,6 +41,9 @@ def main():
     app = QgsApplication([], False)
     app.initQgis()
     app.setMaxThreads(1)
+    from .adaptive import WorkerGate
+    from qgis.PyQt.QtCore import QCoreApplication
+    gate = WorkerGate(folder, lambda: (folder / "cancel").exists(), QCoreApplication.processEvents) if parameters.get("adaptive") else None
     project = QgsProject()
     try:
         started = datetime.now().astimezone().isoformat()
@@ -54,7 +57,7 @@ def main():
             layer, project, QgsGeometry.fromWkt(parameters['area']),
             QgsCoordinateReferenceSystem(parameters['area_crs']), folder / 'raster.gpkg',
             parameters['table'], parameters['levels'], lambda: (folder / 'cancel').exists(),
-            progress,
+            progress, gate=gate,
         )
         result['worker_pid'] = os.getpid()
         result['started_at'] = started
@@ -66,6 +69,8 @@ def main():
         # Provider messages can contain credentials; do not return their raw text.
         return 1
     finally:
+        if gate:
+            gate.close()
         project.clear()
     # Process exit releases providers. exitQgis can race deferred Qt deletion.
     return 0

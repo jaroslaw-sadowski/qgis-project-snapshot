@@ -314,7 +314,7 @@ class LocalWmsTests(unittest.TestCase):
                 if parameters.get('REQUEST', '').lower() == 'getcapabilities':
                     body = f'''<?xml version="1.0"?><WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms" xmlns:xlink="http://www.w3.org/1999/xlink">
                     <Service><Name>WMS</Name><Title>Local fixture</Title></Service><Capability><Request>
-                    <GetMap><Format>image/png</Format><DCPType><HTTP><Get><OnlineResource xlink:href="http://127.0.0.1:{self.server.server_port}/wms"/></Get></HTTP></DCPType></GetMap>
+                    <GetMap><Format>image/png</Format><DCPType><HTTP><Get><OnlineResource xlink:href="http://{self.headers["Host"]}/wms"/></Get></HTTP></DCPType></GetMap>
                     </Request><Exception><Format>XML</Format></Exception><Layer><Title>Test</Title><CRS>EPSG:2180</CRS>
                     <Layer><Name>map</Name><Title>Map</Title><CRS>EPSG:2180</CRS>
                     <EX_GeographicBoundingBox><westBoundLongitude>18</westBoundLongitude><eastBoundLongitude>20</eastBoundLongitude><southBoundLatitude>51</southBoundLatitude><northBoundLatitude>54</northBoundLatitude></EX_GeographicBoundingBox>
@@ -330,6 +330,15 @@ class LocalWmsTests(unittest.TestCase):
                     with self.server.lock:
                         self.server.active -= 1
                     width, height = int(parameters.get('WIDTH', 256)), int(parameters.get('HEIGHT', 256))
+                    with self.server.lock:
+                        scripted = getattr(self.server, 'scripted_statuses', [])
+                        status = scripted.pop(0) if scripted else None
+                    if status:
+                        self.send_response(status)
+                        self.send_header('Retry-After', getattr(self.server, 'retry_after', '0'))
+                        self.send_header('Content-Length', '0')
+                        self.end_headers()
+                        return
                     if getattr(self.server, 'forced_status', None):
                         self.send_error(self.server.forced_status)
                         return

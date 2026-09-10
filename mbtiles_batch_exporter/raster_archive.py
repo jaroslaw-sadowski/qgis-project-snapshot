@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Bounded-memory raster capture using QGIS rendering and GDAL GeoPackage."""
 from .i18n import tr
+from .adaptive import DownloadError, HostDeferred, retry_after
 from contextlib import closing
 import json
 import math
@@ -116,7 +117,10 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
         content_type = bytes(reply.rawHeader(b'Content-Type')).decode('ascii', errors='replace').lower()
         operation = QUrlQuery(reply.request().url()).queryItemValue('REQUEST').lower()
         if reply.error() != QNetworkReply.NoError or (operation == 'getmap' and 'xml' in content_type):
-            network_errors.append(reply.attribute(QNetworkRequest.HttpStatusCodeAttribute))
+            code = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
+            if reply.error() == QNetworkReply.TimeoutError:
+                code = 'timeout'
+            network_errors.append((code, retry_after(bytes(reply.rawHeader(b'Retry-After')).decode('ascii', errors='replace'))))
 
     network.requestAboutToBeCreated[QgsNetworkRequestParameters].connect(request_created)
     network.finished[QgsNetworkReplyContent].connect(reply_finished)
@@ -145,12 +149,15 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
         QCoreApplication.processEvents()
         if network_errors:
             for code in (429, 503):
-                if code in network_errors:
-                    message = ('[HTTP 429] ' + tr('Serwer {0}: zbyt wiele zapytań. Kliknij „Przerwij”, zmniejsz „Zadania na serwer” i spróbuj ponownie po przerwie.').format(service.host()) if code == 429
-                               else '[HTTP 503] ' + tr('Serwer {0}: usługa niedostępna lub przeciążona. Jeśli problem się powtarza, kliknij „Przerwij” i zmniejsz „Zadania na serwer”. HTTP 503 nie potwierdza, że przyczyną jest liczba zapytań.').format(service.host()))
+                if code in [item[0] for item in network_errors]:
+                    message = ('[HTTP 429] ' + tr('Serwer {0}: zbyt wiele zapytań. Potrzebna jest przerwa przed ponownym pobieraniem.').format(service.host()) if code == 429
+                               else '[HTTP 503] ' + tr('Serwer {0}: usługa niedostępna lub przeciążona. HTTP 503 nie potwierdza, że przyczyną jest liczba zapytań.').format(service.host()))
                     progress(message)
-                    raise RuntimeError(message)
-            raise RuntimeError(tr('Usługa mapowa zwróciła błąd sieciowy lub odpowiedź błędu WMS.'))
+                    raise DownloadError(message, code, next(delay for status, delay in network_errors if status == code))
+            if any(code == 'timeout' for code, _ in network_errors):
+                raise TimeoutError(tr('Przekroczono czas pobierania fragmentu mapy.'))
+            code = network_errors[0][0]
+            raise DownloadError(tr('Usługa mapowa zwróciła błąd sieciowy lub odpowiedź błędu WMS.'), code)
         if job.errors():
             raise RuntimeError(tr('Renderer QGIS zgłosił błąd pobierania lub rysowania warstwy.'))
         result = job.renderedImage()
@@ -164,7 +171,7 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
         network.finished[QgsNetworkReplyContent].disconnect(reply_finished)
 
 
-def _render_tile(layer, project, bounds, resolution, size, cancelled, progress, counters):
+def _render_tile(layer, project, bounds, resolution, size, cancelled, progress, counters, gate=None):
     # A small gutter avoids cutting strokes at tile edges. Output remains 256px.
     gutter = 16
     expanded = QgsRectangle(bounds)
@@ -173,18 +180,24 @@ def _render_tile(layer, project, bounds, resolution, size, cancelled, progress, 
         if cancelled():
             raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
         try:
+            if gate:
+                gate.before(retry=gate.retrying)
             image = _render_image(layer, project, expanded, size + 2 * gutter,
                                   size + 2 * gutter, cancelled, progress)
             return image.copy(gutter, gutter, size, size)
-        except InterruptedError:
+        except (InterruptedError, HostDeferred):
             raise
         except (RuntimeError, TimeoutError) as error:
             if str(error).startswith(('[HTTP 429]', '[HTTP 503]')):
                 warnings = counters.setdefault('server_warnings', [])
                 if str(error) not in warnings:
                     warnings.append(str(error))
-                if str(error).startswith('[HTTP 429]'):
+                if gate or str(error).startswith('[HTTP 429]'):
                     raise  # Do not amplify an explicit rate limit with tile retries.
+            if getattr(error, 'status', None) in (401, 403, 404) or (gate and isinstance(error, TimeoutError)):
+                raise
+            if gate:
+                gate.outcome(error)
             # Some providers cache the empty image produced by a failed request.
             # Invalidate only the disposable clone before trying again.
             if layer.dataProvider() is not None:
@@ -205,7 +218,7 @@ def _render_tile(layer, project, bounds, resolution, size, cancelled, progress, 
                 x = bounds.xMinimum() + column * half * resolution
                 y = bounds.yMaximum() - row * half * resolution
                 part = QgsRectangle(x, y - half * resolution, x + half * resolution, y)
-                image = _render_tile(layer, project, part, resolution, half, cancelled, progress, counters)
+                image = _render_tile(layer, project, part, resolution, half, cancelled, progress, counters, gate)
                 painter.drawImage(column * half, row * half, image)
     finally:
         painter.end()
@@ -240,7 +253,7 @@ def _mask_image(image, area, bounds, resolution):
     return image.convertToFormat(QImage.Format_RGBA8888)
 
 
-def write_rendered_raster(layer, project, area, area_crs, database, table, levels, cancelled, progress):
+def write_rendered_raster(layer, project, area, area_crs, database, table, levels, cancelled, progress, gate=None):
     """One sparse RGBA tile table; each zoom is rendered independently."""
     mask = QgsGeometry(area)
     if area_crs != project.crs():
@@ -302,54 +315,58 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
                          math.ceil(height * finest / (TILE_SIZE * level['resolution'])),
                          TILE_SIZE, TILE_SIZE, level['resolution'], level['resolution']) for level in levels
                     ])
-            failures_in_a_row = 0
-            for level in reversed(levels):
-                zoom, resolution = level['zoom'], level['resolution']
-                progress(tr('{0}: rozpoczęcie zoomu {1}; rozdzielczość {2:.3g} jednostek/piksel.').format(layer.name(), zoom, resolution))
-                level_stats = dict(zoom=zoom, attempted=0, nonempty=0, empty=0, failed=0)
-                stats['levels'].append(level_stats)
-                dataset = gdal.OpenEx(str(database), gdal.OF_RASTER | gdal.OF_UPDATE,
-                                     open_options=[f'TABLE={table}', f'ZOOM_LEVEL={zoom}', 'BAND_COUNT=4'] + PNG_OPTIONS)
-                for column, row in intersecting_tiles(mask, x0, y0, resolution, dataset.RasterXSize, dataset.RasterYSize):
-                    progress(tr('{0} — zoom {1}, fragment {2}').format(layer.name(), zoom, level_stats["attempted"] + 1))
-                    if cancelled():
-                        raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
-                    level_stats['attempted'] += 1
-                    x, y = x0 + column * TILE_SIZE * resolution, y0 - row * TILE_SIZE * resolution
-                    tile_bounds = QgsRectangle(x, y - TILE_SIZE * resolution, x + TILE_SIZE * resolution, y)
-                    try:
-                        image = _render_tile(clone, project, tile_bounds, resolution, TILE_SIZE,
-                                             cancelled, progress, stats)
-                    except InterruptedError:
-                        raise
-                    except (RuntimeError, TimeoutError) as error:
-                        level_stats['failed'] += 1
-                        failures_in_a_row += 1
-                        if len(stats['failures']) < 20:
-                            stats['failures'].append({'zoom': zoom, 'column': column, 'row': row, 'reason': str(error)})
-                        if str(error).startswith('[HTTP 429]') or failures_in_a_row >= 5:
-                            stats['stopped_early'] = True
-                            break
-                        continue
-                    failures_in_a_row = 0
-                    image = _mask_image(image, mask, tile_bounds, resolution)
-                    # Last overview tiles can be smaller than 256 pixels at dataset edges.
-                    w = min(TILE_SIZE, dataset.RasterXSize - column * TILE_SIZE)
-                    h = min(TILE_SIZE, dataset.RasterYSize - row * TILE_SIZE)
-                    image = image.copy(0, 0, w, h)
-                    pixels = image.constBits().asstring(image.sizeInBytes())
-                    if not any(pixels[3::4]):
-                        level_stats['empty'] += 1
-                        continue
-                    dataset.WriteRaster(column * TILE_SIZE, row * TILE_SIZE, w, h, pixels,
-                                        band_list=[1, 2, 3, 4], buf_pixel_space=4,
-                                        buf_line_space=image.bytesPerLine(), buf_band_space=1)
-                    level_stats['nonempty'] += 1
-                dataset.FlushCache()
-                dataset = None
-                progress(tr('{0}: zoom {1} zakończony — zapisane {2}, puste {3}, błędne {4} fragmenty.').format(layer.name(), zoom, level_stats["nonempty"], level_stats["empty"], level_stats["failed"]))
-                if stats['stopped_early']:
-                    break
+            if gate:
+                _capture_adaptive(clone, project, mask, database, table, levels, x0, y0,
+                                  cancelled, progress, stats, gate)
+            else:
+                failures_in_a_row = 0
+                for level in reversed(levels):
+                    zoom, resolution = level['zoom'], level['resolution']
+                    progress(tr('{0}: rozpoczęcie zoomu {1}; rozdzielczość {2:.3g} jednostek/piksel.').format(layer.name(), zoom, resolution))
+                    level_stats = dict(zoom=zoom, attempted=0, nonempty=0, empty=0, failed=0)
+                    stats['levels'].append(level_stats)
+                    dataset = gdal.OpenEx(str(database), gdal.OF_RASTER | gdal.OF_UPDATE,
+                                         open_options=[f'TABLE={table}', f'ZOOM_LEVEL={zoom}', 'BAND_COUNT=4'] + PNG_OPTIONS)
+                    for column, row in intersecting_tiles(mask, x0, y0, resolution, dataset.RasterXSize, dataset.RasterYSize):
+                        progress(tr('{0} — zoom {1}, fragment {2}').format(layer.name(), zoom, level_stats["attempted"] + 1))
+                        if cancelled():
+                            raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
+                        level_stats['attempted'] += 1
+                        x, y = x0 + column * TILE_SIZE * resolution, y0 - row * TILE_SIZE * resolution
+                        tile_bounds = QgsRectangle(x, y - TILE_SIZE * resolution, x + TILE_SIZE * resolution, y)
+                        try:
+                            image = _render_tile(clone, project, tile_bounds, resolution, TILE_SIZE,
+                                                 cancelled, progress, stats)
+                        except InterruptedError:
+                            raise
+                        except (RuntimeError, TimeoutError) as error:
+                            level_stats['failed'] += 1
+                            failures_in_a_row += 1
+                            if len(stats['failures']) < 20:
+                                stats['failures'].append({'zoom': zoom, 'column': column, 'row': row, 'reason': str(error)})
+                            if str(error).startswith('[HTTP 429]') or failures_in_a_row >= 5:
+                                stats['stopped_early'] = True
+                                break
+                            continue
+                        failures_in_a_row = 0
+                        image = _mask_image(image, mask, tile_bounds, resolution)
+                        # Last overview tiles can be smaller than 256 pixels at dataset edges.
+                        w = min(TILE_SIZE, dataset.RasterXSize - column * TILE_SIZE)
+                        h = min(TILE_SIZE, dataset.RasterYSize - row * TILE_SIZE)
+                        image = image.copy(0, 0, w, h)
+                        pixels = image.constBits().asstring(image.sizeInBytes())
+                        if not any(pixels[3::4]):
+                            level_stats['empty'] += 1
+                            continue
+                        dataset.WriteRaster(column * TILE_SIZE, row * TILE_SIZE, w, h, pixels,
+                                            band_list=[1, 2, 3, 4], buf_pixel_space=4,
+                                            buf_line_space=image.bytesPerLine(), buf_band_space=1)
+                        level_stats['nonempty'] += 1
+                    dataset.FlushCache()
+                    dataset = None
+                    progress(tr('{0}: zoom {1} zakończony — zapisane {2}, puste {3}, błędne {4} fragmenty.').format(layer.name(), zoom, level_stats["nonempty"], level_stats["empty"], level_stats["failed"]))
+                    if stats['stopped_early']:
+                        break
             if cancelled():
                 raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
             with closing(sqlite3.connect(database)) as connection:
@@ -382,6 +399,117 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
     if status == 'failed':
         result.pop('local_source')
     return result
+
+
+def _capture_adaptive(layer, project, mask, database, table, levels, x0, y0,
+                      cancelled, progress, stats, gate):
+    """Three bounded passes; durable successes (including empty tiles) are never redrawn."""
+    ledger_path = gate.folder / (table + '.tiles.sqlite')
+    deferred = False
+    with closing(sqlite3.connect(ledger_path)) as ledger:
+        ledger.execute('CREATE TABLE tiles (zoom INTEGER, col INTEGER, row INTEGER, status TEXT, '
+                       'attempts INTEGER DEFAULT 0, reason TEXT DEFAULT "", PRIMARY KEY(zoom,col,row))')
+        for level in reversed(levels):
+            zoom, resolution = level['zoom'], level['resolution']
+            progress(tr('Przygotowanie rejestru kafelków: zoom {0}…').format(zoom))
+            dataset = gdal.OpenEx(str(database), gdal.OF_RASTER, open_options=[f'TABLE={table}', f'ZOOM_LEVEL={zoom}'])
+            width, height = dataset.RasterXSize, dataset.RasterYSize
+            dataset = None
+            for index, (column, row) in enumerate(intersecting_tiles(mask, x0, y0, resolution, width, height)):
+                if cancelled():
+                    raise InterruptedError()
+                ledger.execute('INSERT INTO tiles(zoom,col,row,status) VALUES(?,?,?,?)', (zoom, column, row, 'pending'))
+                if index % 500 == 0:
+                    ledger.commit()
+                    progress(tr('Przygotowanie rejestru kafelków: zoom {0}…').format(zoom))
+            ledger.commit()
+        stats.update(repair_attempts=0, repaired=0, deferred=False)
+        for round_number in range(3):
+            if deferred:
+                break
+            for level in reversed(levels):
+                if deferred:
+                    break
+                zoom, resolution = level['zoom'], level['resolution']
+                dataset = gdal.OpenEx(str(database), gdal.OF_RASTER | gdal.OF_UPDATE,
+                                     open_options=[f'TABLE={table}', f'ZOOM_LEVEL={zoom}', 'BAND_COUNT=4'] + PNG_OPTIONS)
+                # Read a cursor, not an in-memory list of an entire corridor.
+                cursor = ledger.execute('SELECT col,row,attempts FROM tiles WHERE zoom=? '
+                                        'AND status IN ("pending","retry") AND attempts < 3 ORDER BY col,row', (zoom,))
+                try:
+                    for column, row, attempts in cursor:
+                        if cancelled():
+                            raise InterruptedError()
+                        # An overload probe retries this missing tile before requesting a new one.
+                        while attempts < 3:
+                            gate.retrying = attempts > 0
+                            progress(tr('{0} — zoom {1}, fragment {2}/{3}, próba {4}').format(
+                                layer.name(), zoom, column, row, attempts + 1))
+                            x, y = x0 + column * TILE_SIZE * resolution, y0 - row * TILE_SIZE * resolution
+                            bounds = QgsRectangle(x, y - TILE_SIZE * resolution, x + TILE_SIZE * resolution, y)
+                            try:
+                                image = _render_tile(layer, project, bounds, resolution, TILE_SIZE,
+                                                     cancelled, progress, stats, gate)
+                                image = _mask_image(image, mask, bounds, resolution)
+                                w = min(TILE_SIZE, dataset.RasterXSize - column * TILE_SIZE)
+                                h = min(TILE_SIZE, dataset.RasterYSize - row * TILE_SIZE)
+                                image = image.copy(0, 0, w, h)
+                                pixels = image.constBits().asstring(image.sizeInBytes())
+                                empty = not any(pixels[3::4])
+                                if not empty:
+                                    dataset.WriteRaster(column * TILE_SIZE, row * TILE_SIZE, w, h, pixels,
+                                                        band_list=[1, 2, 3, 4], buf_pixel_space=4,
+                                                        buf_line_space=image.bytesPerLine(), buf_band_space=1)
+                                dataset.FlushCache()
+                                attempts += 1
+                                if attempts > 1:
+                                    stats['repair_attempts'] += 1
+                                    stats['repaired'] += 1
+                                ledger.execute('UPDATE tiles SET status=?,attempts=?,reason="" '
+                                               'WHERE zoom=? AND col=? AND row=?',
+                                               ('empty' if empty else 'saved', attempts, zoom, column, row))
+                                ledger.commit()
+                                gate.outcome()
+                                break
+                            except HostDeferred:
+                                deferred = True
+                                break
+                            except InterruptedError:
+                                raise
+                            except (RuntimeError, TimeoutError) as error:
+                                attempts += 1
+                                if attempts > 1:
+                                    stats['repair_attempts'] += 1
+                                permanent = getattr(error, 'status', None) in (401, 403, 404)
+                                retryable = not permanent and attempts < 3
+                                ledger.execute('UPDATE tiles SET status=?,attempts=?,reason=? '
+                                               'WHERE zoom=? AND col=? AND row=?',
+                                               ('retry' if retryable else 'failed', attempts, str(error), zoom, column, row))
+                                ledger.commit()
+                                gate.outcome(error, recoverable=retryable)
+                                if layer.dataProvider() is not None:
+                                    layer.dataProvider().reloadData()
+                                overload = getattr(error, 'status', None) in (429, 503) or isinstance(error, TimeoutError)
+                                if not overload or not retryable:
+                                    break
+                        if deferred:
+                            break
+                finally:
+                    cursor.close()
+                    dataset.FlushCache()
+                    dataset = None
+        stats['deferred'] = deferred
+        stats['stopped_early'] = deferred
+        for level in reversed(levels):
+            zoom = level['zoom']
+            counts = dict(ledger.execute('SELECT status,count(*) FROM tiles WHERE zoom=? GROUP BY status', (zoom,)))
+            attempted = ledger.execute('SELECT coalesce(sum(attempts),0) FROM tiles WHERE zoom=?', (zoom,)).fetchone()[0]
+            stats['levels'].append({'zoom': zoom, 'attempted': attempted, 'nonempty': counts.get('saved', 0),
+                                    'empty': counts.get('empty', 0),
+                                    'failed': sum(v for k, v in counts.items() if k not in ('saved', 'empty'))})
+        stats['failures'] = [dict(zoom=z, column=c, row=r, reason=reason or tr('Serwer odłożony do późniejszej próby.'))
+                             for z, c, r, reason in ledger.execute(
+                                 'SELECT zoom,col,row,reason FROM tiles WHERE status NOT IN ("saved","empty") LIMIT 20')]
 
 
 def write_raster_data(layer, project, area, area_crs, staging, table, cancelled, progress):

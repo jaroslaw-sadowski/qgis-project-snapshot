@@ -25,7 +25,6 @@ class ProgressTests(unittest.TestCase):
         dialog.polygon_combo.addItem(polygon.name(), polygon.id())
         dialog.area_combo.setCurrentIndex(1)
         dialog.output_edit.setText(str(self.folder))
-        dialog.workers.setCurrentIndex(0)
         return dialog
 
     def test_real_export_shows_layer_progress_stages_and_result(self):
@@ -45,7 +44,7 @@ class ProgressTests(unittest.TestCase):
             self.assertFalse(dialog.timer.isActive())
             self.assertTrue(dialog.report_button.isEnabled())
             for widget in (dialog.output_edit, dialog.area_combo, dialog.polygon_combo, dialog.zoom_min,
-                           dialog.zoom_max, dialog.workers, dialog.tree, dialog.log, dialog.progress):
+                           dialog.zoom_max, dialog.servers, dialog.tree, dialog.log, dialog.progress):
                 self.assertTrue(widget.toolTip())
         finally:
             dialog.close()

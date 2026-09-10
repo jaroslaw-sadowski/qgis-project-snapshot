@@ -1,117 +1,100 @@
-# qgis-project-snapshot — krótka instrukcja
+# qgis-project-snapshot — instrukcja 0.8.1
 
-## Instalacja
+## Instalacja i uruchomienie
 
-1. W QGIS otwórz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-0.7.2.zip` i włącz **qgis-project-snapshot**.
-   Jeśli aktualizujesz poprzednią wersję, zakończ eksport i uruchom ponownie QGIS.
-3. Wybierz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
+1. QGIS: **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
+2. Wskaż `qgis-project-snapshot-0.8.1.zip`. Po aktualizacji uruchom ponownie QGIS.
+3. Otwórz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
 
-Wymagane: QGIS 3.40 z PyQt5 oraz GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
-pełny projekt z MSSQL trzeba jeszcze odebrać na komputerze służbowym.
+Wymagane: QGIS 3.40, PyQt5 i GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
+Windows i źródła firmowe wymagają próby na stanowisku służbowym.
+Interfejs wybiera polski dla języka QGIS `pl`, angielski dla wszystkich `en`.
+Bez własnego języka QGIS używa języka systemu; pozostałe języki mają wersję angielską.
 
-Język opcji QGIS wybiera polski (`pl`) lub angielski (wszystkie `en`, np. brytyjski
-i amerykański). Bez własnego języka QGIS używany jest język systemu; inne języki
-mają angielski interfejs. Po zmianie ustawień otwórz ponownie okno wtyczki.
+## Zapis archiwum
 
-## Utworzenie archiwum
+1. Otwórz projekt z dostępem do danych, np. w sieci firmowej dla MSSQL.
+2. Wybierz folder, obszar i warstwy. Dla pasa inwestycji użyj poligonów.
+3. Na początek zostaw zoomy 13–17 i mały obszar testowy.
+4. Kliknij **Utwórz archiwum**. Objaśnienia opcji znajdziesz po najechaniu kursorem.
 
-1. Otwórz projekt z dostępem do jego danych. Pierwszą próbę zrób na małym obszarze.
-2. Wybierz folder, obszar i warstwy. Dla pasa inwestycji użyj poligonów obszaru.
-3. Na początek pozostaw zbliżenia 13–17. Kliknij **Dobierz do komputera i zaznaczonych warstw**.
-   Przy szybkim łączu możesz zwiększyć **Zadania na serwer** i ponownie użyć doboru.
-4. Kliknij **Utwórz archiwum**. Szczegóły każdej opcji przeczytasz po najechaniu kursorem.
+Oryginalny projekt nie jest zastępowany. PNG zachowują przezroczystość i kompresję
+bezstratną. Wektory zachowują obiekty i atrybuty; zastąpienie obrazem jest opisane
+w raporcie. Daty raportu oznaczają czasy pobierania, nie wspólną chwilę wszystkich źródeł.
 
-Pasek pokazuje liczbę zakończonych warstw. Kolumna **Stan** i **dziennik** opisują
-pobieranie map, fragmenty, ponowienia, zapis i kontrolę plików. **Kopiuj dziennik**
-pozwala zachować komunikaty. Niekiedy źródło długo odpowiada — ostatnia czynność
-pozostaje wtedy widoczna. **Przerwij** zachowuje ukończone, scalone warstwy.
+## Automatyczna równoległość
 
-## Sprawdzenie wyniku
+Nie trzeba ustawiać liczby procesów ani zapytań. Tabela pokazuje dla każdego hosta:
+**aktywne zadania / limit**, kolejkę, skuteczne kafelki/s, stan i pozostałą przerwę.
+Nad nią widać wykorzystanie procesów map. Limity dotyczą zadań mapowych, nie dokładnej
+liczby żądań HTTP na sekundę — dostawca QGIS może wysyłać kilka żądań dla jednego zadania.
 
-1. Otwórz raport: sprawdź błędy, puste obrazy i elementy wymagające kontroli.
-2. Przenieś **cały folder archiwum**. Zamknij projekt źródłowy, odłącz internet
-   i sieć firmową, a następnie otwórz archiwalny `.qgz`.
-3. Porównaj mapę, atrybuty, załączniki i używane formularze oraz wydruki.
-   Po małej próbie sprawdź reprezentatywny długi pas i dopiero potem cały obszar.
+Automat zaczyna od 1 zadania na host. Po co najmniej 15 sekundach i 10 poprawnych
+kafelkach może dodać jedno zadanie, jeśli są następne mapy do pobrania. Sprawdza,
+czy zwiększanie faktycznie poprawia szybkość. Po błędzie przeciążenia albo dwóch
+oknach bez poprawy wraca o krok i nie zwiększa już obciążenia w tym eksporcie.
+Dalsze problemy mogą je jeszcze zmniejszyć. CPU i dostępny RAM ograniczają
+łączną liczbę procesów; nieznany RAM oznacza ostrożny limit.
 
-Oryginalny projekt nie jest zastępowany. Archiwum może być częściowe; sam
-poprawny zapis nie potwierdza wszystkich zależności. Do odczytu lokalnej kopii
-nasza wtyczka nie jest potrzebna. Daty raportu oznaczają czas pobierania warstw.
+To heurystyka, nie gwarancja najszybszego ustawienia. Krótki eksport może skończyć
+się przed zwiększeniem równoległości. Pojedyncza mapa nadal jest obsługiwana przez
+jeden proces. Wektory, rastry źródłowe i niezapisane edycje pozostają w głównym QGIS.
 
-Przy problemie zanotuj wersję QGIS/systemu, warstwę i opcje eksportu; zachowaj
-raport oraz dziennik. Dane i poświadczenia firmowe pozostaw w środowisku służbowym.
+## Czerwone ostrzeżenie i uzupełnianie
 
-## Problemy i ponowna próba
+HTTP 429 oznacza zbyt wiele zapytań. HTTP 503 oznacza niedostępność lub możliwe
+przeciążenie; nie dowodzi, że przyczyną jest nasz ruch. Automat wstrzymuje nowe
+pobrania tego hosta i respektuje `Retry-After`. Inne hosty mogą pracować dalej.
+Bez terminu od serwera stosuje przerwy 30/60/120 sekund. Pierwsza próba po przerwie
+dotyczy brakującego kafelka; dopiero sukces pozwala wznowić pozostałe zadania.
 
-Po eksporcie przewijane pole pokazuje nazwy problematycznych warstw i przyczyny.
-Błędne, przerwane, puste i częściowe obrazy są automatycznie zaznaczane;
-poprawnie zapisane warstwy są odznaczane. Poprawnie odczytany wektor bez obiektów
-jest sukcesem, nie błędem pobierania.
+Poprawne kafelki, również przezroczyste, nie są pobierane ponownie. Automat uzupełnia
+braki **w tym samym archiwum**, najwyżej dwukrotnie po pierwszym pobraniu kafelka.
+Gdy limit prób się wyczerpie albo serwer wymaga czekania ponad 5 minut, pozostawia
+wynik niepełny i zapisuje powód. Błędów dostępu 401/403/404 nie ponawia automatycznie.
 
-Przycisk **Ponów tylko niezapisane i niepełne warstwy** uruchamia eksport zaznaczonych
-warstw. Powstaje osobny folder, bez automatycznego łączenia z poprzednim wynikiem.
-**Zachowaj oba foldery.** Szczegółowy raport `raport.html` zawiera też diagnostykę
-z `manifest.json`, w tym próby zastępcze i zapisane przykłady błędów kafelków.
+**Przerwij** działa również podczas oczekiwania. Zachowuje ukończone, scalone mapy;
+nieukończone prywatne pliki są usuwane. W razie problemu możesz przerwać i sprawdzić
+raport. Automat nie wznawia pracy po zamknięciu QGIS i nie pamięta limitów między eksportami.
 
-## Dobór równoległości
+## Wynik i odbiór offline
 
-Wtyczka odczytuje dostępne CPU, wolny RAM (Linux i Windows) i stan połączenia
-sieciowego. Rekomendacja rezerwuje 2 GiB dla głównego QGIS i około 1 GiB na proces,
-uwzględnia liczbę map i limit na serwer. To punkt startowy: rzeczywiste zużycie
-zależy od źródeł. Można wybrać 1–32 procesy i 1–8 zadań na serwer.
+Po zakończeniu przewijana lista pokazuje problematyczne warstwy. Raport HTML oraz
+`manifest.json` zawierają przyczyny, uzupełnianie i historię limitów hostów.
+Przycisk ponowienia **po zakończeniu** eksportu tworzy osobny folder wyłącznie
+z zaznaczonymi warstwami. Zachowaj oba foldery; ten przycisk nie łączy wyników.
 
-Aktywne połączenie nie potwierdza dostępu do internetu, VPN ani konkretnej usługi.
-Wtyczka nie wykonuje publicznego testu szybkości: przepustowość internetu i serwerów
-jest oznaczona jako **niezmierzona**. Przy wolnym łączu, błędach lub obciążeniu pamięci
-zmniejsz liczbę zadań; przy sprawnym szybkim serwerze zwiększaj stopniowo.
-Wektory i niektóre źródła nadal wymagają głównego procesu QGIS.
+Przenieś **cały folder archiwum**, odłącz internet i sieć firmową, otwórz kopię `.qgz`.
+Sprawdź mapę, atrybuty, załączniki, formularze i wydruki. Archiwum nadal wymaga
+odbioru: poprawne lokalne ścieżki nie potwierdzają wszystkich zależności projektu.
+Do odczytu kopii ta wtyczka nie jest potrzebna.
+
+Szacunek przy kafelkach dotyczy jednej mapy i wszystkich wybranych zoomów.
+Model zakłada 0,2–2 s oraz 10–250 KiB PNG na kafelek; to nie pomiar serwera ani
+prognoza całego projektu. Nie uwzględnia zasobów, wektorów, rastrów źródłowych,
+scalania, kontroli i miejsca tymczasowego. Szczegóły są w podpowiedzi.
+
+Automatyka nie zmienia zasad dostawcy. Standardowe `tile.openstreetmap.org`
+nie dopuszcza masowego pobierania obszarów offline; wybierz źródło dopuszczające
+archiwizację albo własny serwer.
 
 ## English quick start
 
-Open **Plugins → qgis-project-snapshot → Archive project…**. Choose the output
-folder, area and layers, then use **Recommend for this computer and selected layers**
-and **Create archive**. Hover over controls for explanations. English is selected
-for all English QGIS locales; Polish for Polish. Other locales fall back to English.
+Open **Plugins → qgis-project-snapshot → Archive project…**. Choose the folder,
+area, layers and zooms, then **Create archive**. Concurrency is automatic. The
+server table shows active tasks/limit, queue, successful tiles/s, state and cooldown.
 
-After export, scroll through the result list. Missing, cancelled, empty and partial
-layers are selected for retry; successful layers are deselected. Retrying creates a
-**separate archive of the selected layers**. Keep both folders; results are not merged.
-Open the report and verify the archived project with network access disconnected.
+Each host starts at one map task. After successful windows, concurrency may grow.
+Errors or no speed gain reduce the limit and stop further growth for this export.
+CPU/RAM constrain processes. This controls map tasks, not exact HTTP requests/sec.
 
-CPU and available RAM guide the suggested process count (up to 32; 1–8 tasks per
-server). Network connection state is detected, but internet throughput is not measured.
-More processes may help across several servers, but can exhaust RAM or slow a service.
+HTTP 429/503 triggers a host cooldown. Other hosts continue. Retry-After is respected;
+otherwise backoff is 30/60/120 seconds. Only missing tiles are repaired in the same
+archive, with at most two additional attempts. Successful and transparent tiles are
+not fetched again. Long waits, exhausted retries and permanent access errors are
+reported as incomplete results. Cancel remains available while waiting.
 
-## Szacunek przed uruchomieniem
-
-Pod liczbą kafelków znajdziesz przedział czasu i rozmiaru skompresowanych PNG
-**na jedną mapę**, dla obszaru i całego wybranego zakresu zoomów. To model
-przy założeniu 0,2–2 s i 10–250 KiB na kafelek, nie pomiar twojego serwera.
-Podpowiedź po najechaniu wyjaśnia ograniczenia. Wektory, rastry źródłowe, zasoby,
-scalanie, kontrola i dodatkowe miejsce na pliki tymczasowe nie są w nim ujęte.
-Wynik może wyjść poza przedział; przy wąskim pasie prostokąt obszaru zawyża liczbę
-kafelków. Równoległość nie skraca modelowego czasu pojedynczej mapy.
-
-The tile estimate also shows a **per-map** time and compressed PNG size range.
-This is a planning model (0.2–2 seconds and 10–250 KiB per tile), not a measured
-forecast. Hover for assumptions and exclusions; allow extra temporary disk space.
-
-## Czerwone ostrzeżenie serwera
-
-Przy HTTP 429 pojawia się czerwony komunikat „zbyt wiele zapytań”. Przy HTTP 503
-komunikat wskazuje niedostępność lub możliwe przeciążenie — nie jest to dowód,
-że wysłano za dużo zapytań. Ostrzeżenie pozostaje widoczne do kolejnego eksportu;
-szczegóły trafiają do dziennika oraz diagnostyki warstwy w raporcie.
-
-Kliknij **Przerwij**, zmniejsz istniejący osobny parametr **Zadania na serwer**
-(np. z 8 do 2, a przy dalszych problemach do 1), odczekaj i ponów próbę. Ten limit dotyczy jednoczesnych zadań map,
-nie dokładnej liczby żądań HTTP na sekundę — dostawca QGIS może wysyłać kilka
-żądań dla jednego zadania. Przy HTTP 429 wtyczka sama kończy pobieranie bieżącej
-mapy bez kolejnych ponowień i podziałów kafelków. Inne zadania działają do przerwania.
-
-A persistent red warning identifies HTTP 429 (too many requests) or HTTP 503
-(service unavailable or possibly overloaded). Click **Cancel**, lower **Tasks per
-server**, wait and retry. HTTP 429 stops the affected map without tile retries;
-other tasks continue until cancelled. The limit controls concurrent map tasks,
-not exact HTTP requests per second. Warnings cover map downloads observed by QGIS.
+After export, check the report and open the archived project offline. Move the entire
+folder. The final Retry button creates a separate archive of selected layers; keep
+both folders. There is no restart/resume after closing QGIS. Service usage policies
+still apply. Hover over controls for details.

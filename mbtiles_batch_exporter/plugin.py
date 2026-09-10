@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
+from pathlib import Path
 from .i18n import tr
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QAction
+from PyQt5.QtWidgets import QAction, QStyle
 
 from .dialog import MBTilesBatchExporterDialog
 from .archive_dialog import ArchiveDialog
@@ -19,12 +20,13 @@ class MBTilesBatchExporterPlugin:
 
     def initGui(self):
         self.action = QAction(
-            QIcon(),
+            self.iface.mainWindow().style().standardIcon(QStyle.SP_DriveHDIcon),
             self.tr(tr('Eksportuj MBTiles…')),
             self.iface.mainWindow(),
         )
         self.action.triggered.connect(self.run)
         self.archive_action = QAction(
+            QIcon(str(Path(__file__).with_name('icon.svg'))),
             self.tr(tr('Archiwizuj projekt…')), self.iface.mainWindow(),
         )
         self.archive_action.triggered.connect(self.run_archive)

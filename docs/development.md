@@ -37,7 +37,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.7.2.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.8.1.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -87,3 +87,13 @@ lrelease mbtiles_batch_exporter/en.ts -qm mbtiles_batch_exporter/en.qm
 To narzędzie Qt używane tylko podczas rozwoju. Użytkownik dostaje gotowy katalog.
 Testy sprawdzają zgodność katalogu z wywołaniami `tr`, parametry szablonów i oba języki.
 Testy zachowania domyślnie ustawiają polski, niezależnie od lokalnego profilu QGIS.
+
+## Benchmark automatu
+
+```bash
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 tests/benchmark_adaptive.py --output /tmp/adaptive-benchmark.json
+```
+
+Porównuje sześć map, dwa hosty lokalnego WMS i tryb stały/adaptacyjny. Początkowy
+budżet zasobów jest ustalony w teście, bieżąca kontrola RAM pozostaje aktywna.
+Sprawdza identyczność PNG i lokalny odczyt. Wynik nie jest obietnicą szybkości usług produkcyjnych.

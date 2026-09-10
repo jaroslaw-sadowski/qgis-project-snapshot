@@ -1,48 +1,87 @@
-# qgis-project-snapshot
+# <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> qgis-project-snapshot
 
-Wtyczka QGIS zapisująca stan projektu do archiwum offline: lokalne dane,
-mapy PNG z przezroczystością, zasoby, kopia projektu i raport.
-Dotychczasowy eksporter MBTiles pozostaje dostępny.
+Polski · [English](README.en.md)
 
-## Paczka do testów służbowych
+Wtyczka QGIS do zachowania danych i wyglądu projektu na potrzeby późniejszego
+odczytu bez sieci. Pomaga udokumentować, na jakich mapach i danych oparto analizę,
+studium wykonalności lub projekt inwestycji, zanim zmienią się źródłowe usługi i bazy.
 
-**Wersja 0.7.2** — [ZIP instalacyjny](dist/qgis-project-snapshot-0.7.2.zip)
-i [SHA-256](dist/qgis-project-snapshot-0.7.2.zip.sha256).
-W QGIS użyj menedżera wtyczek i zakładki **Zainstaluj z ZIP**.
-[Instrukcja dla zespołu](docs/team-guide.md) jest też dołączona do paczki.
+Tworzy osobną kopię projektu z grupami, kolejnością, widocznością i stylami warstw.
+Wektory z atrybutami oraz obrazy map zapisuje w GeoPackage; rastry źródłowe
+i dostępne zasoby projektu kopiuje do plików lokalnych. PNG zachowuje przezroczystość
+przy mocnej kompresji bezstratnej. Mapy mogą pozostać w układzie projektu, np. EPSG:2180.
 
-Wymagane: QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7.
-Sprawdzono 43 testy z gotowej paczki na Ubuntu/QGIS 3.40.15 oraz próbki
-publicznych map i WFS offline. MSSQL, pliki firmowe i cały projekt wymagają
-odbioru na komputerze służbowym w sieci firmowej. Windows nie był testowany.
+Wtyczka jest bezpłatna i otwartoźródłowa (GNU GPL v2): kod można sprawdzić,
+modyfikować i udostępniać na warunkach [licencji](LICENSE).
 
-Interfejs wybiera polski lub angielski według języka QGIS. Po eksporcie pokazuje
-przewijaną listę problemów i zaznacza warstwy do ponowienia. Dobór równoległości
-uwzględnia CPU, dostępny RAM, stan połączenia i liczbę serwerów.
+## Jak używać
 
-Postęp pokazują licznik warstw, kolumna **Stan**, czas i dziennik. Objaśnienia opcji
-są dostępne po najechaniu kursorem. Menu: **Wtyczki → qgis-project-snapshot**.
+Wymaga QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7. Interfejs wybiera polski
+lub angielski według języka QGIS. Aktualna wersja do testów: **0.8.1**.
 
-Archiwum przenoś jako **cały folder**, nie sam plik `.qgz`.
-Wyniki niepełne i zależności wymagające kontroli są opisane w raporcie.
+1. Zainstaluj paczkę przez **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
+2. Otwórz projekt i wybierz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**
+   lub ikonę mapy w pudełku na pasku wtyczek.
+3. Wskaż folder, obszar (widok mapy lub poligony), warstwy i szczegółowość map.
+   Wybierz **Utwórz archiwum**. Podpowiedzi opcji są dostępne po najechaniu kursorem.
+4. Sprawdź raport, a następnie otwórz kopię projektu bez internetu i sieci firmowej.
+   Przenoś **cały folder archiwum**, nie sam plik `.qgz`.
 
-## Dokumentacja
+Pobieranie automatycznie dobiera liczbę zadań do CPU, RAM i odpowiedzi każdego
+serwera. Okno pokazuje aktywne zadania, limity, kolejki, przerwy i dziennik.
+Podczas eksportu uzupełnia tylko brakujące kafelki w tym samym archiwum.
+Ręczne ponowienie z końcowego ekranu tworzy nowe archiwum wybranych warstw.
+Dotychczasowy eksport do osobnych plików MBTiles pozostaje w menu.
 
-- [Instrukcja i odbiór przez zespół](docs/team-guide.md)
-- [Budowa paczki, testy i benchmark](docs/development.md)
-- [Działanie, moduły i ograniczenia](docs/architecture.md)
-- [Aktualny stan i dalsze prace](docs/PROJECT_STATE.md)
-- [Spis dokumentacji i raportów](docs/README.md)
-- [Instrukcje dla agentów AI / Codexa](AGENTS.md)
+[Instrukcja dla zespołu](docs/team-guide.md) opisuje opcje, wyniki i odbiór archiwum.
+Jest również dołączona do ZIP-a.
 
-## Odtworzenie paczki
+## Dane i ograniczenia
+
+Wtyczka łączy się z bazami i usługami wskazanymi w projekcie, aby pobrać dane.
+Nie zastępuje projektu źródłowego. Korzysta z bibliotek dostarczanych z QGIS
+oraz standardowego Pythona; nie wymaga dodatkowych instalacji.
+Archiwum i raport mogą zawierać dane firmowe oraz nazwy warstw.
+
+Data archiwum oznacza czas pobierania, a nie jednoczesny stan wszystkich źródeł.
+Obrazy map zachowują wybrany obszar i poziomy szczegółowości. Brakujące warstwy,
+puste obrazy oraz zależności wymagające sprawdzenia są opisane w raporcie.
+Fonty, kod formularzy i wszystkie zależności wyrażeń nie są automatycznie pakowane.
+Nie ma wznawiania po zamknięciu QGIS. Warunki korzystania ze źródeł nadal obowiązują,
+w tym ograniczenia masowego pobierania standardowych kafelków OSM.
+
+Projekt powstaje metodą vibe coding z pomocą AI. Przed wykorzystaniem archiwum
+sprawdź jego kompletność, wygląd i odczyt bez sieci. Warunki udostępniania
+oprogramowania i brak gwarancji opisuje [licencja](LICENSE).
+
+## Wykonane kontrole
+
+- 65 testów QGIS: zapis i odczyt danych, mapy, raport, PL/EN, anulowanie,
+  ograniczenia serwerów i uzupełnianie braków.
+- Test instalacyjnego ZIP-a: natywne wykrywanie i ładowanie w QGIS, oba okna,
+  wyłączenie wtyczki oraz uruchomienie testów na kodzie z paczki.
+- Kontrola składni, integralności ZIP-a i zgodności jego zawartości ze źródłami.
+- Kontrolowany benchmark trybu stałego i automatycznego z identycznymi kafelkami wynikowymi.
+
+Środowisko testowe: Ubuntu, QGIS 3.40.15. Windows, MSSQL i kompletny projekt
+firmowy wymagają odbioru na stanowisku użytkownika. To kontrole lokalne,
+nie certyfikat QGIS ani gwarancja poprawności dowolnego projektu.
+[Raporty i dokumentacja](docs/README.md).
+
+## Paczka i rozwój
+
+Repozytorium zawiera źródła. Aby przygotować ZIP **0.8.1**, uruchom:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-ZIP i suma kontrolna powstają w `dist/`, który jest ignorowany przez Git.
-Dlatego po świeżym klonowaniu repozytorium trzeba je wygenerować powyższą komendą.
-Kod źródłowy, instrukcja i licencja są pakowane bez danych projektów ani testów.
+Paczka `qgis-project-snapshot-0.8.1.zip` i suma SHA-256 powstaną w `dist/`.
+Ten katalog nie jest przechowywany w Git. Samo przygotowanie ZIP-a nie oznacza
+publikacji w katalogu wtyczek QGIS.
 
-Licencja: [GPL-2.0](LICENSE).
+[Budowa i testy](docs/development.md) · [Architektura](docs/architecture.md) ·
+[Stan dla kolejnych sesji](docs/PROJECT_STATE.md) · [Instrukcje agentów](AGENTS.md)
+
+Autor: Jarosław Sadowski · Licencja: GNU GPL v2 ·
+[Zgłoszenia](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues)
