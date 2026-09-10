@@ -60,11 +60,11 @@ w takich przypadkach potrzebne jest również porównanie wizualne.
 
 ## Równoległe pobieranie i CPU
 
-Okno pozwala wybrać 1–8 procesów; domyślnie do 4, zależnie od liczby CPU.
+Okno pozwala wybrać 1–32 procesy; rekomendacja uwzględnia CPU, RAM i dostępne zadania.
 Mapy usług są pobierane i kompresowane równolegle w osobnych procesach QGIS,
 które mogą używać różnych rdzeni. Wątki Pythona nadzorują procesy; nie dotykają
-warstw ani projektu otwartego w interfejsie. Kolejka przeplata serwery i ogranicza
-liczbę procesów dla jednego hosta do dwóch. Limit dotyczy zadań warstw, nie
+warstw ani projektu otwartego w interfejsie. Kolejka wybiera wolne serwery i ogranicza
+liczbę procesów dla jednego hosta, domyślnie do dwóch (opcjonalnie do ośmiu). Limit dotyczy zadań warstw, nie
 wewnętrznych połączeń HTTP poszczególnych dostawców QGIS.
 
 Każdy proces zapisuje własny tymczasowy GeoPackage. Główny proces scala gotowe
@@ -121,3 +121,56 @@ backend został przeniesiony do wątków.
 | `archive_worker.py` | Punkt wejścia osobnego procesu QGIS |
 | `archive_resources.py` | Zasoby projektu, relacje i kontrola lokalnych źródeł |
 | `dialog.py`, `utils.py` | Dotychczasowy eksporter MBTiles |
+
+## Wersja 0.7: język, ponowienie, dobór zasobów
+
+`i18n.py` wybiera język przez QgsSettings (`locale/overrideFlag`, `locale/userLocale`),
+a następnie QLocale. Katalog Qt `en.ts` jest kompilowany do `en.qm`; oba są pakowane.
+Szablony tłumaczone są przed interpolacją nazw warstw i innych wartości. Procesy
+otrzymują wybrany język w `QGIS_SNAPSHOT_LANGUAGE`. Kody statusów i nazwy plików
+pozostają stałe. Komunikaty dostawców QGIS/GDAL mogą zależeć od ich własnego języka.
+
+`resources.py` używa dostępnych CPU (z ograniczeniem affinity), MemAvailable na
+Linuksie i GlobalMemoryStatusEx na Windows. Nieznany RAM ogranicza rekomendację
+do 2 procesów. Limit: minimum z 32, 2 × CPU, budżetu RAM po rezerwie 2 GiB
+(1 GiB/proces) i liczby map dopuszczonych przez limit na serwer. Brak potwierdzonego
+połączenia ogranicza sugestię do 2. To heurystyka, nie gwarancja użycia pamięci
+ani pomiar przepustowości. Windows nie odebrano na rzeczywistym stanowisku.
+
+Kolejka wybiera następne zadanie z serwera mającego wolny limit. Zadania czekające
+na zajęty host nie zajmują procesów. Limit backendu wynosi 1–32 procesy i 1–8 na
+serwer; interfejs udostępnia na serwer 1/2/4/6/8. Domyślny limit nadal wynosi 2.
+Scalanie końcowego GeoPackage ma jednego zapisującego.
+
+Panel wyniku przewija wszystkie problematyczne rekordy i zaznacza wyłącznie statusy
+failed/cancelled/empty/partial. Ponowienie używa zwykłego eksportu wybranych warstw
+w nowym folderze. Nie naprawia wcześniejszego archiwum w miejscu. HTML raportu
+zawiera cały manifest, w tym istniejący limit 20 przykładów błędów kafelków na mapę.
+
+## Wersja 0.7.1: model kosztu pojedynczej mapy
+
+`ArchiveDialog._update_zoom_labels` przelicza istniejącą liczbę kafelków przez
+jawne założenia 0,2–2 s/kafelek oraz 10–250 KiB/kafelek PNG. Formatuje czas
+w sekundach/minutach/godzinach, rozmiar w MiB/GiB. Nie odpytuje serwera i nie
+zmienia eksportu; nie jest prognozą pozostałego czasu ani wielkości całego projektu.
+Podpowiedź opisuje brak pomiaru, wpływ maski/ponowień i wyłączenia z szacunku.
+
+## Wersja 0.7.2: sygnały przeciążenia
+
+Istniejący obserwator QgsNetworkAccessManager w `_render_image` rozpoznaje HTTP
+429 i 503 dla żądań bieżącego źródła. Emituje komunikat z trwałym prefiksem
+`[HTTP 429]` / `[HTTP 503]`, nazwą hosta (bez URL/poświadczeń) i przetłumaczoną
+instrukcją. 503 oznacza możliwość przeciążenia, nie diagnozę jego przyczyny.
+
+Proces zachowuje ostrzeżenia oddzielnie od ostatniego komunikatu w progress.json;
+nie są pomijane przez ograniczanie częstotliwości aktualizacji. Kolejka przekazuje
+je również dla ukończonych procesów. UI odczytuje je przed filtrowaniem ukończonych
+warstw i ponownie z końcowego rekordu. Czerwona etykieta pozostaje do nowego eksportu.
+`raster.server_warnings` zachowuje diagnostykę w manifeście i HTML. Przy 429
+zatrzymujemy bieżącą mapę na pierwszym błędnym kafelku, bez ponowień/podziałów.
+Pozostałe zadania nie są automatycznie pauzowane. Przy 503 zachowujemy dotychczasowe
+ponowienia, ponieważ przyczyna może być inna niż obciążenie.
+
+Nie dodano limitera HTTP na sekundę. Istniejący osobny parametr `per_server_limit`
+pozostaje limitem równoległych map; wykrywanie dotyczy obserwowanych żądań renderera
+map, nie dowolnych błędów MSSQL, WFS, uwierzytelniania lub eksportera legacy.

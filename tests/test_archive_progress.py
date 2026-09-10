@@ -88,6 +88,26 @@ class ProgressTests(unittest.TestCase):
         finally:
             dialog.close()
 
+    def test_server_warning_survives_progress_and_finished_worker(self):
+        dialog = self.dialog()
+        try:
+            message = '[HTTP 429] Server test: too many requests'
+            dialog._update_progress(message)
+            dialog._update_progress('Next operation')
+            self.assertEqual(dialog.server_warning.text(), message)
+            self.assertFalse(dialog.server_warning.isHidden())
+            self.assertIn('#b00020', dialog.server_warning.styleSheet())
+            dialog._layer_status({'id': self.layer.id(), 'status': 'saved'}, 1, 1)
+            busy = '[HTTP 503] Server test: unavailable'
+            dialog._worker_activity([{'id': self.layer.id(), 'phase': 'ready', 'message': 'Done',
+                                      'server_warnings': [busy]}])
+            self.assertEqual(dialog.server_warning.text(), busy)
+            dialog._update_progress('HTTP 404')
+            self.assertEqual(dialog.server_warning.text(), busy)
+            self.assertEqual(dialog._items[self.layer.id()].text(2), 'Zapisano')
+        finally:
+            dialog.close()
+
     def test_worker_messages_are_deduplicated_and_do_not_overwrite_final_status(self):
         dialog = self.dialog()
         try:

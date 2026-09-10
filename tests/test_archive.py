@@ -15,6 +15,7 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+os.environ.setdefault('QGIS_SNAPSHOT_LANGUAGE', 'pl')
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor

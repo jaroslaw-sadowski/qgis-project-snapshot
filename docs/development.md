@@ -37,7 +37,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.6.0.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.7.2.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -75,3 +75,15 @@ Widoczna nazwa oraz prefiks ZIP-a to `qgis-project-snapshot`. Techniczny katalog
 Pythona/identyfikator QGIS pozostaje `mbtiles_batch_exporter`, aby aktualizacja
 zastępowała poprzednią instalację. Nie zmieniaj go razem z etykietami interfejsu
 bez osobnego planu migracji. Menu tworzy natywne `iface.addPluginToMenu`.
+
+## Tłumaczenia
+
+Po zmianie tekstów zaktualizuj `mbtiles_batch_exporter/en.ts`, następnie skompiluj:
+
+```bash
+lrelease mbtiles_batch_exporter/en.ts -qm mbtiles_batch_exporter/en.qm
+```
+
+To narzędzie Qt używane tylko podczas rozwoju. Użytkownik dostaje gotowy katalog.
+Testy sprawdzają zgodność katalogu z wywołaniami `tr`, parametry szablonów i oba języki.
+Testy zachowania domyślnie ustawiają polski, niezależnie od lokalnego profilu QGIS.

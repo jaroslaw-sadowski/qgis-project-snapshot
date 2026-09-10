@@ -243,8 +243,13 @@ class RasterTests(unittest.TestCase):
             self.assertEqual(dialog.zoom_max.currentData(), 17)
             self.assertIn('1:', dialog.zoom_max.currentText())
             self.assertIn('m/piksel', dialog.zoom_max.currentText())
+            initial_estimate = dialog.zoom_hint.text()
+            self.assertIn('czas ≈', initial_estimate)
+            self.assertIn('na dysku ≈', initial_estimate)
+            self.assertIn('nie pomiar', dialog.zoom_hint.toolTip())
             dialog.zoom_min.setCurrentIndex(20)
             self.assertEqual(dialog.zoom_max.currentData(), 20)
+            self.assertNotEqual(dialog.zoom_hint.text(), initial_estimate)
             dialog.zoom_max.setCurrentIndex(10)
             self.assertEqual(dialog.zoom_min.currentData(), 10)
             self.assertIn(self.layer.id(), dialog._selected_ids())
@@ -325,6 +330,9 @@ class LocalWmsTests(unittest.TestCase):
                     with self.server.lock:
                         self.server.active -= 1
                     width, height = int(parameters.get('WIDTH', 256)), int(parameters.get('HEIGHT', 256))
+                    if getattr(self.server, 'forced_status', None):
+                        self.send_error(self.server.forced_status)
+                        return
                     # QGIS may round the provider's request size by one pixel.
                     if self.server.fail_large and width > 170:
                         self.send_error(503)
@@ -364,6 +372,30 @@ class LocalWmsTests(unittest.TestCase):
     def test_parallel_processes_merge_two_wms_layers_and_open_offline(self):
         self.capture(2)
 
+    def test_parallel_workers_use_english_and_respect_server_limit(self):
+        with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE='en'):
+            self.capture(2, per_server_limit=1)
+
+    def test_rate_limit_is_reported_by_worker_without_tile_retries(self):
+        self.server.forced_status = 429
+        uri = QgsDataSourceUri()
+        for key, value in {'url': f'http://127.0.0.1:{self.server.server_port}/wms', 'layers': 'map',
+                           'styles': '', 'format': 'image/png', 'crs': 'EPSG:2180', 'version': '1.3.0'}.items():
+            uri.setParam(key, value)
+        layer = QgsRasterLayer(bytes(uri.encodedUri()).decode(), 'Rate limited', 'wms')
+        self.project.addMapLayer(layer)
+        result = create_archive(self.project, [layer.id()], self.area, self.crs, self.folder,
+                                zoom_min=17, zoom_max=17, workers=2)
+        manifest = json.loads((result / 'manifest.json').read_text())
+        record = next(r for r in manifest['layers'] if r['id'] == layer.id())
+        self.assertEqual(record['status'], 'failed')
+        self.assertIn('worker_pid', record)
+        self.assertTrue(record['raster']['server_warnings'][0].startswith('[HTTP 429]'))
+        self.assertTrue(record['raster']['stopped_early'])
+        self.assertEqual(record['raster']['retries'], 0)
+        self.assertEqual(record['raster']['subdivisions'], 0)
+        self.assertIn('[HTTP 429]', (result / 'raport.html').read_text())
+
     def test_cancel_parallel_workers_keeps_vector_and_removes_private_files(self):
         uri = QgsDataSourceUri()
         for key, value in {'url': f'http://127.0.0.1:{self.server.server_port}/wms', 'layers': 'map',
@@ -390,7 +422,7 @@ class LocalWmsTests(unittest.TestCase):
         self.assertFalse((result / '.workers').exists())
         self.assertFalse(list(result.rglob('input.json')))
 
-    def capture(self, workers):
+    def capture(self, workers, per_server_limit=2):
         self.server.fail_large = True
         uri = QgsDataSourceUri()
         for key, value in {'url': f'http://127.0.0.1:{self.server.server_port}/wms', 'layers': 'map',
@@ -407,7 +439,7 @@ class LocalWmsTests(unittest.TestCase):
         before = len(self.server.requests)
         activities = []
         result = create_archive(self.project, self.project.mapLayers().keys(), self.area, self.crs, self.folder,
-                                zoom_min=16, zoom_max=17, workers=workers,
+                                zoom_min=16, zoom_max=17, workers=workers, per_server_limit=per_server_limit,
                                 worker_activity=lambda rows: activities.extend(rows))
         manifest = json.loads((result / 'manifest.json').read_text())
         if workers > 1:
@@ -415,13 +447,19 @@ class LocalWmsTests(unittest.TestCase):
                                 for r in activities), activities)
             self.assertEqual(manifest['parallel']['completed_in_workers'], 2, manifest['layers'])
             self.assertEqual(len({r['worker_pid'] for r in manifest['layers'] if 'worker_pid' in r}), 2)
-            self.assertEqual(self.server.peak, 2)
+            self.assertEqual(self.server.peak, min(workers, per_server_limit))
             self.assertTrue(manifest['local_layer_audit']['passed'])
             self.assertFalse((result / '.workers').exists())
         record = next(r for r in manifest['layers'] if r['id'] == layer.id())
         self.assertEqual(record['status'], 'saved', record)
+        if os.environ.get('QGIS_SNAPSHOT_LANGUAGE') == 'en':
+            self.assertIn('Saved a transparent image', record['reason'])
+            self.assertTrue(any('tile' in row['message'] for row in activities), activities)
         self.assertGreater(len(self.server.requests), before)
         self.assertEqual(record['method'], 'raster_render')
+        self.assertTrue(record['raster']['server_warnings'][0].startswith('[HTTP 503]'))
+        if workers > 1:
+            self.assertTrue(any(r.get('server_warnings') for r in activities))
         self.assertGreater(record['raster']['retries'], 0)
         self.assertGreater(record['raster']['subdivisions'], 0)
         self.project.clear()

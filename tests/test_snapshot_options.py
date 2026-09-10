@@ -1,0 +1,148 @@
+"""Locale, retry selection and process scheduling behavior."""
+import ast
+from concurrent.futures import Future, ThreadPoolExecutor
+import os
+from pathlib import Path
+from string import Formatter
+from threading import Condition, Event
+import unittest
+from unittest.mock import patch
+import xml.etree.ElementTree as ET
+
+import test_archive as fixtures
+import test_archive_progress as progress_fixtures
+from mbtiles_batch_exporter import i18n
+from mbtiles_batch_exporter.resources import recommend, detect_resources
+from mbtiles_batch_exporter.parallel_archive import RasterWorkers
+
+
+class LocaleTests(unittest.TestCase):
+    def test_qgis_locale_override_and_os_fallback(self):
+        from qgis.core import QgsSettings
+        settings = QgsSettings()
+        keys = ('locale/overrideFlag', 'locale/userLocale')
+        previous = {key: settings.value(key) for key in keys}
+        try:
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop('QGIS_SNAPSHOT_LANGUAGE', None)
+                settings.setValue(keys[0], True)
+                for locale, language in [('en_US', 'en'), ('en_GB', 'en'), ('en_AU', 'en'), ('pl_PL', 'pl')]:
+                    settings.setValue(keys[1], locale)
+                    self.assertEqual(i18n.language(), language)
+                    self.assertEqual(i18n.tr('Zamknij'), 'Close' if language == 'en' else 'Zamknij')
+                settings.setValue(keys[0], False)
+                with patch('mbtiles_batch_exporter.i18n.QLocale') as locale:
+                    locale.return_value.name.return_value = 'pl_PL'
+                    self.assertEqual(i18n.language(), 'pl')
+        finally:
+            for key, value in previous.items():
+                settings.remove(key) if value is None else settings.setValue(key, value)
+
+    def test_catalog_covers_calls_and_preserves_format_fields(self):
+        folder = Path(i18n.__file__).parent
+        catalog = {m.findtext('source'): m.findtext('translation') for m in ET.parse(folder / 'en.ts').iter('message')}
+        with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE='en'):
+            for source, translated in catalog.items():
+                self.assertEqual(i18n.tr(source), translated)
+            for path in folder.glob('*.py'):
+                for node in ast.walk(ast.parse(path.read_text())):
+                    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                            and node.func.id == 'tr' and node.args and isinstance(node.args[0], ast.Constant)):
+                        source = node.args[0].value
+                        self.assertIn(source, catalog, (path.name, source))
+                        # CSS contains literal braces but is never interpolated.
+                        if '{0' in source:
+                            fields = lambda text: sorted((f, spec, conv) for _, f, spec, conv in Formatter().parse(text) if f is not None)
+                            self.assertEqual(fields(source), fields(catalog[source]))
+
+
+class OptionsTests(unittest.TestCase):
+    setUp = fixtures.ArchiveTests.setUp
+    tearDown = fixtures.ArchiveTests.tearDown
+    add_points = fixtures.ArchiveTests.add_points
+    dialog = progress_fixtures.ProgressTests.dialog
+
+    def test_english_dialog_and_real_report(self):
+        with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE='en'):
+            dialog = self.dialog()
+            try:
+                self.assertIn('Archive project', dialog.windowTitle())
+                self.assertEqual(dialog.close_button.text(), 'Close')
+                dialog.start()
+                self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
+                self.assertIn('Layer 1/1', dialog.log.toPlainText())
+                self.assertIn('Saved', dialog._items[self.layer.id()].text(2))
+                self.assertIn('lang="en"', (dialog._result / 'raport.html').read_text())
+                self.assertEqual(dialog._selected_ids(), set())
+            finally:
+                dialog.close()
+
+    def test_retry_selection_and_new_archive_preserves_previous(self):
+        second = self.add_points('Retry me', [(3, 3)])
+        dialog = self.dialog()
+        status = dialog._layer_status
+        def cancel_second(record, done, total):
+            status(record, done, total)
+            if record['id'] == second.id() and record['status'] == 'pending':
+                dialog.cancel()
+        try:
+            with patch.object(dialog, '_layer_status', side_effect=cancel_second):
+                dialog.start()
+            original = dialog._result
+            self.assertEqual(dialog._selected_ids(), {second.id()})
+            self.assertIn('Retry me', dialog.results.toPlainText())
+            self.assertIn('przerwana', dialog.results.toPlainText())
+            self.assertFalse(dialog.retry_button.isHidden())
+            dialog.retry_button.click()
+            self.assertIsNotNone(dialog._result)
+            self.assertNotEqual(original, dialog._result)
+            self.assertTrue((original / 'manifest.json').exists())
+            self.assertEqual(dialog._selected_ids(), set())
+        finally:
+            dialog.close()
+
+    def test_empty_partial_failed_retry_but_saved_and_excluded_do_not(self):
+        layers = [self.layer] + [self.add_points(str(i), [(3, 3)]) for i in range(5)]
+        dialog = self.dialog()
+        try:
+            statuses = ('saved', 'empty', 'partial', 'failed', 'cancelled', 'excluded')
+            dialog._show_results({'layers': [dict(id=l.id(), name=l.name(), status=s, reason='Diagnostic')
+                                             for l, s in zip(layers, statuses)]})
+            self.assertEqual(dialog._selected_ids(), {l.id() for l in layers[1:5]})
+        finally:
+            dialog.close()
+
+
+class ResourceTests(unittest.TestCase):
+    def test_budgets_respect_ram_cpu_and_server_capacity(self):
+        gb = 1024**3
+        self.assertEqual(recommend(32, 3 * gb, True), 1)
+        self.assertEqual(recommend(32, 64 * gb, True), 32)
+        self.assertEqual(recommend(2, 64 * gb, True), 4)
+        self.assertEqual(recommend(32, None, True), 2)
+        self.assertEqual(recommend(32, 64 * gb, True, hosts={'a': 200}), 2)
+        self.assertEqual(recommend(32, 64 * gb, True, per_server=8, hosts={'a': 200}), 8)
+        self.assertEqual(recommend(32, 64 * gb, False), 2)
+        self.assertGreaterEqual(detect_resources()['cpu'], 1)
+
+    def test_busy_host_does_not_block_another_host(self):
+        workers = RasterWorkers.__new__(RasterWorkers)
+        workers.stop = Event()
+        workers.condition = Condition()
+        workers.per_server_limit = 1
+        workers.active_hosts = {}
+        futures = [Future() for _ in range(3)]
+        workers.queue = [('a', futures[0], 'a1'), ('a', futures[1], 'a2'), ('b', futures[2], 'b')]
+        other_host = Event()
+        def run(folder):
+            if folder == 'a1':
+                self.assertTrue(other_host.wait(3), 'Another server was starved by the busy host')
+            elif folder == 'b':
+                other_host.set()
+            return folder
+        workers._run = run
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            tasks = [pool.submit(workers._work_loop) for _ in range(2)]
+            for task in tasks:
+                task.result(timeout=5)
+        self.assertEqual([f.result() for f in futures], ['a1', 'a2', 'b'])

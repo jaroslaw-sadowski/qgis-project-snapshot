@@ -1,4 +1,5 @@
 """Private process entry point: no live desktop QGIS objects cross processes."""
+from .i18n import tr
 import json
 from datetime import datetime
 import os
@@ -14,21 +15,28 @@ def main():
 
     folder = Path(sys.argv[1])
     last_progress = 0.0
+    server_warnings = []
+    last_message = ''
 
     def progress(message):
-        nonlocal last_progress
-        if time.monotonic() - last_progress < 0.25:
-            return
-        last_progress = time.monotonic()
+        nonlocal last_progress, last_message
+        warning = message.startswith(('[HTTP 429]', '[HTTP 503]'))
+        if warning and message not in server_warnings:
+            server_warnings.append(message)
+        if not warning:
+            last_message = message
+            if time.monotonic() - last_progress < 0.25:
+                return
+            last_progress = time.monotonic()
         # A single atomic snapshot, not an unbounded log or a pipe which can fill.
         try:
             temporary = folder / 'progress.new'
-            temporary.write_text(json.dumps({'message': message, 'updated_at': time.time()}), encoding='utf-8')
+            temporary.write_text(json.dumps({'message': last_message or message, 'updated_at': time.time(), 'server_warnings': server_warnings}), encoding='utf-8')
             temporary.replace(folder / 'progress.json')
         except OSError:
             pass  # Progress reporting must never make a successful export fail.
 
-    progress('Uruchamianie QGIS…')
+    progress(tr('Uruchamianie QGIS…'))
     parameters = json.loads((folder / 'input.json').read_text())
     app = QgsApplication([], False)
     app.initQgis()
@@ -36,12 +44,12 @@ def main():
     project = QgsProject()
     try:
         started = datetime.now().astimezone().isoformat()
-        progress('Otwieranie źródła mapy…')
+        progress(tr('Otwieranie źródła mapy…'))
         if not project.read(str(folder / 'source.qgs')):
-            raise RuntimeError('Nie można odczytać kopii warstwy.')
+            raise RuntimeError(tr('Nie można odczytać kopii warstwy.'))
         layer = project.mapLayer(parameters['layer_id'])
         if layer is None or not layer.isValid():
-            raise RuntimeError('Źródło nie jest dostępne w osobnym procesie.')
+            raise RuntimeError(tr('Źródło nie jest dostępne w osobnym procesie.'))
         result = write_rendered_raster(
             layer, project, QgsGeometry.fromWkt(parameters['area']),
             QgsCoordinateReferenceSystem(parameters['area_crs']), folder / 'raster.gpkg',

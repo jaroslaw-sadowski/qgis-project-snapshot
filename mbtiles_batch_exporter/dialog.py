@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .i18n import tr
 from pathlib import Path
 import time
 
@@ -67,7 +68,7 @@ class MBTilesBatchExporterDialog(QDialog):
     def __init__(self, iface, parent=None):
         super().__init__(parent)
         self.iface = iface
-        self.setWindowTitle("qgis-project-snapshot — Eksport MBTiles")
+        self.setWindowTitle(tr('qgis-project-snapshot — Eksport MBTiles'))
         self.resize(760, 640)
 
         self.alg_id = None
@@ -96,29 +97,29 @@ class MBTilesBatchExporterDialog(QDialog):
         # Output folder
         out_row = QHBoxLayout()
         self.output_edit = QLineEdit()
-        self.output_browse = QPushButton("Wybierz…")
+        self.output_browse = QPushButton(tr('Wybierz…'))
         self.output_browse.clicked.connect(self._browse_output)
         out_row.addWidget(self.output_edit, 1)
         out_row.addWidget(self.output_browse)
 
         form = QFormLayout()
-        form.addRow("Folder zapisu:", out_row)
+        form.addRow(tr('Folder zapisu:'), out_row)
 
         self.extent_combo = QComboBox()
-        self.extent_combo.addItems(["Aktualny widok mapy", "Obszar z warstwy poligonowej"])
+        self.extent_combo.addItems([tr('Aktualny widok mapy'), tr('Obszar z warstwy poligonowej')])
         self.extent_combo.currentIndexChanged.connect(self._update_extent_ui)
 
         self.poly_layer_combo = QComboBox()
-        self.poly_layer_hint = QLabel("Użyj zaznaczonych poligonów lub całej warstwy.")
+        self.poly_layer_hint = QLabel(tr('Użyj zaznaczonych poligonów lub całej warstwy.'))
         self.poly_layer_hint.setWordWrap(True)
 
-        form.addRow("Obszar:", self.extent_combo)
-        form.addRow("Warstwa poligonowa:", self.poly_layer_combo)
+        form.addRow(tr('Obszar:'), self.extent_combo)
+        form.addRow(tr('Warstwa poligonowa:'), self.poly_layer_combo)
         form.addRow("", self.poly_layer_hint)
 
         self.format_combo = QComboBox()
         self.format_combo.addItems(["PNG", "JPEG"])
-        form.addRow("Format kafli:", self.format_combo)
+        form.addRow(tr('Format kafli:'), self.format_combo)
 
         zoom_row = QHBoxLayout()
         self.zoom_min = QSpinBox(); self.zoom_min.setRange(0, 24); self.zoom_min.setValue(13)
@@ -134,22 +135,22 @@ class MBTilesBatchExporterDialog(QDialog):
         form.addRow("Zoom:", zoom_row)
 
         self.jpeg_quality = QSpinBox(); self.jpeg_quality.setRange(1, 100); self.jpeg_quality.setValue(75)
-        form.addRow("Jakość JPEG:", self.jpeg_quality)
+        form.addRow(tr('Jakość JPEG:'), self.jpeg_quality)
 
-        self.chk_pause_render = QCheckBox("Wstrzymaj odświeżanie mapy")
+        self.chk_pause_render = QCheckBox(tr('Wstrzymaj odświeżanie mapy'))
         self.chk_pause_render.setChecked(True)
         form.addRow("", self.chk_pause_render)
 
         layout.addLayout(form)
 
         # Layer selection group
-        grp = QGroupBox("Warstwy do eksportu")
+        grp = QGroupBox(tr('Warstwy do eksportu'))
         grp_layout = QVBoxLayout(grp)
 
         top = QHBoxLayout()
-        self.btn_select_all = QPushButton("Zaznacz wszystko")
-        self.btn_select_none = QPushButton("Odznacz wszystko")
-        self.btn_refresh_layers = QPushButton("Odśwież listę")
+        self.btn_select_all = QPushButton(tr('Zaznacz wszystko'))
+        self.btn_select_none = QPushButton(tr('Odznacz wszystko'))
+        self.btn_refresh_layers = QPushButton(tr('Odśwież listę'))
         self.btn_select_all.clicked.connect(lambda: self._set_all_layers_checked(True))
         self.btn_select_none.clicked.connect(lambda: self._set_all_layers_checked(False))
         self.btn_refresh_layers.clicked.connect(lambda: self._populate_layer_list(default_check_all=True))
@@ -175,16 +176,16 @@ class MBTilesBatchExporterDialog(QDialog):
         self.log = QTextEdit()
         self.log.setReadOnly(True)
 
-        layout.addWidget(QLabel("Postęp:"))
+        layout.addWidget(QLabel(tr('Postęp:')))
         layout.addWidget(self.progress)
-        layout.addWidget(QLabel("Dziennik:"))
+        layout.addWidget(QLabel(tr('Dziennik:')))
         layout.addWidget(self.log, 1)
 
         # Buttons
         btn_row = QHBoxLayout()
         self.run_btn = QPushButton("Start")
-        self.cancel_btn = QPushButton("Przerwij")
-        self.close_btn = QPushButton("Zamknij")
+        self.cancel_btn = QPushButton(tr('Przerwij'))
+        self.close_btn = QPushButton(tr('Zamknij'))
 
         self.run_btn.clicked.connect(self.start)
         self.cancel_btn.clicked.connect(self.cancel)
@@ -200,33 +201,32 @@ class MBTilesBatchExporterDialog(QDialog):
         layout.addLayout(btn_row)
 
         tips = {
-            self.output_edit: 'Wskaż folder na pliki MBTiles. Ten tryb zapisuje osobny plik dla każdej mapy, bez kopii całego projektu.',
-            self.output_browse: 'Otwiera wybór folderu zapisu.',
-            self.extent_combo: 'Widok mapy używa aktualnego zasięgu QGIS. Warstwa poligonowa wyznacza prostokąt '
-                               'obejmujący zaznaczone obiekty, a bez zaznaczenia wszystkie. Przycinanie do kształtu pasa jest dostępne w Archiwizuj projekt.',
-            self.poly_layer_combo: 'Wybierz poligony wyznaczające zasięg. Zaznaczenie obiektów ma pierwszeństwo przed całą warstwą.',
-            self.poly_layer_hint: 'Ten eksporter używa prostokąta otaczającego poligony. Nie wycina ich dokładnego kształtu.',
-            self.format_combo: 'PNG zachowuje przezroczystość. JPEG tworzy obraz bez przezroczystości i może tracić szczegóły.',
-            self.zoom_min: 'Najmniejszy zapisany zoom: widok większego obszaru z mniejszą szczegółowością.',
-            self.zoom_max: 'Największy zapisany zoom: więcej szczegółów, ale zwykle większy plik i dłuższy eksport.',
-            self.jpeg_quality: 'Dotyczy tylko JPEG. Wyższa wartość oznacza mniej strat i większy plik; nie zmienia jakości PNG.',
-            self.chk_pause_render: 'Podczas eksportu nie odświeżaj mapy głównej. Ogranicza dodatkową pracę QGIS; stan zostanie przywrócony po eksporcie.',
-            self.layer_list: 'Zaznacz mapy do zapisania jako MBTiles. Do archiwum całego projektu użyj osobnej akcji Archiwizuj projekt.',
-            self.btn_select_all: 'Zaznacza wszystkie warstwy z listy do eksportu.',
-            self.btn_select_none: 'Odznacza wszystkie warstwy z listy.',
-            self.btn_refresh_layers: 'Wczytuje ponownie warstwy projektu i zaznacza je wszystkie.',
-            self.progress: 'Postęp eksportu bieżącej warstwy zgłaszany przez algorytm QGIS.',
-            self.log: 'Komunikaty algorytmu, kolejne warstwy i błędy eksportu.',
-            self.run_btn: 'Rozpoczyna eksport zaznaczonych map do plików MBTiles.',
-            self.cancel_btn: 'Prosi algorytm o przerwanie eksportu. Zakończenie bieżącej operacji może chwilę potrwać.',
-            self.close_btn: 'Zamyka okno eksportera MBTiles.',
+            self.output_edit: tr('Wskaż folder na pliki MBTiles. Ten tryb zapisuje osobny plik dla każdej mapy, bez kopii całego projektu.'),
+            self.output_browse: tr('Otwiera wybór folderu zapisu.'),
+            self.extent_combo: tr('Widok mapy używa aktualnego zasięgu QGIS. Warstwa poligonowa wyznacza prostokąt obejmujący zaznaczone obiekty, a bez zaznaczenia wszystkie. Przycinanie do kształtu pasa jest dostępne w Archiwizuj projekt.'),
+            self.poly_layer_combo: tr('Wybierz poligony wyznaczające zasięg. Zaznaczenie obiektów ma pierwszeństwo przed całą warstwą.'),
+            self.poly_layer_hint: tr('Ten eksporter używa prostokąta otaczającego poligony. Nie wycina ich dokładnego kształtu.'),
+            self.format_combo: tr('PNG zachowuje przezroczystość. JPEG tworzy obraz bez przezroczystości i może tracić szczegóły.'),
+            self.zoom_min: tr('Najmniejszy zapisany zoom: widok większego obszaru z mniejszą szczegółowością.'),
+            self.zoom_max: tr('Największy zapisany zoom: więcej szczegółów, ale zwykle większy plik i dłuższy eksport.'),
+            self.jpeg_quality: tr('Dotyczy tylko JPEG. Wyższa wartość oznacza mniej strat i większy plik; nie zmienia jakości PNG.'),
+            self.chk_pause_render: tr('Podczas eksportu nie odświeżaj mapy głównej. Ogranicza dodatkową pracę QGIS; stan zostanie przywrócony po eksporcie.'),
+            self.layer_list: tr('Zaznacz mapy do zapisania jako MBTiles. Do archiwum całego projektu użyj osobnej akcji Archiwizuj projekt.'),
+            self.btn_select_all: tr('Zaznacza wszystkie warstwy z listy do eksportu.'),
+            self.btn_select_none: tr('Odznacza wszystkie warstwy z listy.'),
+            self.btn_refresh_layers: tr('Wczytuje ponownie warstwy projektu i zaznacza je wszystkie.'),
+            self.progress: tr('Postęp eksportu bieżącej warstwy zgłaszany przez algorytm QGIS.'),
+            self.log: tr('Komunikaty algorytmu, kolejne warstwy i błędy eksportu.'),
+            self.run_btn: tr('Rozpoczyna eksport zaznaczonych map do plików MBTiles.'),
+            self.cancel_btn: tr('Prosi algorytm o przerwanie eksportu. Zakończenie bieżącej operacji może chwilę potrwać.'),
+            self.close_btn: tr('Zamyka okno eksportera MBTiles.'),
         }
         for widget, text in tips.items():
             widget.setToolTip(f'<p>{text}</p>')
 
 
     def prepare_on_open(self):
-        """Wywoływane przy każdym otwarciu okna z menu: odświeża listy i czyści UI."""
+        """Refresh lists and clear the UI whenever the menu opens this window."""
         # 1) wyczyść UI
         self.progress.setValue(0)
         self.log.clear()
@@ -264,7 +264,7 @@ class MBTilesBatchExporterDialog(QDialog):
             self.layer_list.addItem(item)
 
         if not layers:
-            item = QListWidgetItem("— brak warstw wektorowych/rastrowych —")
+            item = QListWidgetItem(tr('— brak warstw wektorowych/rastrowych —'))
             item.setFlags(Qt.NoItemFlags)
             self.layer_list.addItem(item)
 
@@ -288,7 +288,7 @@ class MBTilesBatchExporterDialog(QDialog):
         return ids
 
     def _browse_output(self):
-        folder = QFileDialog.getExistingDirectory(self, "Wybierz folder na pliki MBTiles", "")
+        folder = QFileDialog.getExistingDirectory(self, tr('Wybierz folder na pliki MBTiles'), "")
         if folder:
             self.output_edit.setText(folder)
 
@@ -300,7 +300,7 @@ class MBTilesBatchExporterDialog(QDialog):
                 self._poly_layers.append(layer)
                 self.poly_layer_combo.addItem(layer.name(), layer.id())
         if not self._poly_layers:
-            self.poly_layer_combo.addItem("— brak warstw poligonowych —", None)
+            self.poly_layer_combo.addItem(tr('— brak warstw poligonowych —'), None)
 
     def _update_extent_ui(self):
         use_poly = (self.extent_combo.currentIndex() == 1)
@@ -321,10 +321,10 @@ class MBTilesBatchExporterDialog(QDialog):
 
         layer_id = self.poly_layer_combo.currentData()
         if not layer_id:
-            raise RuntimeError("Nie wybrano warstwy poligonowej (lub brak warstw poligonowych w projekcie).")
+            raise RuntimeError(tr('Nie wybrano warstwy poligonowej (lub brak warstw poligonowych w projekcie).'))
         layer = QgsProject.instance().mapLayer(layer_id)
         if not layer or not layer.isValid():
-            raise RuntimeError("Wybrana warstwa poligonowa jest nieprawidłowa.")
+            raise RuntimeError(tr('Wybrana warstwa poligonowa jest nieprawidłowa.'))
         return polygon_layer_extent_string(layer)
 
     def _tile_format_value(self) -> int:
@@ -333,33 +333,33 @@ class MBTilesBatchExporterDialog(QDialog):
     def start(self):
         out = self.output_edit.text().strip()
         if not out:
-            QMessageBox.warning(self, "Brak folderu", "Wybierz folder zapisu.")
+            QMessageBox.warning(self, tr('Brak folderu'), tr('Wybierz folder zapisu.'))
             return
         out_path = Path(out)
         if not out_path.exists() or not out_path.is_dir():
-            QMessageBox.warning(self, "Błędny folder", f"Katalog nie istnieje: {out}")
+            QMessageBox.warning(self, tr('Błędny folder'), tr('Katalog nie istnieje: {0}').format(out))
             return
 
         selected_ids = self._selected_layer_ids()
         if not selected_ids:
-            QMessageBox.warning(self, "Brak warstw", "Zaznacz przynajmniej jedną warstwę do eksportu.")
+            QMessageBox.warning(self, tr('Brak warstw'), tr('Zaznacz przynajmniej jedną warstwę do eksportu.'))
             return
 
         try:
             self.alg_id = get_algorithm_id()
         except Exception as e:
-            QMessageBox.critical(self, "Brak algorytmu", str(e))
+            QMessageBox.critical(self, tr('Brak algorytmu'), str(e))
             return
 
         try:
             self.all_layer_nodes, all_targets = iter_target_layer_nodes()
             self.target_nodes = [n for n in all_targets if (n.layer() and n.layer().id() in selected_ids)]
         except Exception as e:
-            QMessageBox.critical(self, "Brak warstw", str(e))
+            QMessageBox.critical(self, tr('Brak warstw'), str(e))
             return
 
         if not self.target_nodes:
-            QMessageBox.warning(self, "Brak warstw", "Żadna z wybranych warstw nie jest dostępna w drzewie projektu.")
+            QMessageBox.warning(self, tr('Brak warstw'), tr('Żadna z wybranych warstw nie jest dostępna w drzewie projektu.'))
             return
 
         try:
@@ -385,8 +385,8 @@ class MBTilesBatchExporterDialog(QDialog):
             canvas.setRenderFlag(False)
 
         self.log.clear()
-        self._log(f"Algorytm: {self.alg_id}")
-        self._log(f"Warstw do przetworzenia: {len(self._queue)} (zaznaczone w oknie)")
+        self._log(tr('Algorytm: {0}').format(self.alg_id))
+        self._log(tr('Warstw do przetworzenia: {0} (zaznaczone w oknie)').format(len(self._queue)))
         self._log(f"EXTENT: {extent_str}")
         self.progress.setValue(0)
 
@@ -400,7 +400,7 @@ class MBTilesBatchExporterDialog(QDialog):
         self._cancel_requested = True
         if self._current_feedback is not None:
             self._current_feedback.cancel()
-        self._log("⏹ Przerywam… (po zakończeniu bieżącego kroku)")
+        self._log(tr('⏹ Przerywam… (po zakończeniu bieżącego kroku)'))
 
     def _start_next(self):
         if self._cancel_requested:
@@ -420,7 +420,7 @@ class MBTilesBatchExporterDialog(QDialog):
         node = self._queue[self._current_index]
         layer = node.layer()
         if not layer:
-            self._log(f"[{self._current_index+1}/{total}] Pomijam pusty węzeł warstwy.")
+            self._log(tr('[{0}/{1}] Pomijam pusty węzeł warstwy.').format(self._current_index+1, total))
             QTimer.singleShot(0, self._start_next)
             return
 
@@ -437,9 +437,9 @@ class MBTilesBatchExporterDialog(QDialog):
         if out_file.exists():
             try:
                 out_file.unlink()
-                self._log(f"  • Nadpisuję istniejący plik: {out_file.name}")
+                self._log(tr('  • Nadpisuję istniejący plik: {0}').format(out_file.name))
             except Exception as e:
-                self._log(f"  ⚠ Nie mogę usunąć istniejącego pliku ({out_file}): {e}")
+                self._log(tr('  ⚠ Nie mogę usunąć istniejącego pliku ({0}): {1}').format(out_file, e))
 
         params = {
             "ANTIALIAS": True,
@@ -473,9 +473,9 @@ class MBTilesBatchExporterDialog(QDialog):
             self._log(f"  ✅ OK → {out_file.name}")
         except Exception as e:
             self._failed_layers.append(layer_name)
-            self._log(f"  ❌ Błąd podczas eksportu warstwy '{layer_name}': {e}")
+            self._log(tr("  ❌ Błąd podczas eksportu warstwy '{0}': {1}").format(layer_name, e))
             QgsMessageLog.logMessage(
-                f"qgis-project-snapshot: błąd dla warstwy '{layer_name}': {e}",
+                tr("qgis-project-snapshot: błąd dla warstwy '{0}': {1}").format(layer_name, e),
                 "qgis-project-snapshot",
                 Qgis.Critical,
             )
@@ -508,16 +508,16 @@ class MBTilesBatchExporterDialog(QDialog):
             self._canvas_render_flag = None
 
         if cancelled:
-            self._log("\n⛔ Przerwano.")
+            self._log(tr('\n⛔ Przerwano.'))
         else:
-            self._log("\n✅ Gotowe.")
+            self._log(tr('\n✅ Gotowe.'))
         # Podsumowanie
         if self._failed_layers:
-            self._log("\n⚠️ Nieprzetworzone warstwy:")
+            self._log(tr('\n⚠️ Nieprzetworzone warstwy:'))
             for name in sorted(set(self._failed_layers)):
                 self._log(f"  • {name}")
         else:
-            self._log("\n🎉 Wszystkie warstwy przetworzone pomyślnie.")
+            self._log(tr('\n🎉 Wszystkie warstwy przetworzone pomyślnie.'))
 
 
         self.progress.setValue(100 if not cancelled else self.progress.value())

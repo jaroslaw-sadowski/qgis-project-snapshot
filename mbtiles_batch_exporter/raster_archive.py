@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Bounded-memory raster capture using QGIS rendering and GDAL GeoPackage."""
+from .i18n import tr
 from contextlib import closing
 import json
 import math
@@ -29,21 +30,21 @@ def zoom_levels(project, area, area_crs, zoom_min, zoom_max):
     """XYZ-equivalent resolution at the AOI center, expressed in project units."""
     if not (isinstance(zoom_min, int) and isinstance(zoom_max, int)
             and 0 <= zoom_min <= zoom_max <= 24):
-        raise ValueError('Wybierz zoom od 0 do 24; minimum nie może przekraczać maksimum.')
+        raise ValueError(tr('Wybierz zoom od 0 do 24; minimum nie może przekraczać maksimum.'))
     crs = project.crs()
     if not crs.isValid() or not area_crs.isValid() or area.isEmpty():
-        raise ValueError('Nie można obliczyć skali bez poprawnego obszaru i układu współrzędnych.')
+        raise ValueError(tr('Nie można obliczyć skali bez poprawnego obszaru i układu współrzędnych.'))
     mercator = QgsCoordinateReferenceSystem('EPSG:3857')
     center = area.boundingBox().center()
     center = QgsCoordinateTransform(area_crs, mercator, project).transform(center)
     if abs(center.y()) > 20037508.342789244:
-        raise ValueError('Wybrany obszar znajduje się poza zakresem zoomów XYZ (obszary polarne).')
+        raise ValueError(tr('Wybrany obszar znajduje się poza zakresem zoomów XYZ (obszary polarne).'))
     transform = QgsCoordinateTransform(mercator, crs, project)
     origin = transform.transform(center)
     east = transform.transform(QgsPointXY(center.x() + 1, center.y()))
     local_factor = math.hypot(east.x() - origin.x(), east.y() - origin.y())
     if not math.isfinite(local_factor) or local_factor <= 0:
-        raise ValueError('Nie udało się przeliczyć rozdzielczości do układu projektu.')
+        raise ValueError(tr('Nie udało się przeliczyć rozdzielczości do układu projektu.'))
     calculator = QgsScaleCalculator(96)
     calculator.setMapUnits(crs.mapUnits())
     levels = []
@@ -128,7 +129,7 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
             QCoreApplication.processEvents()
             if time.monotonic() - last_notice >= 5:
                 seconds = int(RENDER_TIMEOUT - (deadline - time.monotonic()))
-                progress(f'{layer.name()}: renderowanie lub oczekiwanie na dane — {seconds} s (limit {RENDER_TIMEOUT} s).')
+                progress(tr('{0}: renderowanie lub oczekiwanie na dane — {1} s (limit {2} s).').format(layer.name(), seconds, RENDER_TIMEOUT))
                 last_notice = time.monotonic()
             if cancelled() or time.monotonic() > deadline:
                 timed_out = not cancelled()
@@ -138,17 +139,23 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
                 break
             QThread.msleep(10)
         if cancelled():
-            raise InterruptedError('Przerwano pobieranie obrazu.')
+            raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
         if timed_out:
-            raise TimeoutError('Przekroczono czas pobierania fragmentu mapy.')
+            raise TimeoutError(tr('Przekroczono czas pobierania fragmentu mapy.'))
         QCoreApplication.processEvents()
         if network_errors:
-            raise RuntimeError('Usługa mapowa zwróciła błąd sieciowy lub odpowiedź błędu WMS.')
+            for code in (429, 503):
+                if code in network_errors:
+                    message = ('[HTTP 429] ' + tr('Serwer {0}: zbyt wiele zapytań. Kliknij „Przerwij”, zmniejsz „Zadania na serwer” i spróbuj ponownie po przerwie.').format(service.host()) if code == 429
+                               else '[HTTP 503] ' + tr('Serwer {0}: usługa niedostępna lub przeciążona. Jeśli problem się powtarza, kliknij „Przerwij” i zmniejsz „Zadania na serwer”. HTTP 503 nie potwierdza, że przyczyną jest liczba zapytań.').format(service.host()))
+                    progress(message)
+                    raise RuntimeError(message)
+            raise RuntimeError(tr('Usługa mapowa zwróciła błąd sieciowy lub odpowiedź błędu WMS.'))
         if job.errors():
-            raise RuntimeError('Renderer QGIS zgłosił błąd pobierania lub rysowania warstwy.')
+            raise RuntimeError(tr('Renderer QGIS zgłosił błąd pobierania lub rysowania warstwy.'))
         result = job.renderedImage()
         if result.isNull():
-            raise RuntimeError('QGIS nie zwrócił obrazu mapy.')
+            raise RuntimeError(tr('QGIS nie zwrócił obrazu mapy.'))
         return result
     finally:
         if job.isActive():
@@ -164,23 +171,29 @@ def _render_tile(layer, project, bounds, resolution, size, cancelled, progress, 
     expanded.grow(gutter * resolution)
     for attempt in range(3):
         if cancelled():
-            raise InterruptedError('Przerwano pobieranie obrazu.')
+            raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
         try:
             image = _render_image(layer, project, expanded, size + 2 * gutter,
                                   size + 2 * gutter, cancelled, progress)
             return image.copy(gutter, gutter, size, size)
         except InterruptedError:
             raise
-        except (RuntimeError, TimeoutError):
+        except (RuntimeError, TimeoutError) as error:
+            if str(error).startswith(('[HTTP 429]', '[HTTP 503]')):
+                warnings = counters.setdefault('server_warnings', [])
+                if str(error) not in warnings:
+                    warnings.append(str(error))
+                if str(error).startswith('[HTTP 429]'):
+                    raise  # Do not amplify an explicit rate limit with tile retries.
             # Some providers cache the empty image produced by a failed request.
             # Invalidate only the disposable clone before trying again.
             if layer.dataProvider() is not None:
                 layer.dataProvider().reloadData()
             if attempt < 2:
                 counters['retries'] += 1
-                progress(f'{layer.name()}: ponowienie pobierania fragmentu ({attempt + 1}/2)…')
+                progress(tr('{0}: ponowienie pobierania fragmentu ({1}/2)…').format(layer.name(), attempt + 1))
     if size <= 128:
-        raise RuntimeError('Pobieranie nie powiodło się także po ponowieniach i podziale fragmentu.')
+        raise RuntimeError(tr('Pobieranie nie powiodło się także po ponowieniach i podziale fragmentu.'))
     counters['subdivisions'] += 1
     result = QImage(size, size, QImage.Format_ARGB32_Premultiplied)
     result.fill(Qt.transparent)
@@ -202,7 +215,7 @@ def _render_tile(layer, project, bounds, resolution, size, cancelled, progress, 
 def _mask_image(image, area, bounds, resolution):
     clipped = area.intersection(QgsGeometry.fromRect(bounds))
     if clipped.lastError() or (not clipped.isEmpty() and not clipped.isGeosValid()):
-        raise RuntimeError('Nie udało się wyznaczyć maski fragmentu mapy.')
+        raise RuntimeError(tr('Nie udało się wyznaczyć maski fragmentu mapy.'))
     mask = QImage(image.size(), QImage.Format_ARGB32_Premultiplied)
     mask.fill(Qt.transparent)
     path = QPainterPath()
@@ -237,17 +250,17 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
     width = math.ceil(bounds.width() / (finest * TILE_SIZE)) * TILE_SIZE
     height = math.ceil(bounds.height() / (finest * TILE_SIZE)) * TILE_SIZE
     if not (0 < width < 2 ** 31 and 0 < height < 2 ** 31):
-        raise ValueError('Rozmiar rastra przekracza limit formatu. Zmniejsz obszar lub maksymalny zoom.')
+        raise ValueError(tr('Rozmiar rastra przekracza limit formatu. Zmniejsz obszar lub maksymalny zoom.'))
     x0, y0 = bounds.xMinimum(), bounds.yMaximum()
     clone = layer.clone()
     if clone is None or not clone.isValid():
-        raise RuntimeError('Nie można przygotować warstwy do zapisu obrazu.')
+        raise RuntimeError(tr('Nie można przygotować warstwy do zapisu obrazu.'))
     if isinstance(layer, QgsVectorLayer) and layer.isEditable():
         # clone() copies provider data, but omits unsaved edits. Replay just the
         # edit buffer on the disposable clone; never commit to the real provider.
         edits = layer.editBuffer()
         if not clone.startEditing():
-            raise RuntimeError('Nie można uwzględnić niezapisanych edycji w obrazie.')
+            raise RuntimeError(tr('Nie można uwzględnić niezapisanych edycji w obrazie.'))
         operations = []
         for index in sorted(edits.deletedAttributeIds(), reverse=True):
             operations.append(clone.deleteAttribute(index))
@@ -263,7 +276,7 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
         for feature in edits.addedFeatures().values():
             operations.append(clone.addFeature(feature))
         if not all(operations):
-            raise RuntimeError('Nie udało się uwzględnić wszystkich niezapisanych edycji w obrazie.')
+            raise RuntimeError(tr('Nie udało się uwzględnić wszystkich niezapisanych edycji w obrazie.'))
     clone.setScaleBasedVisibility(False)
     # Blend against other layers in the archive, not against a transparent capture canvas.
     clone.setBlendMode(QPainter.CompositionMode_SourceOver)
@@ -292,15 +305,15 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
             failures_in_a_row = 0
             for level in reversed(levels):
                 zoom, resolution = level['zoom'], level['resolution']
-                progress(f'{layer.name()}: rozpoczęcie zoomu {zoom}; rozdzielczość {resolution:.3g} jednostek/piksel.')
+                progress(tr('{0}: rozpoczęcie zoomu {1}; rozdzielczość {2:.3g} jednostek/piksel.').format(layer.name(), zoom, resolution))
                 level_stats = dict(zoom=zoom, attempted=0, nonempty=0, empty=0, failed=0)
                 stats['levels'].append(level_stats)
                 dataset = gdal.OpenEx(str(database), gdal.OF_RASTER | gdal.OF_UPDATE,
                                      open_options=[f'TABLE={table}', f'ZOOM_LEVEL={zoom}', 'BAND_COUNT=4'] + PNG_OPTIONS)
                 for column, row in intersecting_tiles(mask, x0, y0, resolution, dataset.RasterXSize, dataset.RasterYSize):
-                    progress(f'{layer.name()} — zoom {zoom}, fragment {level_stats["attempted"] + 1}')
+                    progress(tr('{0} — zoom {1}, fragment {2}').format(layer.name(), zoom, level_stats["attempted"] + 1))
                     if cancelled():
-                        raise InterruptedError('Przerwano pobieranie obrazu.')
+                        raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
                     level_stats['attempted'] += 1
                     x, y = x0 + column * TILE_SIZE * resolution, y0 - row * TILE_SIZE * resolution
                     tile_bounds = QgsRectangle(x, y - TILE_SIZE * resolution, x + TILE_SIZE * resolution, y)
@@ -314,7 +327,7 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
                         failures_in_a_row += 1
                         if len(stats['failures']) < 20:
                             stats['failures'].append({'zoom': zoom, 'column': column, 'row': row, 'reason': str(error)})
-                        if failures_in_a_row >= 5:
+                        if str(error).startswith('[HTTP 429]') or failures_in_a_row >= 5:
                             stats['stopped_early'] = True
                             break
                         continue
@@ -334,22 +347,21 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
                     level_stats['nonempty'] += 1
                 dataset.FlushCache()
                 dataset = None
-                progress(f'{layer.name()}: zoom {zoom} zakończony — zapisane {level_stats["nonempty"]}, '
-                         f'puste {level_stats["empty"]}, błędne {level_stats["failed"]} fragmenty.')
+                progress(tr('{0}: zoom {1} zakończony — zapisane {2}, puste {3}, błędne {4} fragmenty.').format(layer.name(), zoom, level_stats["nonempty"], level_stats["empty"], level_stats["failed"]))
                 if stats['stopped_early']:
                     break
             if cancelled():
-                raise InterruptedError('Przerwano pobieranie obrazu.')
+                raise InterruptedError(tr('Przerwano pobieranie obrazu.'))
             with closing(sqlite3.connect(database)) as connection:
                 tiles = connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
             nonempty = sum(level['nonempty'] for level in stats['levels'])
             if tiles != nonempty:
-                raise RuntimeError('Kontrola liczby zapisanych kafelków nie powiodła się.')
+                raise RuntimeError(tr('Kontrola liczby zapisanych kafelków nie powiodła się.'))
             for level in levels:
                 dataset = gdal.OpenEx(str(database), gdal.OF_RASTER,
                                      open_options=[f'TABLE={table}', f'ZOOM_LEVEL={level["zoom"]}'])
                 if dataset.RasterCount != 4 or not math.isclose(dataset.GetGeoTransform()[1], level['resolution']):
-                    raise RuntimeError('Nieprawidłowa rozdzielczość lub kanały zapisanego obrazu.')
+                    raise RuntimeError(tr('Nieprawidłowa rozdzielczość lub kanały zapisanego obrazu.'))
                 dataset = None
     finally:
         dataset = None
@@ -362,10 +374,10 @@ def write_rendered_raster(layer, project, area, area_crs, database, table, level
         'local_source': f'./dane.gpkg|option:TABLE={table}|option:ZOOM_LEVEL={levels[-1]["zoom"]}',
         'local_provider': 'gdal', 'table': table, 'tile_count': nonempty,
         'raster': stats, 'png': {'format': 'PNG', 'zlevel': 9, 'rgba': True},
-        'reason': ('Nie udało się pobrać obrazu; ponowienia i mniejsze fragmenty również zawiodły.' if status == 'failed' else
-                   'Obraz częściowy: nie wszystkie fragmenty udało się pobrać.' if failed else
-                   'Co najmniej jeden zoom jest całkowicie przezroczysty — wymaga sprawdzenia.' if blank else
-                   'Zapisano obraz z przezroczystością; każdy zoom pobrano osobno.'),
+        'reason': (tr('Nie udało się pobrać obrazu; ponowienia i mniejsze fragmenty również zawiodły.') if status == 'failed' else
+                   tr('Obraz częściowy: nie wszystkie fragmenty udało się pobrać.') if failed else
+                   tr('Co najmniej jeden zoom jest całkowicie przezroczysty — wymaga sprawdzenia.') if blank else
+                   tr('Zapisano obraz z przezroczystością; każdy zoom pobrano osobno.')),
     }
     if status == 'failed':
         result.pop('local_source')
@@ -383,13 +395,13 @@ def write_raster_data(layer, project, area, area_crs, staging, table, cancelled,
             uri = layer.source().split('|option:')
             source = gdal.OpenEx(uri[0], gdal.OF_RASTER, open_options=uri[1:])
             if source is None:
-                raise RuntimeError('GDAL nie może odczytać oryginalnych wartości rastra.')
+                raise RuntimeError(tr('GDAL nie może odczytać oryginalnych wartości rastra.'))
             numerical = any(source.GetRasterBand(i).DataType != gdal.GDT_Byte for i in range(1, source.RasterCount + 1))
             if numerical and source.GetRasterBand(source.RasterCount).GetColorInterpretation() == gdal.GCI_AlphaBand:
-                raise RuntimeError('Wielobitowy kanał przezroczystości wymaga zachowania wyglądu przez renderer QGIS.')
+                raise RuntimeError(tr('Wielobitowy kanał przezroczystości wymaga zachowania wyglądu przez renderer QGIS.'))
             transform = source.GetGeoTransform()
             if transform[2] or transform[4] or transform[1] <= 0 or transform[5] >= 0:
-                raise RuntimeError('Raster ma obróconą lub nietypową siatkę; potrzebny jest zapis obrazu.')
+                raise RuntimeError(tr('Raster ma obróconą lub nietypową siatkę; potrzebny jest zapis obrazu.'))
             mask = QgsGeometry(area)
             if layer.crs() != area_crs:
                 mask.transform(QgsCoordinateTransform(area_crs, layer.crs(), project))
@@ -399,7 +411,7 @@ def write_raster_data(layer, project, area, area_crs, staging, table, cancelled,
             top = max(0, math.floor((box.yMaximum() - transform[3]) / transform[5]))
             bottom = min(source.RasterYSize, math.ceil((box.yMinimum() - transform[3]) / transform[5]))
             if right <= left or bottom <= top:
-                raise RuntimeError('Raster nie przecina obszaru archiwizacji.')
+                raise RuntimeError(tr('Raster nie przecina obszaru archiwizacji.'))
             aligned = (transform[0] + left * transform[1], transform[3] + bottom * transform[5],
                        transform[0] + right * transform[1], transform[3] + top * transform[5])
             with TemporaryDirectory(prefix='.cutline-', dir=staging) as temporary:
@@ -411,7 +423,7 @@ def write_raster_data(layer, project, area, area_crs, staging, table, cancelled,
                 }), encoding='utf-8')
 
                 def callback(fraction, message, data):
-                    progress(f'{layer.name()}: zapis wartości rastra {fraction:.0%}')
+                    progress(tr('{0}: zapis wartości rastra {1:.0%}').format(layer.name(), fraction))
                     return not cancelled()
 
                 warp_target = Path(temporary) / 'warped.tif' if numerical else target
@@ -424,9 +436,9 @@ def write_raster_data(layer, project, area, area_crs, staging, table, cancelled,
                                    creationOptions=['TILED=YES', 'COMPRESS=DEFLATE', 'ZLEVEL=9',
                                                     'BIGTIFF=IF_SAFER', 'SPARSE_OK=YES'], callback=callback)
                 if cancelled():
-                    raise InterruptedError('Przerwano zapis rastra.')
+                    raise InterruptedError(tr('Przerwano zapis rastra.'))
                 if output is None:
-                    raise RuntimeError('Nie udało się zapisać oryginalnych wartości rastra.')
+                    raise RuntimeError(tr('Nie udało się zapisać oryginalnych wartości rastra.'))
                 output.FlushCache()
                 band_count = output.RasterCount
                 if numerical:
@@ -440,18 +452,18 @@ def write_raster_data(layer, project, area, area_crs, staging, table, cancelled,
                         )
                         if cancelled():
                             converted = None
-                            raise InterruptedError('Przerwano zapis rastra.')
+                            raise InterruptedError(tr('Przerwano zapis rastra.'))
                         if converted is None:
-                            raise RuntimeError('Nie udało się zapisać maski lokalnego rastra.')
+                            raise RuntimeError(tr('Nie udało się zapisać maski lokalnego rastra.'))
                         converted.FlushCache()
                         converted = None
                 output = None
             output = gdal.Open(str(target))
             if output.RasterXSize != right - left or output.RasterYSize != bottom - top:
-                raise RuntimeError('Kontrola wymiarów lokalnego rastra nie powiodła się.')
+                raise RuntimeError(tr('Kontrola wymiarów lokalnego rastra nie powiodła się.'))
             return {'status': 'saved', 'method': 'raster_data', 'crs': layer.crs().authid(),
                     'local_source': f'./zasoby/{target.name}', 'local_provider': 'gdal',
-                    'alpha_band': band_count, 'reason': 'Zapisano oryginalne wartości rastra i maskę w bezstratnym GeoTIFF.'}
+                    'alpha_band': band_count, 'reason': tr('Zapisano oryginalne wartości rastra i maskę w bezstratnym GeoTIFF.')}
     except Exception:
         output = None
         if target.exists():

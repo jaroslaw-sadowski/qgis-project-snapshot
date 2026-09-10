@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
+from .i18n import tr
 import json
 import math
-import os
 from pathlib import Path
 import time
 from html import escape
@@ -15,11 +15,12 @@ from qgis.PyQt.QtWidgets import (
 )
 from qgis.core import (
     QgsCoordinateTransform, QgsGeometry, QgsLayerTreeGroup, QgsProject,
-    QgsUnitTypes, QgsVectorLayer, QgsWkbTypes,
+    QgsUnitTypes, QgsVectorLayer, QgsWkbTypes, QgsDataSourceUri,
 )
 
 from .archive import create_archive, polygon_area
 from .raster_archive import TILE_SIZE, zoom_levels
+from .resources import MAX_WORKERS, detect_resources, recommend
 
 
 class ArchiveDialog(QDialog):
@@ -36,12 +37,12 @@ class ArchiveDialog(QDialog):
         self._worker_messages = {}
         self._finished_ids = set()
         self._items = {}
-        self.setWindowTitle('qgis-project-snapshot — Archiwizuj projekt')
+        self.setWindowTitle(tr('qgis-project-snapshot — Archiwizuj projekt'))
         self.setWindowModality(Qt.ApplicationModal)
         self.resize(860, 790)
         layout = QVBoxLayout(self)
         notice = QLabel(
-            'Zapisz projekt do pracy bez sieci. Najedź na opcję, aby zobaczyć objaśnienie.'
+            tr('Zapisz projekt do pracy bez sieci. Najedź na opcję, aby zobaczyć objaśnienie.')
         )
         notice.setWordWrap(True)
         layout.addWidget(notice)
@@ -53,21 +54,21 @@ class ArchiveDialog(QDialog):
         self.output_edit = QLineEdit()
         output = QHBoxLayout()
         output.addWidget(self.output_edit)
-        browse = QPushButton('Wybierz…')
-        browse.setToolTip('Wybierz istniejący folder. W nim powstanie nowy katalog archiwum z datą.')
+        browse = QPushButton(tr('Wybierz…'))
+        browse.setToolTip(tr('Wybierz istniejący folder. W nim powstanie nowy katalog archiwum z datą.'))
         browse.clicked.connect(self._browse)
         output.addWidget(browse)
-        form.addRow('Folder archiwum:', output)
+        form.addRow(tr('Folder archiwum:'), output)
         self.area_combo = QComboBox()
-        self.area_combo.addItems(['Aktualny widok mapy', 'Obszar z warstwy poligonowej'])
+        self.area_combo.addItems([tr('Aktualny widok mapy'), tr('Obszar z warstwy poligonowej')])
         self.area_combo.currentIndexChanged.connect(self._update_area)
-        form.addRow('Obszar:', self.area_combo)
+        form.addRow(tr('Obszar:'), self.area_combo)
         self.polygon_combo = QComboBox()
         for layer in self.project.mapLayers().values():
             if (isinstance(layer, QgsVectorLayer) and layer.isValid()
                     and layer.geometryType() == QgsWkbTypes.PolygonGeometry):
                 self.polygon_combo.addItem(layer.name(), layer.id())
-        form.addRow('Warstwa obszaru:', self.polygon_combo)
+        form.addRow(tr('Warstwa obszaru:'), self.polygon_combo)
         self.zoom_min = QComboBox()
         self.zoom_max = QComboBox()
         for combo, default in ((self.zoom_min, 13), (self.zoom_max, 17)):
@@ -75,44 +76,63 @@ class ArchiveDialog(QDialog):
                 combo.addItem(f'Zoom {zoom}', zoom)
             combo.setCurrentIndex(default)
             combo.currentIndexChanged.connect(self._ensure_zoom_order)
-        form.addRow('Najmniejsze zbliżenie:', self.zoom_min)
-        form.addRow('Największe zbliżenie:', self.zoom_max)
+        form.addRow(tr('Najmniejsze zbliżenie:'), self.zoom_min)
+        form.addRow(tr('Największe zbliżenie:'), self.zoom_max)
         self.workers = QComboBox()
-        for count in range(1, 9):
-            self.workers.addItem('1 — oszczędnie' if count == 1 else f'{count} procesy' if count < 5 else f'{count} procesów', count)
-        self.workers.setCurrentIndex(min(4, os.cpu_count() or 1) - 1)
-        form.addRow('Równoległe zadania:', self.workers)
+        for count in range(1, MAX_WORKERS + 1):
+            self.workers.addItem(tr('1 — oszczędnie') if count == 1 else tr('{0} procesy').format(count) if count < 5 else tr('{0} procesów').format(count), count)
+        self.workers.setCurrentIndex(0)
+        form.addRow(tr('Równoległe zadania:'), self.workers)
+        self.server_limit = QComboBox()
+        for count in (1, 2, 4, 6, 8):
+            self.server_limit.addItem(str(count), count)
+        self.server_limit.setCurrentIndex(1)  # Keep 2 as the default; 1 allows backing off.
+        form.addRow(tr('Zadania na serwer:'), self.server_limit)
+        self.resource_hint = QLabel()
+        self.resource_hint.setWordWrap(True)
+        self.resource_hint.setMinimumHeight(self.fontMetrics().lineSpacing() * 3)
+        form.addRow(self.resource_hint)
+        self.recommend_button = QPushButton(tr('Dobierz do komputera i zaznaczonych warstw'))
+        self.recommend_button.clicked.connect(self._recommend_workers)
+        form.addRow(self.recommend_button)
         self.zoom_hint = QLabel()
         self.zoom_hint.setWordWrap(True)
         form.addRow(self.zoom_hint)
         self.polygon_combo.currentIndexChanged.connect(self._update_zoom_labels)
         options_layout.addLayout(form)
         selection = QHBoxLayout()
-        for label, checked in [('Zaznacz wszystko', True), ('Odznacz wszystko', False)]:
+        for label, checked in [(tr('Zaznacz wszystko'), True), (tr('Odznacz wszystko'), False)]:
             button = QPushButton(label)
-            button.setToolTip('Zmienia wybór warstw do archiwum. Nie zmienia widoczności warstw w oryginalnym projekcie.')
+            button.setToolTip(tr('Zmienia wybór warstw do archiwum. Nie zmienia widoczności warstw w oryginalnym projekcie.'))
             button.clicked.connect(lambda _, value=checked: self._select_all(value))
             selection.addWidget(button)
         selection.addStretch()
         options_layout.addLayout(selection)
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(['Warstwa', 'Zapis', 'Stan'])
+        self.tree.setHeaderLabels([tr('Warstwa'), tr('Zapis'), tr('Stan')])
         self._populate_tree(self.project.layerTreeRoot(), self.tree.invisibleRootItem())
         self.tree.expandToDepth(0)
         self.tree.setColumnWidth(0, 290)
         self.tree.setColumnWidth(1, 160)
         options_layout.addWidget(self.tree, 1)
         layout.addWidget(self.options, 1)
-        self.status = QLabel('Gotowe do wyboru obszaru i folderu.')
+        self.status = QLabel(tr('Gotowe do wyboru obszaru i folderu.'))
         self.status.setTextFormat(Qt.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.server_warning = QLabel()
+        self.server_warning.setTextFormat(Qt.PlainText)
+        self.server_warning.setWordWrap(True)
+        self.server_warning.setStyleSheet('QLabel { color: #b00020; background-color: #fff0f0; padding: 6px; font-weight: bold; }')
+        self.server_warning.hide()
+        self._server_warnings = set()
+        layout.addWidget(self.server_warning)
         self.progress = QProgressBar()
         self.progress.setRange(0, 1)
         self.progress.setValue(0)
-        self.progress.setFormat('Jeszcze nie uruchomiono')
+        self.progress.setFormat(tr('Jeszcze nie uruchomiono'))
         layout.addWidget(self.progress)
-        self.elapsed = QLabel('Czas: 00:00')
+        self.elapsed = QLabel(tr('Czas: 00:00'))
         layout.addWidget(self.elapsed)
         self.workers_status = QLabel('')
         self.workers_status.setTextFormat(Qt.PlainText)
@@ -124,68 +144,62 @@ class ArchiveDialog(QDialog):
         self.log.setMaximumBlockCount(2000)
         self.log.setMinimumHeight(130)
         self.log.setMaximumHeight(180)
-        self.log.setPlaceholderText('Tutaj pojawią się szczegóły przebiegu archiwizacji.')
+        self.log.setPlaceholderText(tr('Tutaj pojawią się szczegóły przebiegu archiwizacji.'))
         layout.addWidget(self.log)
+        self.results = QPlainTextEdit()
+        self.results.setReadOnly(True)
+        self.results.setMinimumHeight(130)
+        self.results.setMaximumHeight(210)
+        self.results.hide()
+        layout.addWidget(self.results)
+        self.retry_button = QPushButton(tr('Ponów tylko niezapisane i niepełne warstwy'))
+        self.retry_button.setToolTip(tr('Te warstwy zaznaczono automatycznie. Powstanie osobne archiwum tylko z ponowionych warstw. Zachowaj również wcześniejszy folder; wyniki nie są automatycznie łączone.'))
+        self.retry_button.hide()
+        self.retry_button.clicked.connect(self.start)
+        layout.addWidget(self.retry_button)
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
         self.timer.timeout.connect(self._update_elapsed)
         buttons = QHBoxLayout()
-        self.report_button = QPushButton('Otwórz raport')
+        self.report_button = QPushButton(tr('Otwórz raport'))
         self.report_button.setEnabled(False)
         self.report_button.clicked.connect(self._open_report)
         buttons.addWidget(self.report_button)
-        self.copy_button = QPushButton('Kopiuj dziennik')
+        self.copy_button = QPushButton(tr('Kopiuj dziennik'))
         self.copy_button.clicked.connect(lambda: QCoreApplication.instance().clipboard().setText(self.log.toPlainText()))
         buttons.addWidget(self.copy_button)
         buttons.addStretch()
-        self.start_button = QPushButton('Utwórz archiwum')
+        self.start_button = QPushButton(tr('Utwórz archiwum'))
         self.start_button.clicked.connect(self.start)
         buttons.addWidget(self.start_button)
-        self.cancel_button = QPushButton('Przerwij')
+        self.cancel_button = QPushButton(tr('Przerwij'))
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self.cancel)
         buttons.addWidget(self.cancel_button)
-        self.close_button = QPushButton('Zamknij')
+        self.close_button = QPushButton(tr('Zamknij'))
         self.close_button.clicked.connect(self.reject)
         buttons.addWidget(self.close_button)
         layout.addLayout(buttons)
         tips = {
-            notice: 'Powstaje osobna kopia projektu, dane lokalne i raport. Oryginał nie jest zastępowany. '
-                    'Po eksporcie sprawdź raport i otwórz kopię bez internetu oraz sieci firmowej.',
-            self.output_edit: 'Wybierz folder z wolnym miejscem na archiwum i pliki tymczasowe. '
-                              'Powstanie osobny katalog z datą. Przenoś później cały ten katalog, nie sam plik projektu.',
-            self.area_combo: 'Widok mapy zapisuje obszar aktualnie widoczny w QGIS. Poligony pozwalają wybrać '
-                             'kształt pasa inwestycji. Całe obiekty wektorowe przecinające obszar zostaną zachowane.',
-            self.polygon_combo: 'Wskaż warstwę z obszarem opracowania. Jeśli zaznaczono w niej obiekty, użyjemy '
-                                'tylko zaznaczonych; w przeciwnym razie wszystkich. Mapy będą przycięte do ich kształtu.',
-            self.zoom_min: 'Najmniejsze zbliżenie zapisanych map. Niski numer obejmuje większy teren z mniejszą '
-                           'szczegółowością. Zapisujemy każdy poziom między minimum i maksimum; wektory zachowują pełne dane.',
-            self.zoom_max: 'Największe zbliżenie zapisanych map. Wyższy numer pokazuje więcej szczegółów, '
-                           'ale może mocno zwiększyć czas i rozmiar archiwum. Na pierwszą próbę pozostaw 17.',
-            self.workers: 'Liczba map przetwarzanych równocześnie w osobnych procesach. 1 oszczędza pamięć; '
-                          '2–4 zwykle pomaga przy większym obszarze. Limit to dwa zadania na serwer. '
-                          'Wektory z niezapisanymi edycjami są odczytywane w głównym QGIS.',
-            self.zoom_hint: 'To przybliżenie dla prostokąta obszaru, na jedną mapę i cały zakres zoomów. '
-                            'Dla pasa pobieramy tylko kafelki przecinające jego kształt. Skale obliczono dla środka obszaru przy 96 DPI.',
-            self.tree: 'Zaznacz warstwy do archiwum. Wyłączone na mapie warstwy też można zapisać. '
-                       'Kolumna Stan pokazuje kolejkę, pobieranie, zapis lub problem. Najedź na stan, aby przeczytać szczegóły.',
-            self.progress: 'Licznik zakończonych warstw, nie prognoza czasu. Warstwy mają różne rozmiary. '
-                           'Po zapisie danych trzeba jeszcze sprawdzić pliki i przygotować raport.',
-            self.status: 'Aktualna czynność głównego QGIS. Postęp równoległych map znajdziesz w kolumnie Stan i dzienniku.',
-            self.elapsed: 'Czas od uruchomienia eksportu. Brak nowego komunikatu nie musi oznaczać zatrzymania: '
-                          'niektóre źródła długo odpowiadają na zapytanie.',
-            self.workers_status: 'Podsumowanie procesów mapowych: zadania pracujące, oczekujące i gotowe do scalenia. '
-                                 'Szczegóły każdej mapy są w kolumnie Stan.',
-            self.log: 'Ostatnie 2000 komunikatów z czasem od startu: etapy, warstwy, zoomy, fragmenty, ponowienia '
-                      'i wyniki. Nie zawiera pełnych adresów źródeł ani poświadczeń. Pełny wynik warstw zapisuje raport.',
-            self.copy_button: 'Kopiuje widoczny dziennik do schowka, aby można go było dołączyć do opisu problemu. '
-                              'Dziennik może zawierać nazwy warstw z projektu.',
-            self.report_button: 'Otwiera raport gotowego archiwum: zapisane i brakujące warstwy oraz elementy do sprawdzenia.',
-            self.start_button: 'Rozpoczyna zapis zaznaczonych warstw i kopii projektu. PNG zachowuje przezroczystość '
-                               'i kompresję bezstratną. Po zakończeniu sprawdź wynik bez sieci.',
-            self.cancel_button: 'Zatrzymuje kolejne zadania i przerywa pobieranie. Ukończone, scalone warstwy pozostają '
-                                'w archiwum. Niektóre operacje mogą potrzebować chwili na zakończenie.',
-            self.close_button: 'Zamyka okno. Podczas eksportu działa jak Przerwij; okno pozostanie otwarte do zakończenia zapisu.',
+            notice: tr('Powstaje osobna kopia projektu, dane lokalne i raport. Oryginał nie jest zastępowany. Po eksporcie sprawdź raport i otwórz kopię bez internetu oraz sieci firmowej.'),
+            self.output_edit: tr('Wybierz folder z wolnym miejscem na archiwum i pliki tymczasowe. Powstanie osobny katalog z datą. Przenoś później cały ten katalog, nie sam plik projektu.'),
+            self.area_combo: tr('Widok mapy zapisuje obszar aktualnie widoczny w QGIS. Poligony pozwalają wybrać kształt pasa inwestycji. Całe obiekty wektorowe przecinające obszar zostaną zachowane.'),
+            self.polygon_combo: tr('Wskaż warstwę z obszarem opracowania. Jeśli zaznaczono w niej obiekty, użyjemy tylko zaznaczonych; w przeciwnym razie wszystkich. Mapy będą przycięte do ich kształtu.'),
+            self.zoom_min: tr('Najmniejsze zbliżenie zapisanych map. Niski numer obejmuje większy teren z mniejszą szczegółowością. Zapisujemy każdy poziom między minimum i maksimum; wektory zachowują pełne dane.'),
+            self.zoom_max: tr('Największe zbliżenie zapisanych map. Wyższy numer pokazuje więcej szczegółów, ale może mocno zwiększyć czas i rozmiar archiwum. Na pierwszą próbę pozostaw 17.'),
+            self.workers: tr('Liczba map przetwarzanych równocześnie w osobnych procesach. 1 oszczędza pamięć; Dobór uwzględnia CPU, wolną pamięć i liczbę serwerów. Wektory z niezapisanymi edycjami są odczytywane w głównym QGIS.'),
+            self.zoom_hint: tr('Model dla prostokąta obszaru, jednej mapy i wszystkich wybranych zoomów: 0,2–2 s oraz 10–250 KiB skompresowanego PNG na kafelek 256 × 256. To założenia, nie pomiar łącza ani serwera; wynik może wyjść poza podany przedział. Długi pas i puste kafelki zwykle zmniejszają rozmiar. Błędy i ponowienia wydłużają czas. Szacunek nie obejmuje wektorów, oryginalnych rastrów, zasobów projektu, scalania i kontroli plików. Na pliki tymczasowe przewidź dodatkowe miejsce. Równoległość dotyczy wielu map, nie dzieli czasu jednej mapy. Skale obliczono dla środka obszaru przy 96 DPI.'),
+            self.tree: tr('Zaznacz warstwy do archiwum. Wyłączone na mapie warstwy też można zapisać. Kolumna Stan pokazuje kolejkę, pobieranie, zapis lub problem. Najedź na stan, aby przeczytać szczegóły.'),
+            self.progress: tr('Licznik zakończonych warstw, nie prognoza czasu. Warstwy mają różne rozmiary. Po zapisie danych trzeba jeszcze sprawdzić pliki i przygotować raport.'),
+            self.status: tr('Aktualna czynność głównego QGIS. Postęp równoległych map znajdziesz w kolumnie Stan i dzienniku.'),
+            self.elapsed: tr('Czas od uruchomienia eksportu. Brak nowego komunikatu nie musi oznaczać zatrzymania: niektóre źródła długo odpowiadają na zapytanie.'),
+            self.workers_status: tr('Podsumowanie procesów mapowych: zadania pracujące, oczekujące i gotowe do scalenia. Szczegóły każdej mapy są w kolumnie Stan.'),
+            self.log: tr('Ostatnie 2000 komunikatów z czasem od startu: etapy, warstwy, zoomy, fragmenty, ponowienia i wyniki. Nie zawiera pełnych adresów źródeł ani poświadczeń. Pełny wynik warstw zapisuje raport.'),
+            self.copy_button: tr('Kopiuje widoczny dziennik do schowka, aby można go było dołączyć do opisu problemu. Dziennik może zawierać nazwy warstw z projektu.'),
+            self.report_button: tr('Otwiera raport gotowego archiwum: zapisane i brakujące warstwy oraz elementy do sprawdzenia.'),
+            self.start_button: tr('Rozpoczyna zapis zaznaczonych warstw i kopii projektu. PNG zachowuje przezroczystość i kompresję bezstratną. Po zakończeniu sprawdź wynik bez sieci.'),
+            self.cancel_button: tr('Zatrzymuje kolejne zadania i przerywa pobieranie. Ukończone, scalone warstwy pozostają w archiwum. Niektóre operacje mogą potrzebować chwili na zakończenie.'),
+            self.close_button: tr('Zamyka okno. Podczas eksportu działa jak Przerwij; okno pozostanie otwarte do zakończenia zapisu.'),
         }
         for widget, text in tips.items():
             widget.setToolTip(f'<p>{escape(text)}</p>')
@@ -195,7 +209,28 @@ class ArchiveDialog(QDialog):
             if label and label.widget() and field:
                 widget = field.widget() or self.output_edit
                 label.widget().setToolTip(widget.toolTip())
+        self.server_limit.setToolTip(tr('Zacznij od 2. Zwiększ do 4–8 przy szybkim łączu i serwerze, który obsługuje wiele zapytań. Większa liczba może powodować błędy lub spowolnienie.'))
+        self.recommend_button.setToolTip(tr('Odświeża dostępne zasoby i ustawia rekomendację. Rezerwuje 2 GiB dla QGIS i około 1 GiB na proces. To punkt startowy, nie pomiar maksymalnej wydajności.'))
         self._update_area()
+        self._recommend_workers()
+
+    def _recommend_workers(self):
+        resources = detect_resources()
+        hosts = {}
+        for layer_id in self._selected_ids():
+            layer = self.project.mapLayer(layer_id)
+            if (not layer or not layer.isValid() or isinstance(layer, QgsVectorLayer)
+                    or layer.providerType() == 'gdal' or 'authcfg=' in layer.source()):
+                continue
+            uri = QgsDataSourceUri()
+            uri.setEncodedUri(layer.source())
+            host = QUrl(uri.param('url')).host() or layer.providerType()
+            hosts[host] = hosts.get(host, 0) + 1
+        count = recommend(**resources, per_server=self.server_limit.currentData(), hosts=hosts)
+        self.workers.setCurrentIndex(count - 1)
+        memory = f"{resources['memory'] / 1024**3:.1f} GiB" if resources['memory'] is not None else tr('brak odczytu')
+        network = tr('aktywne połączenie') if resources['online'] else tr('brak potwierdzonego połączenia')
+        self.resource_hint.setText(tr('CPU: {0} • wolny RAM: {1} • sieć: {2}. Rekomendacja: {3}. Przepustowość internetu i serwerów: niezmierzona.').format(resources['cpu'], memory, network, count))
 
     def _populate_tree(self, node, parent):
         for child in node.children():
@@ -208,11 +243,10 @@ class ArchiveDialog(QDialog):
                 layer = child.layer()
                 item.setData(0, Qt.UserRole, child.layerId())
                 self._items[child.layerId()] = item
-                item.setText(1, 'Dane wektorowe' if isinstance(layer, QgsVectorLayer)
-                             else 'Mapa lub raster')
-                item.setText(2, 'Gotowa do wyboru')
-                item.setToolTip(1, 'Wektor zachowuje obiekty i atrybuty. Obraz mapy zachowuje wygląd. '
-                                  'Jeśli nie uda się zapisać danych, raport wskaże próbę zastąpienia ich obrazem.')
+                item.setText(1, tr('Dane wektorowe') if isinstance(layer, QgsVectorLayer)
+                             else tr('Mapa lub raster'))
+                item.setText(2, tr('Gotowa do wyboru'))
+                item.setToolTip(1, tr('Wektor zachowuje obiekty i atrybuty. Obraz mapy zachowuje wygląd. Jeśli nie uda się zapisać danych, raport wskaże próbę zastąpienia ich obrazem.'))
             item.setCheckState(0, Qt.Checked)
 
     def _select_all(self, checked):
@@ -227,12 +261,12 @@ class ArchiveDialog(QDialog):
     def _area(self, use_geometry=True):
         if self.area_combo.currentIndex() == 0:
             if self.iface is None:
-                raise ValueError('Podgląd skali wymaga widoku mapy.')
+                raise ValueError(tr('Podgląd skali wymaga widoku mapy.'))
             canvas = self.iface.mapCanvas()
             return QgsGeometry.fromRect(canvas.extent()), canvas.mapSettings().destinationCrs()
         layer = self.project.mapLayer(self.polygon_combo.currentData())
         if layer is None or not layer.isValid():
-            raise ValueError('Wybierz dostępną warstwę poligonową.')
+            raise ValueError(tr('Wybierz dostępną warstwę poligonową.'))
         if use_geometry:
             area = polygon_area(layer)
         else:
@@ -255,7 +289,7 @@ class ArchiveDialog(QDialog):
             levels = zoom_levels(self.project, area, crs, 0, 24)
             unit = QgsUnitTypes.toAbbreviatedString(self.project.crs().mapUnits())
             for level in levels:
-                label = f'Zoom {level["zoom"]} ≈ 1:{level["scale"]:,.0f} ({level["resolution"]:.3g} {unit}/piksel)'
+                label = tr('Zoom {0} ≈ 1:{1:,.0f} ({2:.3g} {3}/piksel)').format(level["zoom"], level["scale"], level["resolution"], unit)
                 for combo in (self.zoom_min, self.zoom_max):
                     combo.setItemText(level['zoom'], label)
             if crs != self.project.crs():
@@ -264,12 +298,27 @@ class ArchiveDialog(QDialog):
             count = sum(math.ceil(box.width() / (TILE_SIZE * level['resolution']))
                         * math.ceil(box.height() / (TILE_SIZE * level['resolution']))
                         for level in levels[self.zoom_min.currentData():self.zoom_max.currentData() + 1])
-            self.zoom_hint.setText(f'Szacunkowo do {count:,} kafelków na mapę.')
+            # Planning scenarios, not measured throughput or an export ETA.
+            # Each process renders one map; do not divide its time by workers.
+            seconds = (count * 0.2, count * 2.0)
+            if seconds[1] < 120:
+                duration = tr('{0}–{1} s').format(math.ceil(seconds[0]), math.ceil(seconds[1]))
+            elif seconds[1] < 7200:
+                duration = tr('{0}–{1} min').format(math.ceil(seconds[0] / 60), math.ceil(seconds[1] / 60))
+            else:
+                duration = tr('{0:.1f}–{1:.1f} godz.').format(seconds[0] / 3600, seconds[1] / 3600)
+            mib = (count * 10 / 1024, count * 250 / 1024)
+            size = (tr('{0:.1f}–{1:.1f} MiB').format(*mib) if mib[1] < 1024
+                    else tr('{0:.1f}–{1:.1f} GiB').format(mib[0] / 1024, mib[1] / 1024))
+            self.zoom_hint.setText(
+                tr('Szacunkowo do {0:,} kafelków na mapę.').format(count) + '\n'
+                + tr('Model na jedną mapę: czas ≈ {0}; rozmiar PNG na dysku ≈ {1}.').format(duration, size)
+            )
         except Exception:
-            self.zoom_hint.setText('Wybierz poprawny obszar, aby zobaczyć skalę dla każdego zoomu.')
+            self.zoom_hint.setText(tr('Wybierz poprawny obszar, aby zobaczyć skalę dla każdego zoomu.'))
 
     def _browse(self):
-        folder = QFileDialog.getExistingDirectory(self, 'Folder na archiwum projektu')
+        folder = QFileDialog.getExistingDirectory(self, tr('Folder na archiwum projektu'))
         if folder:
             self.output_edit.setText(folder)
 
@@ -289,11 +338,11 @@ class ArchiveDialog(QDialog):
             return
         folder = self.output_edit.text().strip()
         if not folder or not Path(folder).is_dir():
-            QMessageBox.warning(self, 'Folder archiwum', 'Wybierz istniejący folder zapisu.')
+            QMessageBox.warning(self, tr('Folder archiwum'), tr('Wybierz istniejący folder zapisu.'))
             return
         selected_ids = self._selected_ids()
         if not selected_ids:
-            QMessageBox.warning(self, 'Warstwy', 'Zaznacz przynajmniej jedną warstwę.')
+            QMessageBox.warning(self, tr('Warstwy'), tr('Zaznacz przynajmniej jedną warstwę.'))
             return
         self._running = True
         self._cancelled = False
@@ -305,26 +354,32 @@ class ArchiveDialog(QDialog):
         self._finished_ids.clear()
         self._worker_messages.clear()
         self.log.clear()
+        self._server_warnings.clear()
+        self.server_warning.clear()
+        self.server_warning.hide()
+        self.results.hide()
+        self.retry_button.hide()
+        self.log.show()
         self.workers_status.clear()
         for layer_id, item in self._items.items():
-            item.setText(2, 'W kolejce' if layer_id in selected_ids else 'Pominięto')
-            item.setToolTip(2, 'Czeka na rozpoczęcie eksportu.' if layer_id in selected_ids else 'Warstwa nie jest zaznaczona do eksportu.')
+            item.setText(2, tr('W kolejce') if layer_id in selected_ids else tr('Pominięto'))
+            item.setToolTip(2, tr('Czeka na rozpoczęcie eksportu.') if layer_id in selected_ids else tr('Warstwa nie jest zaznaczona do eksportu.'))
         self.options.setEnabled(False)
         self.start_button.setEnabled(False)
         self.report_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.progress.setRange(0, len(selected_ids) + 1)
         self.progress.setValue(0)
-        self.progress.setFormat(f'Zakończone warstwy: 0/{len(selected_ids)}')
+        self.progress.setFormat(tr('Zakończone warstwy: 0/{0}').format(len(selected_ids)))
         self.timer.start()
         try:
-            self._update_progress('Wyznaczanie obszaru archiwizacji…')
+            self._update_progress(tr('Wyznaczanie obszaru archiwizacji…'))
             area, crs = self._area()
             self._result = create_archive(
                 self.project, selected_ids, area, crs, folder,
                 cancelled=lambda: self._cancelled, progress=self._update_progress,
                 zoom_min=self.zoom_min.currentData(), zoom_max=self.zoom_max.currentData(),
-                workers=self.workers.currentData(),
+                workers=self.workers.currentData(), per_server_limit=self.server_limit.currentData(),
                 layer_status=self._layer_status, worker_activity=self._worker_activity,
             )
             self._finished_at = time.monotonic()
@@ -333,29 +388,27 @@ class ArchiveDialog(QDialog):
             saved = sum(record['status'] == 'saved' for record in manifest['layers'])
             missing = sum(record['status'] in ('failed', 'cancelled') for record in manifest['layers'])
             review = sum(record['status'] in ('empty', 'partial') for record in manifest['layers'])
-            self.status.setText(f'Archiwum częściowe: zapisano {saved} warstw; do sprawdzenia: {review}; '
-                                f'niezapisanych: {missing}.\n{self._result}')
+            self.status.setText(tr('Archiwum częściowe: zapisano {0} warstw; do sprawdzenia: {1}; niezapisanych: {2}.\n{3}').format(saved, review, missing, self._result))
             self._append_log(self.status.text())
             self.progress.setValue(self.progress.maximum())
-            self.progress.setFormat('Przerwano — sprawdź raport' if manifest['cancelled'] else 'Zakończono — sprawdź raport')
+            self.progress.setFormat(tr('Przerwano — sprawdź raport') if manifest['cancelled'] else tr('Zakończono — sprawdź raport'))
             self.report_button.setEnabled(True)
-            QMessageBox.information(self, 'Archiwum częściowe',
-                                    self.status.text() + '\nSzczegóły i przyczyny braków znajdziesz w raporcie.')
+            self._show_results(manifest)
         except (ValueError, OSError, RuntimeError) as error:
             self._finished_at = time.monotonic()
             self.timer.stop()
-            self.status.setText('Nie utworzono archiwum. Oryginalny projekt nie został zastąpiony.')
+            self.status.setText(tr('Nie utworzono archiwum. Oryginalny projekt nie został zastąpiony.'))
             self._append_log(self.status.text())
-            self._append_log(f'Błąd: {error}')
-            self.progress.setFormat('Błąd — nie utworzono archiwum')
-            QMessageBox.warning(self, 'Archiwizacja', str(error))
+            self._append_log(tr('Błąd: {0}').format(error))
+            self.progress.setFormat(tr('Błąd — nie utworzono archiwum'))
+            QMessageBox.warning(self, tr('Archiwizacja'), str(error))
         except Exception:
             self._finished_at = time.monotonic()
             self.timer.stop()
-            self.status.setText('Nie utworzono archiwum z powodu nieoczekiwanego błędu.')
+            self.status.setText(tr('Nie utworzono archiwum z powodu nieoczekiwanego błędu.'))
             self._append_log(self.status.text())
-            self.progress.setFormat('Błąd — nie utworzono archiwum')
-            QMessageBox.warning(self, 'Archiwizacja', self.status.text())
+            self.progress.setFormat(tr('Błąd — nie utworzono archiwum'))
+            QMessageBox.warning(self, tr('Archiwizacja'), self.status.text())
         finally:
             self._running = False
             self.timer.stop()
@@ -364,11 +417,38 @@ class ArchiveDialog(QDialog):
             self.start_button.setEnabled(True)
             self.cancel_button.setEnabled(False)
 
+    def _show_results(self, manifest):
+        retry = {record['id'] for record in manifest['layers']
+                 if record['status'] in ('failed', 'cancelled', 'empty', 'partial')}
+        lines = [self.status.text(), '']
+        for record in manifest['layers']:
+            if record['id'] in retry:
+                lines.append(f"{record['name']} — {record.get('reason') or record['status']}")
+        if not retry:
+            lines.append(tr('Nie ma warstw wymagających ponownej próby. Sprawdź pozostałe uwagi w raporcie.'))
+        else:
+            lines.append(tr('\nZaznaczono tylko warstwy do ponowienia. Ponowna próba utworzy osobny folder; zachowaj oba archiwa.'))
+        lines.append(tr('Pełne wyniki i diagnostyka: raport.html oraz manifest.json w folderze archiwum.'))
+        for layer_id, item in self._items.items():
+            item.setCheckState(0, Qt.Checked if layer_id in retry else Qt.Unchecked)
+        self.results.setPlainText('\n'.join(lines))
+        self.log.hide()
+        self.results.show()
+        self.retry_button.setVisible(bool(retry))
+
+    def _show_server_warning(self, message):
+        if message.startswith(('[HTTP 429]', '[HTTP 503]')) and message not in self._server_warnings:
+            self._server_warnings.add(message)
+            self.server_warning.setText(message)
+            self.server_warning.show()
+            self._append_log(message)
+
     def _update_progress(self, message):
+        self._show_server_warning(message)
         if message != self._last_message:
             self._last_message = message
             self._append_log(message)
-        self.status.setText(('Przerywanie — ' if self._cancelled else '') + message)
+        self.status.setText((tr('Przerywanie — ') if self._cancelled else '') + message)
         QCoreApplication.processEvents()
 
     def _append_log(self, message):
@@ -381,30 +461,35 @@ class ArchiveDialog(QDialog):
             return
         seconds = int((self._finished_at or time.monotonic()) - self._started_at)
         quiet = int(time.monotonic() - self._last_change)
-        text = f'Czas: {seconds // 60:02d}:{seconds % 60:02d}'
+        text = tr('Czas: {0:02d}:{1:02d}').format(seconds // 60, seconds % 60)
         if self._running and self._finished_at is None and quiet >= 10:
-            text += f' — ostatni komunikat {quiet} s temu; trwa powyższa czynność.'
+            text += tr(' — ostatni komunikat {0} s temu; trwa powyższa czynność.').format(quiet)
         self.elapsed.setText(text)
 
     def _layer_status(self, record, completed, total):
+        for warning in record.get('raster', {}).get('server_warnings', []):
+            self._show_server_warning(warning)
         item = self._items.get(record['id'])
-        labels = {'pending': 'Przetwarzanie', 'saved': 'Zapisano', 'empty': 'Pusty obraz — sprawdź',
-                  'partial': 'Brak części obrazu', 'failed': 'Błąd', 'cancelled': 'Przerwano'}
+        labels = {'pending': tr('Przetwarzanie'), 'saved': tr('Zapisano'), 'empty': tr('Pusty obraz — sprawdź'),
+                  'partial': tr('Brak części obrazu'), 'failed': tr('Błąd'), 'cancelled': tr('Przerwano')}
         if item is not None:
             item.setText(2, labels.get(record['status'], record['status']))
-            item.setToolTip(2, f'<p>{escape(record.get("reason") or "Przygotowanie warstwy do archiwizacji.")}</p>')
+            reason = record.get('reason') or tr('Przygotowanie warstwy do archiwizacji.')
+            item.setToolTip(2, f'<p>{escape(reason)}</p>')
         if record['status'] != 'pending':
             self._finished_ids.add(record['id'])
         self.progress.setValue(completed)
-        self.progress.setFormat(f'Zakończone warstwy: {completed}/{total}' + (' — kontrola plików' if completed == total else ''))
+        self.progress.setFormat(tr('Zakończone warstwy: {0}/{1}').format(completed, total) + (tr(' — kontrola plików') if completed == total else ''))
 
     def _worker_activity(self, rows):
         active = sum(row['phase'] == 'active' for row in rows)
         queued = sum(row['phase'] == 'queued' for row in rows)
         ready = sum(row['phase'] == 'ready' for row in rows)
         self.workers_status.setVisible(bool(rows))
-        self.workers_status.setText(f'Mapy: pracuje {active} • w kolejce {queued} • czeka na scalenie {ready}' if rows else '')
+        self.workers_status.setText(tr('Mapy: pracuje {0} • w kolejce {1} • czeka na scalenie {2}').format(active, queued, ready) if rows else '')
         for row in rows:
+            for warning in row.get('server_warnings', []):
+                self._show_server_warning(warning)
             if row['id'] in self._finished_ids:
                 continue
             item = self._items.get(row['id'])
@@ -421,7 +506,7 @@ class ArchiveDialog(QDialog):
     def cancel(self):
         self._cancelled = True
         self.cancel_button.setEnabled(False)
-        self.status.setText('Przerywanie… Ukończone warstwy zostaną zachowane w archiwum częściowym.')
+        self.status.setText(tr('Przerywanie… Ukończone warstwy zostaną zachowane w archiwum częściowym.'))
         self._append_log(self.status.text())
 
     def reject(self):

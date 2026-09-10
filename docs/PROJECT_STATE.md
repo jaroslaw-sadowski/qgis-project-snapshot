@@ -1,6 +1,6 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 9 września 2026. Wersja wtyczki: **0.6.0**.
+Aktualizacja: 10 września 2026. Wersja wtyczki: **0.7.2**.
 Stan funkcjonalny: gotowa paczka do testów na komputerze służbowym;
 pełny odbiór wszystkich źródeł firmowych nie został wykonany.
 
@@ -23,16 +23,25 @@ Oryginalny eksporter MBTiles pozostaje dostępny jako osobna funkcja.
 6. Uporządkowanie dokumentacji, reguł agentów i niniejszego przekazania stanu.
 7. Wersja 0.6.0: szczegółowy postęp, stany warstw i procesów, dziennik, podpowiedzi
    oraz nazwa qgis-project-snapshot w menedżerze, menu i oknach.
+8. Wersja 0.7.0: PL/EN według języka QGIS, przewijany wynik i zaznaczanie warstw
+   do ponowienia, diagnostyka w HTML, dobór CPU/RAM/sieci, do 32 procesów
+   i konfigurowalny limit na serwer; kolejka nie blokuje innych hostów.
+9. Wersja 0.7.1: obok kafelków przedział czasu i rozmiaru PNG na jedną mapę,
+   aktualizowany po zmianie obszaru/zoomów, PL i EN.
+10. Wersja 0.7.2: trwałe czerwone ostrzeżenia HTTP 429/503 z procesów map,
+    zapis diagnostyki i możliwość ograniczenia do 1 zadania na serwer.
 
 Wynik eksportu nadal ma status archiwum częściowego/do odbioru. To celowe,
 ze względu na nierozstrzygnięte zależności i brak pełnego odbioru firmowego.
 
 ## Sprawdzona paczka i wyniki
 
-- `dist/qgis-project-snapshot-0.6.0.zip`, 51,886 bajtów, 15 plików.
-- SHA-256: `e77aa32f3605df001024f307ee346036bd19d46ef73ecd4a3fd756683a8198d6`.
+- `dist/qgis-project-snapshot-0.7.2.zip`, 93,789 bajtów, 19 plików.
+- SHA-256: `3afbda686256ba325205da1ad696146dda2015d432b151675f874f21f6fb448b`.
 - Build: `python3 scripts/build_plugin.py`. `dist/` nie jest wersjonowany.
-- 33 testy integracyjne przeszły także z kodu ZIP-a, bez pominięć WMS.
+- 43 testy integracyjne przeszły z kodu ZIP-a, bez pominięć WMS (32,00 s).
+  Sprawdzono warianty en_US/en_GB/en_AU i pl_PL, angielski raport oraz procesy,
+  ponowienie po anulowaniu, limity CPU/RAM i brak blokowania wolnych serwerów.
 - QGIS 3.40.15, PyQt5, GDAL 3.12.2, Python 3.14.4, Ubuntu; inne systemy nieodebrane.
 - ZIP wykryto i załadowano natywnymi mechanizmami QGIS, otwarto oba okna
   z minimalnym interfejsem testowym. Nie był to ręczny odbiór pełnego pulpitu.
@@ -83,3 +92,51 @@ Pliki prób w `/tmp/qgis-step4` są przejściowe i nie są wymagane do pracy nad
 Identyfikator instalacji pozostaje `mbtiles_batch_exporter` dla zgodności aktualizacji.
 Przy komunikatach użytkownika o braku postępu sprawdź dziennik i stany z procesów;
 nie zastępuj rzeczywistych informacji sztucznym procentem lub prognozą czasu.
+
+## Ustalenia wersji 0.7.0 dla następnego agenta
+
+- Tłumaczenia: `i18n.py`, natywny katalog Qt `en.ts` + `en.qm`. Po zmianach
+  uruchom `lrelease` i sprawdź zgodność szablonów. Katalog trafia do ZIP-a.
+- Ponowienie: zaznaczane są failed/cancelled/empty/partial, saved i excluded
+  są odznaczane. Przycisk uruchamia zaznaczone warstwy w nowym archiwum;
+  brak łączenia lub naprawy poprzedniego folderu. Jest to opisane w interfejsie.
+- Rekomendacja zasobów jest heurystyką. RAM dostępny: Linux/Windows; inne systemy
+  zachowawczo. Stan sieci nie oznacza testu internetu ani VPN. **Przepustowość
+  nie jest mierzona**; nie opisuj tego jako automatycznego speedtestu lub gwarancji
+  optymalnej szybkości. Dla jednego serwera domyślnie maksymalnie 2 procesy,
+  chyba że użytkownik zwiększy limit i ponowi dobór.
+- Nie wykonywano nowego benchmarku 32 procesów ani odbioru w Windows/sieci firmowej.
+  Poprzednie wyniki benchmarku nie są pomiarem nowej wersji.
+- Test ZIP-a wykrywa i otwiera oba okna; ekran EN sprawdzono dodatkowo na zrzucie
+  z Qt offscreen. Nie zastępuje to ręcznej próby na komputerze użytkownika.
+
+## Szacunek 0.7.1
+
+Użytkownik poprosił o czas i rozmiar obok liczby kafelków. Dodano model planowania
+na jedną mapę, cały zakres zoomów i prostokąt obszaru: 0,2–2 s oraz 10–250 KiB
+PNG na kafelek. To jawne założenia, nie pomiar lub gwarantowane granice; pełne
+ograniczenia w podpowiedzi. Nie dziel czasu jednej mapy przez liczbę procesów.
+Nie obejmuje wektorów, rastrów źródłowych, zasobów, scalania, kontroli i miejsca
+tymczasowego. Zakres może zawyżać ilość dla pasa i pustych kafelków.
+
+Test ZIP-a 0.7.1: 41/41, bez pominięć WMS; istniejący test UI sprawdza też zmianę
+szacunku przy zmianie zoomu. Katalog Qt 317 tłumaczeń. Sprawdzono wysokość etykiety
+w Qt offscreen (50 px, pełny tekst). Nie wykonano pomiaru kalibrującego model.
+
+## Ostrzeżenia serwera 0.7.2
+
+- HTTP 429: czerwone ostrzeżenie i zakończenie bieżącej mapy bez ponowień kafelka.
+  HTTP 503: ostrzeżenie o niedostępności/możliwym przeciążeniu, bez przypisywania
+  przyczyny wyłącznie liczbie zapytań. Pozostałe zadania czekają na ręczne Przerwij.
+- Osobny istniejący parametr Zadania na serwer ma wartości 1/2/4/6/8 (domyślnie 2).
+  Nie jest dokładnym limiterem HTTP na sekundę.
+- Ostrzeżenia mają trwały prefiks [HTTP 429]/[HTTP 503], tłumaczoną treść i host,
+  bez URL/poświadczeń. Są zachowywane w progress.json niezależnie od ostatniego
+  postępu oraz w raster.server_warnings manifestu/HTML. Baner pozostaje do nowego eksportu.
+- Testy wykryły zagłuszanie normalnego postępu przez częste 503; poprawiono zapis
+  ostrzeżeń tak, aby nie resetował zegara ograniczającego zwykłe aktualizacje.
+- Odbiór finalnego ZIP-a: 43/43, 32,00 s, bez pominięć. WMS rzeczywisty lokalny:
+  HTTP 429, brak powtarzania kafelka, raport; HTTP 503 z poprawnym odzyskaniem obrazu,
+  postęp oraz ostrzeżenia w procesach PL/EN. UI: trwałość czerwonego ostrzeżenia
+  po zwykłym postępie i ukończeniu procesu. Nie testowano serwerów firmowych.
+- Katalog Qt: 319 tłumaczeń. ZIP CRC, zgodność źródeł, składnia i diff: OK.

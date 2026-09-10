@@ -1,9 +1,10 @@
 """Check the built ZIP in an isolated QGIS profile and run integration tests from it.
 
-Run with isolation: python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.6.0.zip
+Run with isolation: python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-0.7.2.zip
 """
 import argparse
 import importlib
+import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -12,6 +13,7 @@ from zipfile import ZipFile
 
 
 def check(filename):
+    os.environ["QGIS_SNAPSHOT_LANGUAGE"] = "pl"
     from qgis.core import QgsApplication, QgsCoordinateReferenceSystem, QgsProject, QgsRectangle
     from qgis.gui import QgsMapCanvas
     from qgis.PyQt.QtCore import QTimer

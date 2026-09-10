@@ -6,15 +6,19 @@ Dotychczasowy eksporter MBTiles pozostaje dostępny.
 
 ## Paczka do testów służbowych
 
-**Wersja 0.6.0** — [ZIP instalacyjny](dist/qgis-project-snapshot-0.6.0.zip)
-i [SHA-256](dist/qgis-project-snapshot-0.6.0.zip.sha256).
+**Wersja 0.7.2** — [ZIP instalacyjny](dist/qgis-project-snapshot-0.7.2.zip)
+i [SHA-256](dist/qgis-project-snapshot-0.7.2.zip.sha256).
 W QGIS użyj menedżera wtyczek i zakładki **Zainstaluj z ZIP**.
 [Instrukcja dla zespołu](docs/team-guide.md) jest też dołączona do paczki.
 
 Wymagane: QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7.
-Sprawdzono 33 testy z gotowej paczki na Ubuntu/QGIS 3.40.15 oraz próbki
+Sprawdzono 43 testy z gotowej paczki na Ubuntu/QGIS 3.40.15 oraz próbki
 publicznych map i WFS offline. MSSQL, pliki firmowe i cały projekt wymagają
 odbioru na komputerze służbowym w sieci firmowej. Windows nie był testowany.
+
+Interfejs wybiera polski lub angielski według języka QGIS. Po eksporcie pokazuje
+przewijaną listę problemów i zaznacza warstwy do ponowienia. Dobór równoległości
+uwzględnia CPU, dostępny RAM, stan połączenia i liczbę serwerów.
 
 Postęp pokazują licznik warstw, kolumna **Stan**, czas i dziennik. Objaśnienia opcji
 są dostępne po najechaniu kursorem. Menu: **Wtyczki → qgis-project-snapshot**.

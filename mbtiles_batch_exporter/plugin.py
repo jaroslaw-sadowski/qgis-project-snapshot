@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from PyQt5.QtCore import QCoreApplication
+from .i18n import tr
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QAction
 
@@ -15,25 +15,25 @@ class MBTilesBatchExporterPlugin:
         self.archive_dlg = None
 
     def tr(self, message):
-        return QCoreApplication.translate("qgis-project-snapshot", message)
+        return tr(message)
 
     def initGui(self):
         self.action = QAction(
             QIcon(),
-            self.tr("Eksportuj MBTiles…"),
+            self.tr(tr('Eksportuj MBTiles…')),
             self.iface.mainWindow(),
         )
         self.action.triggered.connect(self.run)
         self.archive_action = QAction(
-            self.tr("Archiwizuj projekt…"), self.iface.mainWindow(),
+            self.tr(tr('Archiwizuj projekt…')), self.iface.mainWindow(),
         )
         self.archive_action.triggered.connect(self.run_archive)
         self.iface.addPluginToMenu(self.tr("qgis-project-snapshot"), self.archive_action)
         self.iface.addToolBarIcon(self.archive_action)
-        self.archive_action.setToolTip("qgis-project-snapshot: zapisz kopię projektu, dane i mapy do pracy bez sieci.")
+        self.archive_action.setToolTip(tr('qgis-project-snapshot: zapisz kopię projektu, dane i mapy do pracy bez sieci.'))
         self.iface.addPluginToMenu(self.tr("qgis-project-snapshot"), self.action)
         self.iface.addToolBarIcon(self.action)
-        self.action.setToolTip("qgis-project-snapshot: dotychczasowy eksport map do oddzielnych plików MBTiles.")
+        self.action.setToolTip(tr('qgis-project-snapshot: dotychczasowy eksport map do oddzielnych plików MBTiles.'))
 
     def unload(self):
         if self.archive_dlg:

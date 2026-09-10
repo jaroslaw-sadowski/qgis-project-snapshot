@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .i18n import tr
 import re
 from datetime import date
 
@@ -17,8 +18,7 @@ def get_algorithm_id() -> str:
         if QgsApplication.processingRegistry().algorithmById(candidate):
             return candidate
     raise RuntimeError(
-        "Nie znaleziono algorytmu 'Generate XYZ tiles (MBTiles)' w Processing. "
-        "Sprawdź czy w QGIS dostępny jest algorytm tilesxyzmbtiles."
+        tr("Nie znaleziono algorytmu 'Generate XYZ tiles (MBTiles)' w Processing. Sprawdź czy w QGIS dostępny jest algorytm tilesxyzmbtiles.")
     )
 
 def sanitize_layer_name(name: str) -> str:
@@ -40,7 +40,7 @@ def iter_target_layer_nodes():
         if layer.type() in (QgsMapLayer.VectorLayer, QgsMapLayer.RasterLayer):
             target_nodes.append(node)
     if not target_nodes:
-        raise RuntimeError("Nie znaleziono żadnych warstw wektorowych ani rastrowych do przetworzenia.")
+        raise RuntimeError(tr('Nie znaleziono żadnych warstw wektorowych ani rastrowych do przetworzenia.'))
     return all_layer_nodes, target_nodes
 
 def extent_to_processing_string(extent: QgsRectangle, crs_authid: str) -> str:

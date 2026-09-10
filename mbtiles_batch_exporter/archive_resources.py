@@ -1,4 +1,5 @@
 """Copy known project resources and report dependencies requiring review."""
+from .i18n import tr
 from hashlib import sha256
 import os
 from pathlib import Path
@@ -28,10 +29,10 @@ class ProjectResources:
         if not value or value.startswith(('base64:', 'data:', ':/')):
             return value
         if self.cancelled():
-            self.issue(owner, 'Przerwano kopiowanie zasobów.')
+            self.issue(owner, tr('Przerwano kopiowanie zasobów.'))
             return value
         if re.match(r'^https?://', value, re.I):
-            self.issue(owner, 'Zasób internetowy wymaga ręcznego zapisania i sprawdzenia.')
+            self.issue(owner, tr('Zasób internetowy wymaga ręcznego zapisania i sprawdzenia.'))
             return value
         if value.startswith('attachment:'):
             resolved = self.project.resolveAttachmentIdentifier(value)
@@ -45,12 +46,12 @@ class ProjectResources:
                 path = next((Path(root) / value for root in QgsApplication.svgPaths()
                              if (Path(root) / value).is_file()), path)
         if path is None or not path.is_file():
-            self.issue(owner, 'Nie znaleziono lokalnego pliku zasobu.')
+            self.issue(owner, tr('Nie znaleziono lokalnego pliku zasobu.'))
             return value
         path = path.resolve()
         if path in self.files:
             return self.files[path]
-        self.progress(f'Kopiowanie zasobów: {owner}')
+        self.progress(tr('Kopiowanie zasobów: {0}').format(owner))
         digest = sha256(str(path).encode()).hexdigest()[:20]
         target = self.folder / 'zasoby' / digest / path.name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -59,11 +60,11 @@ class ProjectResources:
                 updated = time.monotonic()
                 for chunk in iter(lambda: source.read(1024 * 1024), b''):
                     if self.cancelled():
-                        self.issue(owner, 'Przerwano kopiowanie zasobów.')
+                        self.issue(owner, tr('Przerwano kopiowanie zasobów.'))
                         break
                     output.write(chunk)
                     if time.monotonic() - updated > 0.1:
-                        self.progress(f'Kopiowanie zasobów: {owner}')
+                        self.progress(tr('Kopiowanie zasobów: {0}').format(owner))
                         updated = time.monotonic()
                 else:
                     shutil.copystat(path, target)
@@ -72,7 +73,7 @@ class ProjectResources:
                 return value
         except OSError:
             target.unlink(missing_ok=True)
-            self.issue(owner, 'Nie udało się skopiować pliku zasobu.')
+            self.issue(owner, tr('Nie udało się skopiować pliku zasobu.'))
             return value
         relative = './' + target.relative_to(self.folder).as_posix()
         self.files[path] = relative
@@ -90,10 +91,10 @@ class ProjectResources:
                         if copied.startswith('./zasoby/'):
                             node.text = os.path.relpath(self.folder / copied[2:], target.parent)
                     if node.tag in ('customwidgets', 'resources') and len(node):
-                        self.issue(owner, 'Formularz używa dodatkowych komponentów Qt; wymaga sprawdzenia.')
+                        self.issue(owner, tr('Formularz używa dodatkowych komponentów Qt; wymaga sprawdzenia.'))
                 tree.write(target, encoding='utf-8', xml_declaration=True)
             except (ET.ParseError, OSError):
-                self.issue(owner, 'Nie udało się sprawdzić odwołań wewnątrz SVG lub formularza.')
+                self.issue(owner, tr('Nie udało się sprawdzić odwołań wewnątrz SVG lub formularza.'))
         return relative
 
     def attachments(self, element, record):
@@ -111,20 +112,20 @@ class ProjectResources:
             layer = QgsVectorLayer(str(self.folder / record['local_source'][2:]), record['name'], 'ogr')
             index = layer.fields().indexFromName(field.get('name'))
             if not layer.isValid() or index < 0 or not layer.startEditing():
-                self.issue(record['name'], 'Nie udało się przepisać odwołań do załączników.')
+                self.issue(record['name'], tr('Nie udało się przepisać odwołań do załączników.'))
                 continue
             try:
                 for feature in layer.getFeatures():
                     if self.cancelled():
-                        self.issue(record['name'], 'Przerwano kopiowanie załączników.')
+                        self.issue(record['name'], tr('Przerwano kopiowanie załączników.'))
                         break
                     value = feature[index]
                     if isinstance(value, str) and value:
                         copied = self.copy(value, record['name'], base)
                         if copied != value and not layer.changeAttributeValue(feature.id(), index, copied):
-                            raise RuntimeError('Nie udało się zapisać ścieżki załącznika.')
+                            raise RuntimeError(tr('Nie udało się zapisać ścieżki załącznika.'))
                 if not layer.commitChanges():
-                    raise RuntimeError('Nie udało się zapisać ścieżek załączników.')
+                    raise RuntimeError(tr('Nie udało się zapisać ścieżek załączników.'))
             finally:
                 if layer.isEditable():
                     layer.rollBack()
@@ -144,10 +145,10 @@ class ProjectResources:
             for relation in list(relations):
                 if relation.get('referencingLayer') in vectors and relation.get('referencedLayer') in vectors:
                     valid_relations.add(relation.get('id'))
-                    self.issue(relation.get('name') or 'Relacja', 'Relacja zachowana; obszar eksportu może pomijać powiązane obiekty poza obszarem.')
+                    self.issue(relation.get('name') or 'Relacja', tr('Relacja zachowana; obszar eksportu może pomijać powiązane obiekty poza obszarem.'))
                 else:
                     relations.remove(relation)
-                    self.issue('Relacje', 'Usunięto relację do warstwy niezapisanej jako dane wektorowe.')
+                    self.issue('Relacje', tr('Usunięto relację do warstwy niezapisanej jako dane wektorowe.'))
         for element in root.findall('./projectlayers/maplayer'):
             record = saved.get(element.findtext('id'))
             if not record:
@@ -162,7 +163,7 @@ class ProjectResources:
                     widget.set('type', 'TextEdit')
                     for child in list(widget):
                         widget.remove(child)
-                    self.issue(owner, 'Pole formularza wskazywało brakującą relację; pozostawiono odczyt wartości.')
+                    self.issue(owner, tr('Pole formularza wskazywało brakującą relację; pozostawiono odczyt wartości.'))
             for parent in element.iter():
                 for child in list(parent):
                     if child.tag == 'attributeEditorRelation' and child.get('relation') not in valid_relations:
@@ -173,9 +174,9 @@ class ProjectResources:
                         node.text = self.copy(node.text.strip(), owner)
             # QGIS stores example Python code even when no init function is enabled.
             if (element.findtext('editforminit') or '').strip():
-                self.issue(owner, 'Kod formularza wymaga ręcznej kontroli zależności.')
+                self.issue(owner, tr('Kod formularza wymaga ręcznej kontroli zależności.'))
             if element.findall('./attributeactions/actionsetting'):
-                self.issue(owner, 'Akcje warstwy mogą uruchamiać zewnętrzne zasoby; wymagają kontroli.')
+                self.issue(owner, tr('Akcje warstwy mogą uruchamiać zewnętrzne zasoby; wymagają kontroli.'))
             for symbol in element.findall('.//layer'):
                 kind = symbol.get('class', '').lower()
                 if any(word in kind for word in ('svg', 'raster')):
@@ -187,15 +188,15 @@ class ProjectResources:
                             prop.set('v', self.copy(prop.get('v', ''), owner))
         for node in root.iter():
             if node.tag == 'LayoutItem' and node.get('file'):
-                node.set('file', self.copy(node.get('file'), 'Układ wydruku'))
+                node.set('file', self.copy(node.get('file'), tr('Układ wydruku')))
             if node.tag == 'Option' and node.get('name') == 'expression' and node.get('value'):
-                self.issue('Wyrażenia', 'Projekt zawiera wyrażenia dynamiczne; ich zależności wymagają kontroli.')
+                self.issue(tr('Wyrażenia'), tr('Projekt zawiera wyrażenia dynamiczne; ich zależności wymagają kontroli.'))
             if node.tag == 'LayoutItem' and (node.get('html') or node.get('url')):
-                self.issue('Układ wydruku', 'Element HTML wymaga kontroli zewnętrznych zasobów.')
+                self.issue(tr('Układ wydruku'), tr('Element HTML wymaga kontroli zewnętrznych zasobów.'))
         if root.findall('.//Layout'):
-            self.issue('Układy wydruku', 'Układy i atlas wymagają odbioru wizualnego po ograniczeniu danych do obszaru.')
+            self.issue(tr('Układy wydruku'), tr('Układy i atlas wymagają odbioru wizualnego po ograniczeniu danych do obszaru.'))
         if root.findall('./polymorphicRelations/relation'):
-            self.issue('Relacje', 'Relacje polimorficzne wymagają ręcznej kontroli.')
+            self.issue('Relacje', tr('Relacje polimorficzne wymagają ręcznej kontroli.'))
         return {'copied_files': len(self.files), 'issues': self.issues}
 
 
@@ -206,13 +207,13 @@ def audit_local_layers(project_file, records):
     failures = []
     try:
         if not project.read(str(project_file)):
-            return ['Nie można otworzyć projektu archiwalnego.']
+            return [tr('Nie można otworzyć projektu archiwalnego.')]
         for record in records:
             if not record.get('local_source'):
                 continue
             layer = project.mapLayer(record['id'])
             if layer is None or not layer.isValid():
-                failures.append(f'Nie można otworzyć lokalnej warstwy: {record["name"]}')
+                failures.append(tr('Nie można otworzyć lokalnej warstwy: {0}').format(record["name"]))
         return failures
     finally:
         project.clear()

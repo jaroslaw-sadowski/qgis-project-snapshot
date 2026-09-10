@@ -19,7 +19,7 @@ def build(output):
     if not re.fullmatch(r'[0-9]+(?:\.[0-9]+){1,3}', version):
         raise ValueError('Nieprawidłowa wersja w metadata.txt.')
     sources = {path.name: path for path in package.glob('*.py')}
-    sources.update({name: package / name for name in ('metadata.txt', 'icon.png', 'README.txt')})
+    sources.update({name: package / name for name in ('metadata.txt', 'icon.png', 'README.txt', 'en.qm', 'en.ts')})
     sources.update({'LICENSE': ROOT / 'LICENSE', 'INSTRUKCJA.md': ROOT / 'docs' / 'team-guide.md'})
     for name, path in sources.items():
         if path.is_symlink() or not path.is_file():

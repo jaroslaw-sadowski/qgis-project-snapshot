@@ -2,7 +2,7 @@
 name=qgis-project-snapshot
 qgisMinimumVersion=3.40
 description=Zapisz projekt QGIS do pracy bez sieci: dane, mapy, zasoby i raport.
-version=0.6.0
+version=0.7.2
 author=ChatGPT
 email=
 about=Zapis projektu, danych i map offline. Postęp każdej warstwy, dziennik i podpowiedzi opcji. PNG z przezroczystością, równoległe pobieranie, lokalne zasoby i raport. Wynik wymaga sprawdzenia bez sieci. Wymagany GDAL 3.7 lub nowszy.

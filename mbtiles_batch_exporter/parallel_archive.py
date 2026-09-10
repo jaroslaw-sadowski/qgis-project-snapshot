@@ -1,5 +1,6 @@
 """Bounded process workers; threads supervise processes, never QGIS objects."""
-from concurrent.futures import ThreadPoolExecutor
+from .i18n import tr, language
+from concurrent.futures import Future, ThreadPoolExecutor
 from collections import deque
 from contextlib import closing
 from copy import deepcopy
@@ -11,7 +12,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
-from threading import Event, Semaphore
+from threading import Condition, Event
 import time
 from zipfile import ZipFile
 import xml.etree.ElementTree as ET
@@ -61,14 +62,19 @@ def merge_raster(source, destination, table, cancelled=lambda: False):
 
 class RasterWorkers:
     """Context manager owns process lifetime, private files and cancellation."""
-    def __init__(self, snapshot, staging, project, records, area, crs, levels, workers):
+    def __init__(self, snapshot, staging, project, records, area, crs, levels, workers, per_server_limit=2):
         self.folder = staging / '.workers'
         self.folder.mkdir(mode=0o700)
         self.stop = Event()
         self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix='archive-process')
         self.futures = {}
         self.parameters = (snapshot, project, records, area, crs, levels)
-        self.server_limits = {}
+        self.active_hosts = {}
+        self.queue = []
+        self.condition = Condition()
+        self.workers = workers
+        self.per_server_limit = per_server_limit
+        self.language = language()
         self.started = set()
         self.merged = set()
 
@@ -117,47 +123,74 @@ class RasterWorkers:
                     'layer_id': layer.id(), 'table': table, 'area': area.asWkt(),
                     'area_crs': crs.toWkt(Qgis.CrsWktVariant.Wkt2_2019), 'levels': levels,
                 }), encoding='utf-8')
-                limit = self.server_limits.setdefault(host, Semaphore(2))
-                self.futures[layer.id()] = (self.pool.submit(self._run, folder, limit), folder)
+                future = Future()
+                self.futures[layer.id()] = (future, folder)
+                self.queue.append((host, future, folder))
+            for _ in range(min(self.workers, len(self.queue))):
+                self.pool.submit(self._work_loop)
             return self
         except Exception:
             self.__exit__(None, None, None)
             raise
 
-    def _run(self, folder, limit):
-        while not limit.acquire(timeout=0.1):
-            if self.stop.is_set():
-                raise InterruptedError()
-        try:
-            if self.stop.is_set():
-                raise InterruptedError()
-            executable = sys.executable if Path(sys.executable).name.lower().startswith('python') else shutil.which('python3')
-            if not executable:
-                raise RuntimeError('Brak interpretera Python dla procesów QGIS.')
-            environment = os.environ.copy()
-            environment['QT_QPA_PLATFORM'] = 'offscreen'
-            environment['PYTHONDONTWRITEBYTECODE'] = '1'
-            environment['PYTHONPATH'] = os.pathsep.join([str(Path(__file__).resolve().parent.parent), *sys.path])
-            environment['GDAL_NUM_THREADS'] = '1'
-            self.started.add(folder.name)
-            with subprocess.Popen([executable, '-m', 'mbtiles_batch_exporter.archive_worker', str(folder)],
-                                  env=environment, stdin=subprocess.DEVNULL,
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
-                stopping = None
-                while process.poll() is None:
-                    if self.stop.is_set():
-                        (folder / 'cancel').touch()
-                        stopping = stopping or time.monotonic()
-                        if time.monotonic() - stopping > 5:
-                            process.kill()
-                    time.sleep(0.05)
+    def _work_loop(self):
+        # Claim only a runnable host. A busy server must not occupy a worker
+        # while layers on another server are still queued.
+        while True:
+            with self.condition:
                 if self.stop.is_set():
-                    raise InterruptedError()
-                if process.returncode or not (folder / 'result.json').exists():
-                    raise RuntimeError('Proces nie zapisał obrazu; użyto ponownej próby w QGIS.')
-            return json.loads((folder / 'result.json').read_text())
-        finally:
-            limit.release()
+                    for _, future, _ in self.queue:
+                        future.cancel()
+                    self.queue.clear()
+                if not self.queue:
+                    return
+                index = next((i for i, (host, _, _) in enumerate(self.queue)
+                              if self.active_hosts.get(host, 0) < self.per_server_limit), None)
+                if index is None:
+                    self.condition.wait(0.1)
+                    continue
+                host, future, folder = self.queue.pop(index)
+                self.active_hosts[host] = self.active_hosts.get(host, 0) + 1
+                future.set_running_or_notify_cancel()
+            try:
+                future.set_result(self._run(folder))
+            except Exception as error:
+                future.set_exception(error)
+            finally:
+                with self.condition:
+                    self.active_hosts[host] -= 1
+                    self.condition.notify_all()
+
+    def _run(self, folder):
+        if self.stop.is_set():
+            raise InterruptedError()
+        executable = sys.executable if Path(sys.executable).name.lower().startswith('python') else shutil.which('python3')
+        if not executable:
+            raise RuntimeError(tr('Brak interpretera Python dla procesów QGIS.'))
+        environment = os.environ.copy()
+        environment['QT_QPA_PLATFORM'] = 'offscreen'
+        environment['PYTHONDONTWRITEBYTECODE'] = '1'
+        environment['PYTHONPATH'] = os.pathsep.join([str(Path(__file__).resolve().parent.parent), *sys.path])
+        environment['GDAL_NUM_THREADS'] = '1'
+        environment['QGIS_SNAPSHOT_LANGUAGE'] = self.language
+        self.started.add(folder.name)
+        with subprocess.Popen([executable, '-m', 'mbtiles_batch_exporter.archive_worker', str(folder)],
+                              env=environment, stdin=subprocess.DEVNULL,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
+            stopping = None
+            while process.poll() is None:
+                if self.stop.is_set():
+                    (folder / 'cancel').touch()
+                    stopping = stopping or time.monotonic()
+                    if time.monotonic() - stopping > 5:
+                        process.kill()
+                time.sleep(0.05)
+            if self.stop.is_set():
+                raise InterruptedError()
+            if process.returncode or not (folder / 'result.json').exists():
+                raise RuntimeError(tr('Proces nie zapisał obrazu; użyto ponownej próby w QGIS.'))
+        return json.loads((folder / 'result.json').read_text())
+
 
     def take(self, layer_id, destination, cancelled, progress):
         future, folder = self.futures[layer_id]
@@ -166,7 +199,7 @@ class RasterWorkers:
             if cancelled():
                 self.stop.set()
                 raise InterruptedError()
-            progress('Równoległe pobieranie map — oczekiwanie na warstwę…')
+            progress(tr('Równoległe pobieranie map — oczekiwanie na warstwę…'))
             time.sleep(0.05)
         if cancelled():
             self.stop.set()
@@ -182,7 +215,7 @@ class RasterWorkers:
                     QCoreApplication.processEvents()
                     if cancelled():
                         self.stop.set()
-                    progress('Scalanie gotowej mapy do GeoPackage…')
+                    progress(tr('Scalanie gotowej mapy do GeoPackage…'))
                     time.sleep(0.05)
                 if self.stop.is_set():
                     raise InterruptedError()
@@ -195,23 +228,31 @@ class RasterWorkers:
         """Read disposable worker snapshots on the main thread only."""
         rows = []
         for layer_id, (future, folder) in self.futures.items():
-            phase, message = 'queued', 'W kolejce'
+            phase, message = 'queued', tr('W kolejce')
             if layer_id in self.merged:
-                phase, message = 'merged', 'Wynik przekazano do archiwizacji'
+                phase, message = 'merged', tr('Wynik przekazano do archiwizacji')
             elif future.done():
                 failed = future.cancelled() or future.exception() is not None or future.result().get('status') == 'failed'
-                phase, message = ('failed', 'Proces zakończony bez obrazu') if failed else ('ready', 'Zakończono pobieranie — czeka na scalenie')
+                phase, message = ('failed', tr('Proces zakończony bez obrazu')) if failed else ('ready', tr('Zakończono pobieranie — czeka na scalenie'))
             elif folder.name in self.started:
-                phase, message = 'active', 'Uruchamianie QGIS lub otwieranie źródła…'
+                phase, message = 'active', tr('Uruchamianie QGIS lub otwieranie źródła…')
                 try:
                     state = json.loads((folder / 'progress.json').read_text(encoding='utf-8'))
                     message = state['message']
                     age = int(time.time() - state['updated_at'])
                     if age >= 10:
-                        message += f' (ostatni komunikat {age} s temu)'
+                        message += tr(' (ostatni komunikat {0} s temu)').format(age)
                 except (OSError, ValueError, KeyError):
                     pass
-            rows.append({'id': layer_id, 'phase': phase, 'message': message})
+            # Warnings are latched separately from the latest progress message,
+            # including workers which have already finished between UI polls.
+            warnings = []
+            if layer_id not in self.merged:
+                try:
+                    warnings = json.loads((folder / 'progress.json').read_text(encoding='utf-8')).get('server_warnings', [])
+                except (OSError, ValueError):
+                    pass
+            rows.append({'id': layer_id, 'phase': phase, 'message': message, 'server_warnings': warnings})
         return rows
 
     def __exit__(self, *args):
