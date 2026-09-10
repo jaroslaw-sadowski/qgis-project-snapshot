@@ -1,36 +1,39 @@
 """Bounded process workers; threads supervise processes, never QGIS objects."""
-from .i18n import tr, language
-from .adaptive import HostPolicy, WorkerGate, PROTOCOL, write_state
-from .resources import available_memory
-from concurrent.futures import Future, ThreadPoolExecutor
-from collections import deque
-from contextlib import closing
-from copy import deepcopy
-from hashlib import sha256
+
 import json
 import math
 import os
-from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
 import sys
-from threading import Condition, Event, Thread
 import time
-from zipfile import ZipFile
 import xml.etree.ElementTree as ET
+from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import closing
+from copy import deepcopy
+from hashlib import sha256
+from pathlib import Path
+from threading import Condition, Event, Thread
+from zipfile import ZipFile
 
 from osgeo import gdal
 from qgis.core import Qgis, QgsDataSourceUri, QgsVectorLayer
 from qgis.PyQt.QtCore import QCoreApplication, QUrl
+
+from .adaptive import PROTOCOL, HostPolicy, WorkerGate, write_state
+from .i18n import language, tr
+from .resources import available_memory
+from .worker_network import network_snapshot
 
 
 def merge_raster(source, destination, table, cancelled=lambda: False):
     """Copy compressed PNG bytes unchanged; only the parent writes the final DB."""
     if not destination.exists():
         try:
-            with source.open('rb') as original, destination.open('wb') as target:
-                for chunk in iter(lambda: original.read(1024 * 1024), b''):
+            with source.open("rb") as original, destination.open("wb") as target:
+                for chunk in iter(lambda: original.read(1024 * 1024), b""):
                     if cancelled():
                         raise InterruptedError()
                     target.write(chunk)
@@ -39,10 +42,21 @@ def merge_raster(source, destination, table, cancelled=lambda: False):
             raise
         return
     with gdal.ExceptionMgr():
-        raster = gdal.OpenEx(str(source), gdal.OF_RASTER, open_options=['TABLE=' + table])
-        target = gdal.GetDriverByName('GPKG').Create(
-            str(destination), raster.RasterXSize, raster.RasterYSize, 4, gdal.GDT_Byte,
-            options=['RASTER_TABLE=' + table, 'APPEND_SUBDATASET=YES', 'TILE_FORMAT=PNG', 'ZLEVEL=9'],
+        raster = gdal.OpenEx(
+            str(source), gdal.OF_RASTER, open_options=["TABLE=" + table]
+        )
+        target = gdal.GetDriverByName("GPKG").Create(
+            str(destination),
+            raster.RasterXSize,
+            raster.RasterYSize,
+            4,
+            gdal.GDT_Byte,
+            options=[
+                "RASTER_TABLE=" + table,
+                "APPEND_SUBDATASET=YES",
+                "TILE_FORMAT=PNG",
+                "ZLEVEL=9",
+            ],
         )
         target.SetProjection(raster.GetProjection())
         target.SetGeoTransform(raster.GetGeoTransform())
@@ -51,25 +65,105 @@ def merge_raster(source, destination, table, cancelled=lambda: False):
     # Names originate exclusively from sha256(layer.id()), never from layer names.
     with closing(sqlite3.connect(destination)) as connection:
         connection.set_progress_handler(lambda: int(cancelled()), 10000)
-        connection.execute('ATTACH DATABASE ? AS incoming', (str(source),))
+        connection.execute("ATTACH DATABASE ? AS incoming", (str(source),))
         with connection:
-            connection.execute('DELETE FROM gpkg_tile_matrix WHERE table_name=?', (table,))
-            connection.execute('INSERT INTO gpkg_tile_matrix SELECT * FROM incoming.gpkg_tile_matrix WHERE table_name=?', (table,))
-            connection.execute(f'INSERT INTO "{table}" SELECT * FROM incoming."{table}"')
-            bounds = connection.execute('SELECT min_x,min_y,max_x,max_y FROM incoming.gpkg_contents WHERE table_name=?', (table,)).fetchone()
-            connection.execute('UPDATE gpkg_contents SET min_x=?,min_y=?,max_x=?,max_y=? WHERE table_name=?', (*bounds, table))
-            bounds = connection.execute('SELECT min_x,min_y,max_x,max_y FROM incoming.gpkg_tile_matrix_set WHERE table_name=?', (table,)).fetchone()
-            connection.execute('UPDATE gpkg_tile_matrix_set SET min_x=?,min_y=?,max_x=?,max_y=? WHERE table_name=?', (*bounds, table))
-        connection.execute('DETACH DATABASE incoming')
+            connection.execute(
+                "DELETE FROM gpkg_tile_matrix WHERE table_name=?", (table,)
+            )
+            connection.execute(
+                (
+                    "INSERT INTO gpkg_tile_matrix SELECT * FROM "
+                    "incoming.gpkg_tile_matrix WHERE table_name=?"
+                ),
+                (table,),
+            )
+            connection.execute(
+                f'INSERT INTO "{table}" SELECT * FROM incoming."{table}"'
+            )
+            bounds = connection.execute(
+                (
+                    "SELECT min_x,min_y,max_x,max_y FROM incoming.gpkg_contents "
+                    "WHERE table_name=?"
+                ),
+                (table,),
+            ).fetchone()
+            connection.execute(
+                (
+                    "UPDATE gpkg_contents SET min_x=?,min_y=?,max_x=?,max_y=? "
+                    "WHERE table_name=?"
+                ),
+                (*bounds, table),
+            )
+            bounds = connection.execute(
+                (
+                    "SELECT min_x,min_y,max_x,max_y FROM "
+                    "incoming.gpkg_tile_matrix_set WHERE table_name=?"
+                ),
+                (table,),
+            ).fetchone()
+            connection.execute(
+                (
+                    "UPDATE gpkg_tile_matrix_set SET "
+                    "min_x=?,min_y=?,max_x=?,max_y=? WHERE table_name=?"
+                ),
+                (*bounds, table),
+            )
+        connection.execute("DETACH DATABASE incoming")
+
+
+class WorkerError(RuntimeError):
+    """Only locally generated diagnostics, never raw provider exception text."""
+
+    def __init__(self, stage, exit_code=None, http_status=None, qt_error=None):
+        self.details = dict(
+            stage=stage, exit_code=exit_code, http_status=http_status, qt_error=qt_error
+        )
+        if http_status == 407 or qt_error == 105:
+            reason = tr(
+                "Proxy odrzuciło uwierzytelnianie. Sprawdź konfigurację proxy w QGIS."
+            )
+        elif qt_error in (101, 102, 103, 104, 199):
+            reason = tr("Nie można połączyć się z proxy skonfigurowanym w QGIS.")
+        elif qt_error == 6:
+            reason = tr(
+                (
+                    "Nie udało się zweryfikować połączenia TLS. Sprawdź zaufane "
+                    "certyfikaty QGIS i systemu."
+                )
+            )
+        else:
+            reason = tr(
+                (
+                    "Proces mapowy nie zakończył pracy. Etap: {0}; kod "
+                    "zakończenia: {1}; HTTP: {2}; kod sieci Qt: {3}."
+                )
+            ).format(stage, exit_code, http_status, qt_error)
+        super().__init__(reason)
 
 
 class RasterWorkers:
     """Context manager owns process lifetime, private files and cancellation."""
-    def __init__(self, snapshot, staging, project, records, area, crs, levels, workers, per_server_limit=2, adaptive=False):
-        self.folder = staging / '.workers'
+
+    def __init__(
+        self,
+        snapshot,
+        staging,
+        project,
+        records,
+        area,
+        crs,
+        levels,
+        workers,
+        per_server_limit=2,
+        adaptive=False,
+    ):
+        self.network = network_snapshot()
+        self.folder = staging / ".workers"
         self.folder.mkdir(mode=0o700)
         self.stop = Event()
-        self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix='archive-process')
+        self.pool = ThreadPoolExecutor(
+            max_workers=workers, thread_name_prefix="archive-process"
+        )
         self.futures = {}
         self.parameters = (snapshot, project, records, area, crs, levels)
         self.active_hosts = {}
@@ -95,20 +189,29 @@ class RasterWorkers:
         try:
             snapshot, project, records, area, crs, levels = self.parameters
             with ZipFile(snapshot) as archive:
-                root = ET.fromstring(archive.read(next(n for n in archive.namelist() if n.endswith('.qgs'))))
+                root = ET.fromstring(
+                    archive.read(
+                        next(n for n in archive.namelist() if n.endswith(".qgs"))
+                    )
+                )
             # Interleave servers so a long queue from one host cannot occupy
             # every supervising thread while other servers remain idle.
             queues = {}
             for record in records:
-                layer = project.mapLayer(record['id'])
+                layer = project.mapLayer(record["id"])
                 # Live vector edits and auth credentials remain in the main process.
-                if record['status'] != 'pending' or not layer.isValid() or isinstance(layer, QgsVectorLayer) or layer.providerType() == 'gdal':
+                if (
+                    record["status"] != "pending"
+                    or not layer.isValid()
+                    or isinstance(layer, QgsVectorLayer)
+                    or layer.providerType() == "gdal"
+                ):
                     continue
-                if 'authcfg=' in layer.source():
+                if "authcfg=" in layer.source():
                     continue
                 uri = QgsDataSourceUri()
                 uri.setEncodedUri(layer.source())
-                host = QUrl(uri.param('url')).host() or layer.providerType()
+                host = QUrl(uri.param("url")).host() or layer.providerType()
                 queues.setdefault(host, deque()).append(record)
             ordered = []
             while any(queues.values()):
@@ -116,33 +219,49 @@ class RasterWorkers:
                     if queue:
                         ordered.append((host, queue.popleft()))
             for host, record in ordered:
-                layer = project.mapLayer(record['id'])
-                table = 'layer_' + sha256(layer.id().encode()).hexdigest()[:24]
+                layer = project.mapLayer(record["id"])
+                table = "layer_" + sha256(layer.id().encode()).hexdigest()[:24]
                 folder = self.folder / table
                 folder.mkdir(mode=0o700)
                 isolated = deepcopy(root)
-                for element in list(isolated.find('projectlayers')):
-                    if element.findtext('id') != layer.id():
-                        isolated.find('projectlayers').remove(element)
+                for element in list(isolated.find("projectlayers")):
+                    if element.findtext("id") != layer.id():
+                        isolated.find("projectlayers").remove(element)
                 for parent in isolated.iter():
                     for child in list(parent):
-                        if child.tag == 'layer-tree-layer' and child.get('id') != layer.id():
+                        if (
+                            child.tag == "layer-tree-layer"
+                            and child.get("id") != layer.id()
+                        ):
                             parent.remove(child)
-                macros = isolated.find('./properties/Macros')
+                macros = isolated.find("./properties/Macros")
                 if macros is not None:
-                    isolated.find('properties').remove(macros)
-                (folder / 'source.qgs').write_bytes(ET.tostring(isolated, encoding='utf-8'))
-                (folder / 'input.json').write_text(json.dumps({
-                    'layer_id': layer.id(), 'table': table, 'area': area.asWkt(),
-                    'area_crs': crs.toWkt(Qgis.CrsWktVariant.Wkt2_2019), 'levels': levels, 'adaptive': self.adaptive,
-                }), encoding='utf-8')
+                    isolated.find("properties").remove(macros)
+                (folder / "source.qgs").write_bytes(
+                    ET.tostring(isolated, encoding="utf-8")
+                )
+                (folder / "input.json").write_text(
+                    json.dumps(
+                        {
+                            "layer_id": layer.id(),
+                            "table": table,
+                            "area": area.asWkt(),
+                            "area_crs": crs.toWkt(Qgis.CrsWktVariant.Wkt2_2019),
+                            "levels": levels,
+                            "adaptive": self.adaptive,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
                 if self.adaptive:
                     self._register(host, folder)
                 future = Future()
                 self.futures[layer.id()] = (future, folder)
                 self.queue.append((host, future, folder))
             if self.adaptive:
-                self.coordinator = Thread(target=self._coordinate, name='archive-coordinator', daemon=True)
+                self.coordinator = Thread(
+                    target=self._coordinate, name="archive-coordinator", daemon=True
+                )
                 self.coordinator.start()
             for _ in range(min(self.workers, len(self.queue))):
                 self.pool.submit(self._work_loop)
@@ -152,34 +271,59 @@ class RasterWorkers:
             raise
 
     def _register(self, host, folder):
-        self.policies.setdefault(host, HostPolicy(host, self.per_server_limit, window_started=time.monotonic()))
-        self.jobs[folder.name] = {'host': host, 'folder': folder, 'active': False,
-                                  'ack': 0, 'counts': {}, 'state': {}}
-        write_state(folder / 'control.json', {'version': PROTOCOL, 'allowed': False,
-                    'generation': 0, 'expires': time.monotonic() + 2, 'ack': 0})
+        self.policies.setdefault(
+            host,
+            HostPolicy(host, self.per_server_limit, window_started=time.monotonic()),
+        )
+        self.jobs[folder.name] = {
+            "host": host,
+            "folder": folder,
+            "active": False,
+            "ack": 0,
+            "counts": {},
+            "state": {},
+        }
+        write_state(
+            folder / "control.json",
+            {
+                "version": PROTOCOL,
+                "allowed": False,
+                "generation": 0,
+                "expires": time.monotonic() + 2,
+                "ack": 0,
+            },
+        )
 
     def _read_job(self, job, now):
         try:
-            state = json.loads((job['folder'] / 'telemetry.json').read_text(encoding='utf-8'))
+            state = json.loads(
+                (job["folder"] / "telemetry.json").read_text(encoding="utf-8")
+            )
         except (OSError, ValueError):
             return
-        if state.get('version') != PROTOCOL:
+        if state.get("version") != PROTOCOL:
             return
-        policy = self.policies[job['host']]
-        job['state'] = state
-        for generation, count in state.get('counts', {}).items():
-            delta = count - job['counts'].get(generation, 0)
+        policy = self.policies[job["host"]]
+        job["state"] = state
+        for generation, count in state.get("counts", {}).items():
+            delta = count - job["counts"].get(generation, 0)
             if delta > 0:
                 policy.success(delta, now, int(generation))
-                job['counts'][generation] = count
-        for event in state.get('events', []):
-            if event['sequence'] <= job['ack']:
+                job["counts"][generation] = count
+        for event in state.get("events", []):
+            if event["sequence"] <= job["ack"]:
                 continue
-            if event['status'] == 'success':
-                policy.success(1, now, event['generation'], probe=event['probe'])
+            if event["status"] == "success":
+                policy.success(1, now, event["generation"], probe=event["probe"])
             else:
-                policy.failure(event['status'], event['delay'], now, event['generation'], probe=event['probe'])
-            job['ack'] = event['sequence']
+                policy.failure(
+                    event["status"],
+                    event["delay"],
+                    now,
+                    event["generation"],
+                    probe=event["probe"],
+                )
+            job["ack"] = event["sequence"]
 
     def _coordinate(self):
         try:
@@ -190,48 +334,98 @@ class RasterWorkers:
                         memory = available_memory()
                         ok = memory is None or memory >= 2 * 1024**3
                         if ok != self.memory_ok:
-                            self.memory_history.append({'at': now - self.origin, 'memory_ok': ok})
+                            self.memory_history.append(
+                                {"at": now - self.origin, "memory_ok": ok}
+                            )
                         self.memory_ok = ok
                         self.next_memory_check = now + 5
                     for job in self.jobs.values():
-                        if job['active']:
+                        if job["active"]:
                             self._read_job(job, now)
                     rows = []
                     for host, policy in self.policies.items():
-                        jobs = [j for j in self.jobs.values() if j['host'] == host and j['active']]
+                        jobs = [
+                            j
+                            for j in self.jobs.values()
+                            if j["host"] == host and j["active"]
+                        ]
                         queued = sum(h == host for h, _, _ in self.queue)
-                        policy.evaluate(now, queued > 0 and sum(self.active_hosts.values()) < self.workers,
-                                        self.memory_ok)
-                        allowed = jobs[:policy.limit]
+                        policy.evaluate(
+                            now,
+                            queued > 0
+                            and sum(self.active_hosts.values()) < self.workers,
+                            self.memory_ok,
+                        )
+                        allowed = jobs[: policy.limit]
                         if policy.recovering:
                             allowed = []
                             if now >= policy.until and not policy.blocked:
-                                candidates = [j for j in jobs if j['state'].get('recoverable')]
-                                # A current recovery probe has priority over other failed maps.
-                                probing = [j for j in candidates if j.get('probing')]
+                                candidates = [
+                                    j for j in jobs if j["state"].get("recoverable")
+                                ]
+                                # A current recovery
+                                # probe has priority
+                                # over other failed
+                                # maps.
+                                probing = [j for j in candidates if j.get("probing")]
                                 allowed = (probing or candidates)[:1]
-                                if not allowed and not any(j['state'].get('running') or not j['state'] for j in jobs):
+                                if not allowed and not any(
+                                    j["state"].get("running") or not j["state"]
+                                    for j in jobs
+                                ):
                                     policy.blocked = True
-                                    policy.change(now, 'no_retryable_tiles')
+                                    policy.change(now, "no_retryable_tiles")
                         for job in jobs:
-                            job['probing'] = policy.recovering and job in allowed
-                            write_state(job['folder'] / 'control.json', {
-                                'version': PROTOCOL, 'generation': policy.generation,
-                                'allowed': job in allowed and not policy.blocked,
-                                'probe': job['probing'], 'blocked': policy.blocked,
-                                'ack': job['ack'], 'expires': now + 2,
-                            })
-                        state = ('deferred' if policy.blocked else 'cooldown' if policy.recovering
-                                 else 'memory' if not self.memory_ok else 'repairing'
-                                 if any(j['state'].get('repairing') for j in jobs)
-                                 else 'stable' if policy.frozen or policy.limit >= policy.ceiling
-                                 else 'increasing' if policy.limit > 1 else 'starting')
-                        rows.append({'host': host, 'active': sum(bool(j['state'].get('running')) for j in jobs),
-                                     'processes': len(jobs), 'limit': policy.limit, 'queued': queued, 'budget': self.workers,
-                                     'rate': (policy.successes / max(0.001, now - policy.window_started)
-                                              if policy.successes else policy.rate), 'state': state,
-                                     'pause': max(0, math.ceil(policy.until - now)),
-                                     'generation': policy.generation, 'successes': policy.total_successes})
+                            job["probing"] = policy.recovering and job in allowed
+                            write_state(
+                                job["folder"] / "control.json",
+                                {
+                                    "version": PROTOCOL,
+                                    "generation": policy.generation,
+                                    "allowed": job in allowed and not policy.blocked,
+                                    "probe": job["probing"],
+                                    "blocked": policy.blocked,
+                                    "ack": job["ack"],
+                                    "expires": now + 2,
+                                },
+                            )
+                        state = (
+                            "deferred"
+                            if policy.blocked
+                            else "cooldown"
+                            if policy.recovering
+                            else "memory"
+                            if not self.memory_ok
+                            else "repairing"
+                            if any(j["state"].get("repairing") for j in jobs)
+                            else "stable"
+                            if policy.frozen or policy.limit >= policy.ceiling
+                            else "increasing"
+                            if policy.limit > 1
+                            else "starting"
+                        )
+                        rows.append(
+                            {
+                                "host": host,
+                                "active": sum(
+                                    bool(j["state"].get("running")) for j in jobs
+                                ),
+                                "processes": len(jobs),
+                                "limit": policy.limit,
+                                "queued": queued,
+                                "budget": self.workers,
+                                "rate": (
+                                    policy.successes
+                                    / max(0.001, now - policy.window_started)
+                                    if policy.successes
+                                    else policy.rate
+                                ),
+                                "state": state,
+                                "pause": max(0, math.ceil(policy.until - now)),
+                                "generation": policy.generation,
+                                "successes": policy.total_successes,
+                            }
+                        )
                     self.rows = rows
                     self.condition.notify_all()
                 self.stop.wait(0.5)
@@ -247,41 +441,68 @@ class RasterWorkers:
             rows = []
             for original in self.rows:
                 row = dict(original)
-                jobs = [j for j in self.jobs.values() if j['active'] and j['host'] == row['host']]
-                row['processes'] = len(jobs)
-                row['active'] = sum(bool(j['state'].get('running')) for j in jobs)
-                row['queued'] = sum(h == row['host'] for h, _, _ in self.queue)
-                if not jobs or row['state'] in ('cooldown', 'deferred'):
-                    row['rate'] = 0.0
+                jobs = [
+                    j
+                    for j in self.jobs.values()
+                    if j["active"] and j["host"] == row["host"]
+                ]
+                row["processes"] = len(jobs)
+                row["active"] = sum(bool(j["state"].get("running")) for j in jobs)
+                row["queued"] = sum(h == row["host"] for h, _, _ in self.queue)
+                if not jobs and not row["queued"] and row["state"] != "deferred":
+                    failed = any(
+                        j.get("failed")
+                        for j in self.jobs.values()
+                        if j["host"] == row["host"]
+                    )
+                    row["state"] = "failed" if failed else "finished"
+                if not jobs or row["state"] in ("cooldown", "deferred"):
+                    row["rate"] = 0.0
                 rows.append(row)
             return rows
 
     def adaptive_report(self):
         with self.condition:
-            return {'protocol': PROTOCOL, 'coordinator_failed': self.coordinator_failed, 'memory': list(self.memory_history), 'hosts': [
-                {'host': p.host, 'limit': p.limit, 'frozen': p.frozen, 'deferred': p.blocked,
-                 'successes': p.total_successes, 'history': [dict(event, at=event['at'] - self.origin)
-                                                            for event in p.history]}
-                for p in self.policies.values()]}
+            return {
+                "protocol": PROTOCOL,
+                "coordinator_failed": self.coordinator_failed,
+                "memory": list(self.memory_history),
+                "hosts": [
+                    {
+                        "host": p.host,
+                        "limit": p.limit,
+                        "frozen": p.frozen,
+                        "deferred": p.blocked,
+                        "successes": p.total_successes,
+                        "history": [
+                            dict(event, at=event["at"] - self.origin)
+                            for event in p.history
+                        ],
+                    }
+                    for p in self.policies.values()
+                ],
+            }
 
     def local_gate(self, layer, cancelled):
-        # Authenticated map providers stay in the main QGIS, but use the same host policy.
+        # Authenticated map providers stay in the main QGIS, but use the same
+        # host policy.
         uri = QgsDataSourceUri()
         uri.setEncodedUri(layer.source())
-        host = QUrl(uri.param('url')).host() or layer.providerType()
-        folder = self.folder / ('local_' + sha256(layer.id().encode()).hexdigest()[:24])
+        host = QUrl(uri.param("url")).host() or layer.providerType()
+        folder = self.folder / ("local_" + sha256(layer.id().encode()).hexdigest()[:24])
         folder.mkdir(exist_ok=True)
         with self.condition:
             self._register(host, folder)
-            self.jobs[folder.name]['active'] = True
+            self.jobs[folder.name]["active"] = True
         return WorkerGate(folder, cancelled, QCoreApplication.processEvents)
 
-    def finish_local(self, gate):
+    def finish_local(self, gate, failed=False):
         gate.close()
         with self.condition:
             job = self.jobs[gate.folder.name]
             self._read_job(job, time.monotonic())
-            job['active'] = False
+            job["active"] = False
+            job["failed"] = failed
 
     def _work_loop(self):
         # Claim only a runnable host. A busy server must not occupy a worker
@@ -294,22 +515,51 @@ class RasterWorkers:
                     self.queue.clear()
                 if not self.queue:
                     return
-                index = next((i for i, (host, _, _) in enumerate(self.queue)
-                              if self.active_hosts.get(host, 0) < (self.policies[host].limit if self.adaptive else self.per_server_limit)
-                              and (not self.adaptive or (self.memory_ok and not self.policies[host].recovering))), None)
+                index = next(
+                    (
+                        i
+                        for i, (host, _, _) in enumerate(self.queue)
+                        if self.active_hosts.get(host, 0)
+                        < (
+                            self.policies[host].limit
+                            if self.adaptive
+                            else self.per_server_limit
+                        )
+                        and (
+                            not self.adaptive
+                            or (self.memory_ok and not self.policies[host].recovering)
+                        )
+                    ),
+                    None,
+                )
                 if self.adaptive:
                     for host, future, folder in list(self.queue):
                         if self.policies[host].blocked:
-                            future.set_result({'status': 'failed', 'method': 'raster_render',
-                                               'reason': tr('Serwer odłożony do późniejszej próby.'),
-                                               'raster': {'deferred': True}})
+                            future.set_result(
+                                {
+                                    "status": "failed",
+                                    "method": "raster_render",
+                                    "reason": tr(
+                                        "Serwer odłożony do późniejszej próby."
+                                    ),
+                                    "raster": {"deferred": True},
+                                }
+                            )
                             self.queue.remove((host, future, folder))
                     if not self.queue:
                         return
                     # Queue may have changed while removing deferred hosts.
-                    index = next((i for i, (host, _, _) in enumerate(self.queue)
-                                  if self.memory_ok and not self.policies[host].recovering
-                                  and self.active_hosts.get(host, 0) < self.policies[host].limit), None)
+                    index = next(
+                        (
+                            i
+                            for i, (host, _, _) in enumerate(self.queue)
+                            if self.memory_ok
+                            and not self.policies[host].recovering
+                            and self.active_hosts.get(host, 0)
+                            < self.policies[host].limit
+                        ),
+                        None,
+                    )
                 if index is None:
                     self.condition.wait(0.1)
                     continue
@@ -317,7 +567,7 @@ class RasterWorkers:
                 self.active_hosts[host] = self.active_hosts.get(host, 0) + 1
                 future.set_running_or_notify_cancel()
                 if self.adaptive:
-                    self.jobs[folder.name]['active'] = True
+                    self.jobs[folder.name]["active"] = True
             error = None
             result = None
             try:
@@ -328,7 +578,10 @@ class RasterWorkers:
                 with self.condition:
                     if self.adaptive:
                         self._read_job(self.jobs[folder.name], time.monotonic())
-                        self.jobs[folder.name]['active'] = False
+                        self.jobs[folder.name]["active"] = False
+                        self.jobs[folder.name]["failed"] = (
+                            error is not None or result.get("status") != "saved"
+                        )
                     self.active_hosts[host] -= 1
                     self.condition.notify_all()
             if error is not None:
@@ -339,37 +592,93 @@ class RasterWorkers:
     def _run(self, folder):
         if self.stop.is_set():
             if self.coordinator_failed:
-                raise RuntimeError(tr('Koordynator pobierania zakończył pracę z błędem.'))
+                raise RuntimeError(
+                    tr("Koordynator pobierania zakończył pracę z błędem.")
+                )
             raise InterruptedError()
-        executable = sys.executable if Path(sys.executable).name.lower().startswith('python') else shutil.which('python3')
+        executable = (
+            sys.executable
+            if Path(sys.executable).name.lower().startswith("python")
+            else None
+        )
+        if not executable and sys.platform == "win32":
+            candidate = Path(sys.prefix) / "python.exe"
+            executable = str(candidate) if candidate.is_file() else None
+        executable = executable or shutil.which("python3")
         if not executable:
-            raise RuntimeError(tr('Brak interpretera Python dla procesów QGIS.'))
+            raise WorkerError("interpreter_missing")
         environment = os.environ.copy()
-        environment['QT_QPA_PLATFORM'] = 'offscreen'
-        environment['PYTHONDONTWRITEBYTECODE'] = '1'
-        environment['PYTHONPATH'] = os.pathsep.join([str(Path(__file__).resolve().parent.parent), *sys.path])
-        environment['GDAL_NUM_THREADS'] = '1'
-        environment['QGIS_SNAPSHOT_LANGUAGE'] = self.language
+        environment["QT_QPA_PLATFORM"] = "offscreen"
+        environment["QGIS_CUSTOM_CONFIG_PATH"] = str(folder / "profile")
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        environment["PYTHONPATH"] = os.pathsep.join(
+            [str(Path(__file__).resolve().parent.parent), *sys.path]
+        )
+        environment["GDAL_NUM_THREADS"] = "1"
+        environment["QGIS_SNAPSHOT_LANGUAGE"] = self.language
         self.started.add(folder.name)
-        with subprocess.Popen([executable, '-m', 'mbtiles_batch_exporter.archive_worker', str(folder)],
-                              env=environment, stdin=subprocess.DEVNULL,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
+        # Redirecting output alone does not prevent a console window on Windows.
+        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        try:
+            process = subprocess.Popen(
+                [
+                    executable,
+                    "-m",
+                    "mbtiles_batch_exporter.archive_worker",
+                    str(folder),
+                ],
+                env=environment,
+                stdin=subprocess.PIPE,
+                creationflags=creationflags,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError:
+            raise WorkerError("process_start") from None
+        with process:
+            try:
+                process.stdin.write(json.dumps(self.network).encode("utf-8"))
+                process.stdin.close()
+            except (BrokenPipeError, OSError):
+                raise WorkerError("network_transfer") from None
             stopping = None
             while process.poll() is None:
                 if self.stop.is_set():
-                    (folder / 'cancel').touch()
+                    (folder / "cancel").touch()
                     stopping = stopping or time.monotonic()
                     if time.monotonic() - stopping > 5:
                         process.kill()
                 time.sleep(0.05)
             if self.stop.is_set():
                 if self.coordinator_failed:
-                    raise RuntimeError(tr('Koordynator pobierania zakończył pracę z błędem.'))
+                    raise RuntimeError(
+                        tr("Koordynator pobierania zakończył pracę z błędem.")
+                    )
                 raise InterruptedError()
-            if process.returncode or not (folder / 'result.json').exists():
-                raise RuntimeError(tr('Proces nie zapisał obrazu; użyto ponownej próby w QGIS.'))
-        return json.loads((folder / 'result.json').read_text())
-
+            if process.returncode or not (folder / "result.json").exists():
+                details = {}
+                try:
+                    details = json.loads((folder / "error.json").read_text())
+                except (OSError, ValueError):
+                    pass
+                raise WorkerError(
+                    details.get("stage", "process_exit"),
+                    process.returncode,
+                    details.get("http_status"),
+                    details.get("qt_error"),
+                )
+        result = json.loads((folder / "result.json").read_text())
+        network_error = result.get("worker_network", {})
+        if result.get("status") == "failed" and network_error:
+            failure = WorkerError(
+                "render",
+                0,
+                network_error.get("http_status"),
+                network_error.get("qt_error"),
+            )
+            result["reason"] = str(failure)
+            result["worker_error"] = failure.details
+        return result
 
     def take(self, layer_id, destination, cancelled, progress):
         future, folder = self.futures[layer_id]
@@ -378,23 +687,30 @@ class RasterWorkers:
             if cancelled():
                 self.stop.set()
                 raise InterruptedError()
-            progress(tr('Równoległe pobieranie map — oczekiwanie na warstwę…'))
+            progress(tr("Równoległe pobieranie map — oczekiwanie na warstwę…"))
             time.sleep(0.05)
         if cancelled():
             self.stop.set()
             raise InterruptedError()
         result = future.result()
-        if result.get('local_source'):
+        if result.get("local_source"):
             # SQLite/GDAL handles are created in this thread. UI events remain
             # responsive even while copying a large table; no QGIS objects move.
-            with ThreadPoolExecutor(max_workers=1, thread_name_prefix='archive-merge') as merger:
-                merging = merger.submit(merge_raster, folder / 'raster.gpkg', destination,
-                                        result['table'], self.stop.is_set)
+            with ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix="archive-merge"
+            ) as merger:
+                merging = merger.submit(
+                    merge_raster,
+                    folder / "raster.gpkg",
+                    destination,
+                    result["table"],
+                    self.stop.is_set,
+                )
                 while not merging.done():
                     QCoreApplication.processEvents()
                     if cancelled():
                         self.stop.set()
-                    progress(tr('Scalanie gotowej mapy do GeoPackage…'))
+                    progress(tr("Scalanie gotowej mapy do GeoPackage…"))
                     time.sleep(0.05)
                 if self.stop.is_set():
                     raise InterruptedError()
@@ -407,20 +723,33 @@ class RasterWorkers:
         """Read disposable worker snapshots on the main thread only."""
         rows = []
         for layer_id, (future, folder) in self.futures.items():
-            phase, message = 'queued', tr('W kolejce')
+            phase, message = "queued", tr("W kolejce")
             if layer_id in self.merged:
-                phase, message = 'merged', tr('Wynik przekazano do archiwizacji')
+                phase, message = "merged", tr("Wynik przekazano do archiwizacji")
             elif future.done():
-                failed = future.cancelled() or future.exception() is not None or future.result().get('status') == 'failed'
-                phase, message = ('failed', tr('Proces zakończony bez obrazu')) if failed else ('ready', tr('Zakończono pobieranie — czeka na scalenie'))
+                failed = (
+                    future.cancelled()
+                    or future.exception() is not None
+                    or future.result().get("status") == "failed"
+                )
+                phase, message = (
+                    ("failed", tr("Proces zakończony bez obrazu"))
+                    if failed
+                    else ("ready", tr("Zakończono pobieranie — czeka na scalenie"))
+                )
             elif folder.name in self.started:
-                phase, message = 'active', tr('Uruchamianie QGIS lub otwieranie źródła…')
+                phase, message = (
+                    "active",
+                    tr("Uruchamianie QGIS lub otwieranie źródła…"),
+                )
                 try:
-                    state = json.loads((folder / 'progress.json').read_text(encoding='utf-8'))
-                    message = state['message']
-                    age = int(time.time() - state['updated_at'])
+                    state = json.loads(
+                        (folder / "progress.json").read_text(encoding="utf-8")
+                    )
+                    message = state["message"]
+                    age = int(time.time() - state["updated_at"])
                     if age >= 10:
-                        message += tr(' (ostatni komunikat {0} s temu)').format(age)
+                        message += tr(" (ostatni komunikat {0} s temu)").format(age)
                 except (OSError, ValueError, KeyError):
                     pass
             # Warnings are latched separately from the latest progress message,
@@ -428,10 +757,19 @@ class RasterWorkers:
             warnings = []
             if layer_id not in self.merged:
                 try:
-                    warnings = json.loads((folder / 'progress.json').read_text(encoding='utf-8')).get('server_warnings', [])
+                    warnings = json.loads(
+                        (folder / "progress.json").read_text(encoding="utf-8")
+                    ).get("server_warnings", [])
                 except (OSError, ValueError):
                     pass
-            rows.append({'id': layer_id, 'phase': phase, 'message': message, 'server_warnings': warnings})
+            rows.append(
+                {
+                    "id": layer_id,
+                    "phase": phase,
+                    "message": message,
+                    "server_warnings": warnings,
+                }
+            )
         return rows
 
     def __exit__(self, *args):

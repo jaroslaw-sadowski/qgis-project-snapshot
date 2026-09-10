@@ -4,26 +4,30 @@ qgisMinimumVersion=3.40
 qgisMaximumVersion=3.99
 description=PL: Archiwizuje projekt QGIS z lokalnymi danymi i mapami do późniejszego odczytu bez sieci.
     | EN: Archives a QGIS project with local data and maps for later offline use.
-version=0.8.1
+version=0.9.0
 author=Jarosław Sadowski
 email=
 about=PL
     Zachowaj dane wykorzystane w analizie, zanim zmienią się w źródłowych bazach i usługach. Wtyczka tworzy kopię projektu z grupami, kolejnością i stylami warstw, zapisuje wektory z atrybutami oraz obrazy map z przezroczystością. Pomaga dokumentować stan prac nad studium wykonalności lub inwestycją liniową.
     Wskaż obszar, warstwy i szczegółowość map. Pobieranie dobiera obciążenie serwerów do wyników i zasobów CPU/RAM, uzupełnia brakujące kafelki i zapisuje raport. Przenoś cały folder archiwum; po eksporcie sprawdź go bez sieci. Data oznacza czas pobierania, nie jednoczesny stan wszystkich źródeł.
-    Interfejs PL/EN. QGIS 3.40 z PyQt5 i GDAL co najmniej 3.7; sprawdzono Ubuntu. Wtyczka łączy się ze źródłami projektu w celu pobrania danych. Nie zastępuje oryginalnego projektu. Korzysta z QGIS i standardowej biblioteki Pythona, bez dodatkowych instalacji.
+    Korzysta z proxy aktywnego QGIS, wyjątków i dostępnych zapisanych poświadczeń. Interfejs PL/EN. QGIS 3.40 z PyQt5 i GDAL co najmniej 3.7; sprawdzono Ubuntu. Wtyczka łączy się ze źródłami projektu w celu pobrania danych. Nie zastępuje oryginalnego projektu. Korzysta z QGIS i standardowej biblioteki Pythona, bez dodatkowych instalacji.
     Projekt rozwijany metodą vibe coding z pomocą AI, bezpłatny i otwartoźródłowy (GNU GPL v2). Lokalne testy QGIS i paczki nie zastępują odbioru własnych danych. Więcej informacji i ograniczenia w repozytorium GitHub.
     EN
     Preserve the data used in an analysis before the source databases and services change. The plugin creates a project copy with layer groups, order and styles, stores vector features with attributes, and saves map images with transparency. It helps document feasibility studies and linear infrastructure projects.
     Choose an area, layers and map detail. Downloads adjust server concurrency using successful results and CPU/RAM resources, repair missing tiles and produce a report. Keep the entire archive folder and check it offline after export. Dates describe acquisition times, not a simultaneous snapshot of all sources.
-    Polish/English interface. Requires QGIS 3.40 with PyQt5 and GDAL 3.7 or newer; tested on Ubuntu. The plugin connects to project sources to retrieve data and does not replace the original project. Uses QGIS and standard Python libraries without additional installations.
+    Uses the active QGIS proxy configuration, exclusions and available saved credentials. Polish/English interface. Requires QGIS 3.40 with PyQt5 and GDAL 3.7 or newer; tested on Ubuntu. The plugin connects to project sources to retrieve data and does not replace the original project. Uses QGIS and standard Python libraries without additional installations.
     Developed through vibe coding with AI assistance. Free and open source (GNU GPL v2). Local QGIS and package tests do not replace validation of your own data. See the GitHub repository for details and limitations.
 category=Raster
 icon=icon.svg
 homepage=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 repository=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 tracker=https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues
-tags=archiwizacja,archive,snapshot,offline,projekt,project,geopackage,gpkg,wms,wfs,mbtiles,png
-changelog=0.8.1: PL/EN opisy i dokumentacja, piktogram archiwum oraz ikony CPU/RAM i działań w oknie.
+tags=archiwizacja,archive,snapshot,offline,projekt,project,geopackage,gpkg,wms,wfs,png
+changelog=0.9.0: Proxy aktywnego QGIS w procesach map, bezpieczna diagnostyka, jedna akcja archiwizacji, audyt Ruff/PEP 8.
+    0.9.0: Desktop QGIS proxy in map workers, safe diagnostics, one archive action, Ruff/PEP 8 audit.
+    0.8.3: Przeglądanie listy warstw podczas eksportu. / Browse layer status during export.
+    0.8.2: Procesy pomocnicze bez okien konsoli w Windows. / Background workers without console windows on Windows.
+    0.8.1: PL/EN opisy i dokumentacja, piktogram archiwum oraz ikony CPU/RAM i działań w oknie.
     0.8.1: Polish/English descriptions and documentation, archive pictogram and CPU/RAM and action icons.
     0.8.0: Automatyczny dobór obciążenia hostów, przerwy i uzupełnianie brakujących kafelków.
     0.8.0: Adaptive per-host concurrency, cooldowns and missing-tile repair.

@@ -1,16 +1,17 @@
 """Per-host feedback control and disposable, versioned worker IPC (stdlib only)."""
-from dataclasses import dataclass, field
-from email.utils import parsedate_to_datetime
+
 import json
 import math
 import time
+from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 
 PROTOCOL = 1
 
 
 def write_state(path, value):
-    temporary = path.with_suffix('.new')
-    temporary.write_text(json.dumps(value), encoding='utf-8')
+    temporary = path.with_suffix(".new")
+    temporary.write_text(json.dumps(value), encoding="utf-8")
     temporary.replace(path)
 
 
@@ -64,8 +65,15 @@ class HostPolicy:
         self.generation += 1
         self.window_started = now
         self.successes = 0
-        self.history.append({'at': now, 'limit': self.limit, 'generation': self.generation,
-                             'reason': reason, 'pause_seconds': max(0, self.until - now)})
+        self.history.append(
+            {
+                "at": now,
+                "limit": self.limit,
+                "generation": self.generation,
+                "reason": reason,
+                "pause_seconds": max(0, self.until - now),
+            }
+        )
 
     def success(self, count, now, generation, probe=False):
         self.total_successes += count
@@ -76,7 +84,7 @@ class HostPolicy:
             self.recovering = False
             self.until = 0
             self.probe_failures = 0
-            self.change(now, 'recovered')
+            self.change(now, "recovered")
         self.successes += count
 
     def failure(self, status, delay, now, generation, probe=False):
@@ -88,13 +96,15 @@ class HostPolicy:
                 self.until = max(self.until, now + delay)
                 if delay > 300:
                     self.blocked = True
-                    self.change(now, 'retry_after_exceeds_300s')
+                    self.change(now, "retry_after_exceeds_300s")
             return
-        if status == 'timeout':
+        if status == "timeout":
             self.timeouts += 1
             if self.timeouts < 3 and not probe:
                 return
-        elif status not in (429, 503) and not (probe and status not in (401, 403, 404)):
+        elif status not in (429, 503) and not (
+            probe and status not in (401, 403, 404, 407)
+        ):
             self.timeouts = 0
             # Broken windows cannot justify a concurrency increase.
             self.successes = 0
@@ -105,11 +115,19 @@ class HostPolicy:
         if probe:
             self.probe_failures += 1
         self.recovering = True
-        pause = delay if delay is not None else (30, 60, 120)[min(self.probe_failures, 2)]
+        pause = (
+            delay if delay is not None else (30, 60, 120)[min(self.probe_failures, 2)]
+        )
         self.until = max(self.until, now + pause)
         self.blocked = self.probe_failures >= 3 or pause > 300
-        self.change(now, 'retry_after_exceeds_300s' if pause > 300 else
-                    'recovery_exhausted' if self.blocked else str(status))
+        self.change(
+            now,
+            "retry_after_exceeds_300s"
+            if pause > 300
+            else "recovery_exhausted"
+            if self.blocked
+            else str(status),
+        )
 
     def evaluate(self, now, backlog, memory_ok=True):
         elapsed = now - self.window_started
@@ -125,17 +143,18 @@ class HostPolicy:
             if self.poor_windows >= 2:
                 self.limit = max(1, self.limit - 1)
                 self.frozen = True
-                self.change(now, 'no_throughput_gain')
+                self.change(now, "no_throughput_gain")
             return
         self.poor_windows = 0
         if backlog and self.limit < self.ceiling:
             self.baseline = self.rate
             self.limit += 1
-            self.change(now, 'increase')
+            self.change(now, "increase")
 
 
 class WorkerGate:
     """Worker-owned telemetry and a fail-closed permission check before rendering."""
+
     def __init__(self, folder, cancelled, pump=lambda: None):
         self.folder = folder
         self.cancelled = cancelled
@@ -145,32 +164,52 @@ class WorkerGate:
         self.required_ack = 0
         self.events = []
         self.counts = {}
-        self.state = {'version': PROTOCOL, 'waiting': False, 'running': False,
-                      'retry': False, 'repairing': False, 'recoverable': False, 'seconds': 0.0}
+        self.state = {
+            "version": PROTOCOL,
+            "waiting": False,
+            "running": False,
+            "retry": False,
+            "repairing": False,
+            "recoverable": False,
+            "seconds": 0.0,
+        }
         self.started = 0.0
         self.publish()
 
     def publish(self):
-        write_state(self.folder / 'telemetry.json', dict(self.state, counts=self.counts, events=self.events))
+        write_state(
+            self.folder / "telemetry.json",
+            dict(self.state, counts=self.counts, events=self.events),
+        )
 
     def before(self, retry=False):
-        self.state.update(waiting=True, running=False, retry=retry, repairing=retry, recoverable=retry)
+        self.state.update(
+            waiting=True, running=False, retry=retry, repairing=retry, recoverable=retry
+        )
         self.publish()
         last_live = time.monotonic()
         while True:
             if self.cancelled():
                 raise InterruptedError()
             try:
-                command = json.loads((self.folder / 'control.json').read_text(encoding='utf-8'))
-                if command.get('version') != PROTOCOL:
-                    raise HostDeferred('IPC version mismatch')
-                if command.get('blocked'):
-                    raise HostDeferred('Host deferred')
-                if command.get('expires', 0) >= time.monotonic():
+                command = json.loads(
+                    (self.folder / "control.json").read_text(encoding="utf-8")
+                )
+                if command.get("version") != PROTOCOL:
+                    raise HostDeferred("IPC version mismatch")
+                if command.get("blocked"):
+                    raise HostDeferred("Host deferred")
+                if command.get("expires", 0) >= time.monotonic():
                     last_live = time.monotonic()
-                    ack = command.get('ack', 0)
-                    self.events = [event for event in self.events if event['sequence'] > ack]
-                    if command.get('allowed') and ack >= self.required_ack and (not command.get('probe') or retry):
+                    ack = command.get("ack", 0)
+                    self.events = [
+                        event for event in self.events if event["sequence"] > ack
+                    ]
+                    if (
+                        command.get("allowed")
+                        and ack >= self.required_ack
+                        and (not command.get("probe") or retry)
+                    ):
                         self.command = command
                         self.state.update(waiting=False, running=True)
                         self.started = time.monotonic()
@@ -179,28 +218,44 @@ class WorkerGate:
             except (OSError, ValueError):
                 pass
             if time.monotonic() - last_live > 10:
-                raise HostDeferred('Coordinator unavailable')
+                raise HostDeferred("Coordinator unavailable")
             self.pump()
             time.sleep(0.05)
 
     def outcome(self, error=None, recoverable=True):
-        generation = self.command.get('generation', 0)
-        probe = self.command.get('probe', False)
-        self.state.update(running=False, recoverable=bool(error and recoverable),
-                          retry=bool(error and recoverable))
-        self.state['seconds'] += max(0, time.monotonic() - self.started)
+        generation = self.command.get("generation", 0)
+        probe = self.command.get("probe", False)
+        self.state.update(
+            running=False,
+            recoverable=bool(error and recoverable),
+            retry=bool(error and recoverable),
+        )
+        self.state["seconds"] += max(0, time.monotonic() - self.started)
         if error is None and not probe:
             key = str(generation)
             self.counts[key] = self.counts.get(key, 0) + 1
         else:
             self.sequence += 1
             self.required_ack = self.sequence
-            self.events.append({'sequence': self.sequence, 'generation': generation, 'probe': probe,
-                                'status': ('success' if error is None else 'timeout' if isinstance(error, TimeoutError)
-                                           else getattr(error, 'status', None)),
-                                'delay': getattr(error, 'delay', None)})
+            self.events.append(
+                {
+                    "sequence": self.sequence,
+                    "generation": generation,
+                    "probe": probe,
+                    "status": (
+                        "success"
+                        if error is None
+                        else "timeout"
+                        if isinstance(error, TimeoutError)
+                        else getattr(error, "status", None)
+                    ),
+                    "delay": getattr(error, "delay", None),
+                }
+            )
         self.publish()
 
     def close(self):
-        self.state.update(waiting=False, running=False, recoverable=False, retry=False, done=True)
+        self.state.update(
+            waiting=False, running=False, recoverable=False, retry=False, done=True
+        )
         self.publish()

@@ -17,7 +17,7 @@ modyfikować i udostępniać na warunkach [licencji](LICENSE).
 ## Jak używać
 
 Wymaga QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7. Interfejs wybiera polski
-lub angielski według języka QGIS. Aktualna wersja do testów: **0.8.1**.
+lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.0**.
 
 1. Zainstaluj paczkę przez **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
 2. Otwórz projekt i wybierz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**
@@ -27,11 +27,11 @@ lub angielski według języka QGIS. Aktualna wersja do testów: **0.8.1**.
 4. Sprawdź raport, a następnie otwórz kopię projektu bez internetu i sieci firmowej.
    Przenoś **cały folder archiwum**, nie sam plik `.qgz`.
 
-Pobieranie automatycznie dobiera liczbę zadań do CPU, RAM i odpowiedzi każdego
-serwera. Okno pokazuje aktywne zadania, limity, kolejki, przerwy i dziennik.
+Pobieranie korzysta z proxy skonfigurowanego w aktywnym QGIS, jego wyjątków
+i dostępnych zapisanych poświadczeń. Nie trzeba wpisywać ich we wtyczce.
+Automatycznie dobiera liczbę zadań do CPU, RAM i odpowiedzi każdego serwera. Okno pokazuje aktywne zadania, limity, kolejki, przerwy i dziennik.
 Podczas eksportu uzupełnia tylko brakujące kafelki w tym samym archiwum.
 Ręczne ponowienie z końcowego ekranu tworzy nowe archiwum wybranych warstw.
-Dotychczasowy eksport do osobnych plików MBTiles pozostaje w menu.
 
 [Instrukcja dla zespołu](docs/team-guide.md) opisuje opcje, wyniki i odbiór archiwum.
 Jest również dołączona do ZIP-a.
@@ -56,10 +56,12 @@ oprogramowania i brak gwarancji opisuje [licencja](LICENSE).
 
 ## Wykonane kontrole
 
-- 65 testów QGIS: zapis i odczyt danych, mapy, raport, PL/EN, anulowanie,
+- 70 testów QGIS: zapis i odczyt danych, mapy, raport, PL/EN, anulowanie,
   ograniczenia serwerów i uzupełnianie braków.
-- Test instalacyjnego ZIP-a: natywne wykrywanie i ładowanie w QGIS, oba okna,
+- Test instalacyjnego ZIP-a: natywne wykrywanie i ładowanie w QGIS, okno archiwizacji,
   wyłączenie wtyczki oraz uruchomienie testów na kodzie z paczki.
+- Ruff: reguły PEP 8/pycodestyle (E/W), Pyflakes (F), importy (I) i formatowanie
+  według konfiguracji projektu (88 znaków).
 - Kontrola składni, integralności ZIP-a i zgodności jego zawartości ze źródłami.
 - Kontrolowany benchmark trybu stałego i automatycznego z identycznymi kafelkami wynikowymi.
 
@@ -70,13 +72,13 @@ nie certyfikat QGIS ani gwarancja poprawności dowolnego projektu.
 
 ## Paczka i rozwój
 
-Repozytorium zawiera źródła. Aby przygotować ZIP **0.8.1**, uruchom:
+Repozytorium zawiera źródła. Aby przygotować ZIP **0.9.0**, uruchom:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-Paczka `qgis-project-snapshot-0.8.1.zip` i suma SHA-256 powstaną w `dist/`.
+Paczka `qgis-project-snapshot-0.9.0.zip` i suma SHA-256 powstaną w `dist/`.
 Ten katalog nie jest przechowywany w Git. Samo przygotowanie ZIP-a nie oznacza
 publikacji w katalogu wtyczek QGIS.
 

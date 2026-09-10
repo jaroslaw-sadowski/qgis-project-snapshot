@@ -21,7 +21,13 @@ Raporty są zapisem historycznym; aktualne priorytety znajdują się w stanie pr
 - [Wersja 0.8.0 — automat i uzupełnianie kafelków](validation-0.8.0.md)
 - [Benchmark 0.8.0 — surowe pomiary](benchmark-0.8.0.json)
 
+- [Odbiór i audyt 0.9.0 — proxy, jedna akcja, Ruff/PEP 8](validation-0.9.0.md)
+
 Kod nie znajduje się w dokumentacji: źródła wtyczki są w `mbtiles_batch_exporter/`,
 testy w `tests/`, a skrypt pakowania w `scripts/`. Paczki są generowane w `dist/`.
 
 - [Odbiór 0.8.1 — opisy PL/EN i ikony](validation-0.8.1.md)
+
+- [Odbiór 0.8.2 — procesy Windows bez konsoli](validation-0.8.2.md)
+
+- [Odbiór 0.8.3 — przeglądanie stanów podczas eksportu](validation-0.8.3.md)

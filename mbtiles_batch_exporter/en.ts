@@ -23,18 +23,6 @@
       <translation>Maximum zoom:</translation>
     </message>
     <message>
-      <source>1 — oszczędnie</source>
-      <translation>1 — low memory use</translation>
-    </message>
-    <message>
-      <source>{0} procesów</source>
-      <translation>{0} processes</translation>
-    </message>
-    <message>
-      <source>Równoległe zadania:</source>
-      <translation>Parallel tasks:</translation>
-    </message>
-    <message>
       <source>Zmienia wybór warstw do archiwum. Nie zmienia widoczności warstw w oryginalnym projekcie.</source>
       <translation>Changes which layers are archived. Does not change layer visibility in the original project.</translation>
     </message>
@@ -95,10 +83,6 @@
       <translation>Maximum zoom of the saved maps. Higher numbers show more detail but can greatly increase export time and archive size. Leave 17 for an initial test.</translation>
     </message>
     <message>
-      <source>Liczba map przetwarzanych równocześnie w osobnych procesach. 1 oszczędza pamięć; Dobór uwzględnia CPU, wolną pamięć i liczbę serwerów. Wektory z niezapisanymi edycjami są odczytywane w głównym QGIS.</source>
-      <translation>Number of maps processed simultaneously in separate processes. 1 uses less memory. The recommendation considers CPU, available RAM and the number of servers. Vectors with unsaved edits are read in the main QGIS process.</translation>
-    </message>
-    <message>
       <source>Zaznacz warstwy do archiwum. Wyłączone na mapie warstwy też można zapisać. Kolumna Stan pokazuje kolejkę, pobieranie, zapis lub problem. Najedź na stan, aby przeczytać szczegóły.</source>
       <translation>Select layers to archive. Hidden layers can also be saved. The Status column shows queued tasks, downloads, writes or problems. Hover over a status for details.</translation>
     </message>
@@ -141,26 +125,6 @@
     <message>
       <source>Zamyka okno. Podczas eksportu działa jak Przerwij; okno pozostanie otwarte do zakończenia zapisu.</source>
       <translation>Closes the window. During export, acts as Cancel; the window stays open until saving finishes.</translation>
-    </message>
-    <message>
-      <source>Zacznij od 2. Zwiększ do 4–8 przy szybkim łączu i serwerze, który obsługuje wiele zapytań. Większa liczba może powodować błędy lub spowolnienie.</source>
-      <translation>Start with 2. Increase to 4–8 with a fast connection and a server that handles concurrent requests. Higher values can cause errors or slowdowns.</translation>
-    </message>
-    <message>
-      <source>Odświeża dostępne zasoby i ustawia rekomendację. Rezerwuje 2 GiB dla QGIS i około 1 GiB na proces. To punkt startowy, nie pomiar maksymalnej wydajności.</source>
-      <translation>Refreshes available resources and applies a recommendation. Reserves 2 GiB for QGIS and about 1 GiB per process. A starting point, not a measurement of maximum performance.</translation>
-    </message>
-    <message>
-      <source>aktywne połączenie</source>
-      <translation>active connection</translation>
-    </message>
-    <message>
-      <source>brak potwierdzonego połączenia</source>
-      <translation>no confirmed connection</translation>
-    </message>
-    <message>
-      <source>CPU: {0} • wolny RAM: {1} • sieć: {2}. Rekomendacja: {3}. Przepustowość internetu i serwerów: niezmierzona.</source>
-      <translation>CPU: {0} • available RAM: {1} • network: {2}. Recommended: {3}. Internet and server throughput: not measured.</translation>
     </message>
     <message>
       <source>Dane wektorowe</source>
@@ -303,142 +267,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Cancelling… Completed layers will be kept in a partial archive.</translation>
     </message>
     <message>
-      <source>Użyj zaznaczonych poligonów lub całej warstwy.</source>
-      <translation>Use selected polygons or the entire layer.</translation>
-    </message>
-    <message>
-      <source>Jakość JPEG:</source>
-      <translation>JPEG quality:</translation>
-    </message>
-    <message>
-      <source>Wstrzymaj odświeżanie mapy</source>
-      <translation>Pause map refresh</translation>
-    </message>
-    <message>
-      <source>Odśwież listę</source>
-      <translation>Refresh list</translation>
-    </message>
-    <message>
-      <source>Postęp:</source>
-      <translation>Progress:</translation>
-    </message>
-    <message>
-      <source>Wskaż folder na pliki MBTiles. Ten tryb zapisuje osobny plik dla każdej mapy, bez kopii całego projektu.</source>
-      <translation>Choose a folder for MBTiles files. This mode saves a separate file for each map, without a copy of the entire project.</translation>
-    </message>
-    <message>
-      <source>Otwiera wybór folderu zapisu.</source>
-      <translation>Opens the output folder chooser.</translation>
-    </message>
-    <message>
-      <source>Widok mapy używa aktualnego zasięgu QGIS. Warstwa poligonowa wyznacza prostokąt obejmujący zaznaczone obiekty, a bez zaznaczenia wszystkie. Przycinanie do kształtu pasa jest dostępne w Archiwizuj projekt.</source>
-      <translation>Map view uses the current QGIS extent. A polygon layer defines the bounding rectangle of selected features, or all features when none are selected. Clipping to the corridor shape is available in Archive project.</translation>
-    </message>
-    <message>
-      <source>Wybierz poligony wyznaczające zasięg. Zaznaczenie obiektów ma pierwszeństwo przed całą warstwą.</source>
-      <translation>Choose polygons defining the extent. Selected features take priority over the entire layer.</translation>
-    </message>
-    <message>
-      <source>Ten eksporter używa prostokąta otaczającego poligony. Nie wycina ich dokładnego kształtu.</source>
-      <translation>This exporter uses the polygon bounding rectangle. It does not clip to the exact shape.</translation>
-    </message>
-    <message>
-      <source>PNG zachowuje przezroczystość. JPEG tworzy obraz bez przezroczystości i może tracić szczegóły.</source>
-      <translation>PNG preserves transparency. JPEG produces an opaque image and may lose detail.</translation>
-    </message>
-    <message>
-      <source>Najmniejszy zapisany zoom: widok większego obszaru z mniejszą szczegółowością.</source>
-      <translation>Lowest saved zoom: a larger area with less detail.</translation>
-    </message>
-    <message>
-      <source>Największy zapisany zoom: więcej szczegółów, ale zwykle większy plik i dłuższy eksport.</source>
-      <translation>Highest saved zoom: more detail, but usually a larger file and longer export.</translation>
-    </message>
-    <message>
-      <source>Dotyczy tylko JPEG. Wyższa wartość oznacza mniej strat i większy plik; nie zmienia jakości PNG.</source>
-      <translation>Applies only to JPEG. Higher values mean less loss and larger files; this does not affect PNG quality.</translation>
-    </message>
-    <message>
-      <source>Podczas eksportu nie odświeżaj mapy głównej. Ogranicza dodatkową pracę QGIS; stan zostanie przywrócony po eksporcie.</source>
-      <translation>Do not refresh the main map during export. Reduces extra QGIS work; the previous state is restored after export.</translation>
-    </message>
-    <message>
-      <source>Zaznacz mapy do zapisania jako MBTiles. Do archiwum całego projektu użyj osobnej akcji Archiwizuj projekt.</source>
-      <translation>Select maps to save as MBTiles. To archive the entire project, use the separate Archive project action.</translation>
-    </message>
-    <message>
-      <source>Postęp eksportu bieżącej warstwy zgłaszany przez algorytm QGIS.</source>
-      <translation>Export progress for the current layer, as reported by the QGIS algorithm.</translation>
-    </message>
-    <message>
-      <source>Komunikaty algorytmu, kolejne warstwy i błędy eksportu.</source>
-      <translation>Algorithm messages, layer progress and export errors.</translation>
-    </message>
-    <message>
-      <source>Rozpoczyna eksport zaznaczonych map do plików MBTiles.</source>
-      <translation>Starts exporting selected maps to MBTiles files.</translation>
-    </message>
-    <message>
-      <source>Prosi algorytm o przerwanie eksportu. Zakończenie bieżącej operacji może chwilę potrwać.</source>
-      <translation>Asks the algorithm to cancel export. The current operation may take a moment to finish.</translation>
-    </message>
-    <message>
-      <source>Wywoływane przy każdym otwarciu okna z menu: odświeża listy i czyści UI.</source>
-      <translation>Called whenever the window opens from the menu: refreshes lists and clears the UI.</translation>
-    </message>
-    <message>
-      <source>Wybrana warstwa poligonowa jest nieprawidłowa.</source>
-      <translation>The selected polygon layer is invalid.</translation>
-    </message>
-    <message>
-      <source>Błędny folder</source>
-      <translation>Invalid folder</translation>
-    </message>
-    <message>
-      <source>Zaznacz przynajmniej jedną warstwę do eksportu.</source>
-      <translation>Select at least one layer to export.</translation>
-    </message>
-    <message>
-      <source>Żadna z wybranych warstw nie jest dostępna w drzewie projektu.</source>
-      <translation>None of the selected layers is available in the project tree.</translation>
-    </message>
-    <message>
-      <source>⏹ Przerywam… (po zakończeniu bieżącego kroku)</source>
-      <translation>⏹ Cancelling… (after the current step)</translation>
-    </message>
-    <message>
-      <source>[{0}/{1}] Pomijam pusty węzeł warstwy.</source>
-      <translation>[{0}/{1}] Skipping an empty layer node.</translation>
-    </message>
-    <message>
-      <source>  • Nadpisuję istniejący plik: {0}</source>
-      <translation>  • Overwriting existing file: {0}</translation>
-    </message>
-    <message>
-      <source>  ⚠ Nie mogę usunąć istniejącego pliku ({0}): {1}</source>
-      <translation>  ⚠ Cannot remove existing file ({0}): {1}</translation>
-    </message>
-    <message>
-      <source>  ❌ Błąd podczas eksportu warstwy '{0}': {1}</source>
-      <translation>  ❌ Error exporting layer '{0}': {1}</translation>
-    </message>
-    <message>
-      <source>qgis-project-snapshot: błąd dla warstwy '{0}': {1}</source>
-      <translation>qgis-project-snapshot: error for layer '{0}': {1}</translation>
-    </message>
-    <message>
-      <source>
-🎉 Wszystkie warstwy przetworzone pomyślnie.</source>
-      <translation>
-🎉 All layers processed successfully.</translation>
-    </message>
-    <message>
       <source>qgis-project-snapshot: zapisz kopię projektu, dane i mapy do pracy bez sieci.</source>
       <translation>qgis-project-snapshot: save a project copy, data and maps for offline use.</translation>
-    </message>
-    <message>
-      <source>qgis-project-snapshot: dotychczasowy eksport map do oddzielnych plików MBTiles.</source>
-      <translation>qgis-project-snapshot: legacy map export to separate MBTiles files.</translation>
     </message>
     <message>
       <source>Obrazy usług mapowych odtwarzają tylko wybrany obszar i poziomy zoomu.</source>
@@ -797,14 +627,6 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Saved original raster values and mask in lossless GeoTIFF.</translation>
     </message>
     <message>
-      <source>Brak interpretera Python dla procesów QGIS.</source>
-      <translation>No Python interpreter available for QGIS processes.</translation>
-    </message>
-    <message>
-      <source>Proces nie zapisał obrazu; użyto ponownej próby w QGIS.</source>
-      <translation>The process did not save an image; retrying in QGIS.</translation>
-    </message>
-    <message>
       <source>Równoległe pobieranie map — oczekiwanie na warstwę…</source>
       <translation>Parallel map download — waiting for a layer…</translation>
     </message>
@@ -823,14 +645,6 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
     <message>
       <source>Otwieranie źródła mapy…</source>
       <translation>Opening the map source…</translation>
-    </message>
-    <message>
-      <source>Nie można odczytać kopii warstwy.</source>
-      <translation>Cannot read the layer copy.</translation>
-    </message>
-    <message>
-      <source>Źródło nie jest dostępne w osobnym procesie.</source>
-      <translation>The source is unavailable in a separate process.</translation>
     </message>
     <message>
       <source>Przerwano kopiowanie zasobów.</source>
@@ -929,20 +743,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Cannot open local layer: {0}</translation>
     </message>
     <message>
-      <source>Nie znaleziono algorytmu 'Generate XYZ tiles (MBTiles)' w Processing. Sprawdź czy w QGIS dostępny jest algorytm tilesxyzmbtiles.</source>
-      <translation>Could not find the 'Generate XYZ tiles (MBTiles)' Processing algorithm. Check that tilesxyzmbtiles is available in QGIS.</translation>
-    </message>
-    <message>
-      <source>Nie znaleziono żadnych warstw wektorowych ani rastrowych do przetworzenia.</source>
-      <translation>No vector or raster layers found to process.</translation>
-    </message>
-    <message>
       <source>qgis-project-snapshot — Archiwizuj projekt</source>
       <translation>qgis-project-snapshot — Archive project</translation>
-    </message>
-    <message>
-      <source>qgis-project-snapshot — Eksport MBTiles</source>
-      <translation>qgis-project-snapshot — Export MBTiles</translation>
     </message>
     <message>
       <source>Wybierz…</source>
@@ -963,18 +765,6 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
     <message>
       <source>Warstwa obszaru:</source>
       <translation>Area layer:</translation>
-    </message>
-    <message>
-      <source>{0} procesy</source>
-      <translation>{0} processes</translation>
-    </message>
-    <message>
-      <source>Zadania na serwer:</source>
-      <translation>Tasks per server:</translation>
-    </message>
-    <message>
-      <source>Dobierz do komputera i zaznaczonych warstw</source>
-      <translation>Recommend for this computer and selected layers</translation>
     </message>
     <message>
       <source>Zaznacz wszystko</source>
@@ -1007,10 +797,6 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
     <message>
       <source>Zamknij</source>
       <translation>Close</translation>
-    </message>
-    <message>
-      <source>brak odczytu</source>
-      <translation>unavailable</translation>
     </message>
     <message>
       <source>Folder na archiwum projektu</source>
@@ -1055,108 +841,6 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
     <message>
       <source>Czas: {0:02d}:{1:02d}</source>
       <translation>Time: {0:02d}:{1:02d}</translation>
-    </message>
-    <message>
-      <source>Folder zapisu:</source>
-      <translation>Output folder:</translation>
-    </message>
-    <message>
-      <source>Warstwa poligonowa:</source>
-      <translation>Polygon layer:</translation>
-    </message>
-    <message>
-      <source>Format kafli:</source>
-      <translation>Tile format:</translation>
-    </message>
-    <message>
-      <source>Warstwy do eksportu</source>
-      <translation>Layers to export</translation>
-    </message>
-    <message>
-      <source>Zaznacza wszystkie warstwy z listy do eksportu.</source>
-      <translation>Selects all listed layers for export.</translation>
-    </message>
-    <message>
-      <source>Odznacza wszystkie warstwy z listy.</source>
-      <translation>Deselects all listed layers.</translation>
-    </message>
-    <message>
-      <source>Wczytuje ponownie warstwy projektu i zaznacza je wszystkie.</source>
-      <translation>Reloads project layers and selects all of them.</translation>
-    </message>
-    <message>
-      <source>Zamyka okno eksportera MBTiles.</source>
-      <translation>Closes the MBTiles exporter window.</translation>
-    </message>
-    <message>
-      <source>Wybierz folder na pliki MBTiles</source>
-      <translation>Choose an MBTiles output folder</translation>
-    </message>
-    <message>
-      <source>Algorytm: {0}</source>
-      <translation>Algorithm: {0}</translation>
-    </message>
-    <message>
-      <source>Warstw do przetworzenia: {0} (zaznaczone w oknie)</source>
-      <translation>Layers to process: {0} (selected in this window)</translation>
-    </message>
-    <message>
-      <source>Dziennik:</source>
-      <translation>Log:</translation>
-    </message>
-    <message>
-      <source>— brak warstw wektorowych/rastrowych —</source>
-      <translation>— no vector/raster layers —</translation>
-    </message>
-    <message>
-      <source>— brak warstw poligonowych —</source>
-      <translation>— no polygon layers —</translation>
-    </message>
-    <message>
-      <source>Nie wybrano warstwy poligonowej (lub brak warstw poligonowych w projekcie).</source>
-      <translation>No polygon layer selected (or the project contains no polygon layers).</translation>
-    </message>
-    <message>
-      <source>Brak folderu</source>
-      <translation>No folder</translation>
-    </message>
-    <message>
-      <source>Wybierz folder zapisu.</source>
-      <translation>Choose an output folder.</translation>
-    </message>
-    <message>
-      <source>Katalog nie istnieje: {0}</source>
-      <translation>Folder does not exist: {0}</translation>
-    </message>
-    <message>
-      <source>Brak warstw</source>
-      <translation>No layers</translation>
-    </message>
-    <message>
-      <source>
-⛔ Przerwano.</source>
-      <translation>
-⛔ Cancelled.</translation>
-    </message>
-    <message>
-      <source>
-✅ Gotowe.</source>
-      <translation>
-✅ Done.</translation>
-    </message>
-    <message>
-      <source>
-⚠️ Nieprzetworzone warstwy:</source>
-      <translation>
-⚠️ Unprocessed layers:</translation>
-    </message>
-    <message>
-      <source>Brak algorytmu</source>
-      <translation>Missing algorithm</translation>
-    </message>
-    <message>
-      <source>Eksportuj MBTiles…</source>
-      <translation>Export MBTiles…</translation>
     </message>
     <message>
       <source>Archiwizuj projekt…</source>
@@ -1283,14 +967,6 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Model per map: time ≈ {0}; PNG disk size ≈ {1}.</translation>
     </message>
     <message>
-      <source>Serwer {0}: zbyt wiele zapytań. Kliknij „Przerwij”, zmniejsz „Zadania na serwer” i spróbuj ponownie po przerwie.</source>
-      <translation>Server {0}: too many requests. Click “Cancel”, reduce “Tasks per server” and retry after a break.</translation>
-    </message>
-    <message>
-      <source>Serwer {0}: usługa niedostępna lub przeciążona. Jeśli problem się powtarza, kliknij „Przerwij” i zmniejsz „Zadania na serwer”. HTTP 503 nie potwierdza, że przyczyną jest liczba zapytań.</source>
-      <translation>Server {0}: service unavailable or overloaded. If the problem persists, click “Cancel” and reduce “Tasks per server”. HTTP 503 does not confirm that request volume is the cause.</translation>
-    </message>
-    <message>
       <source>Serwer odłożony do późniejszej próby.</source>
       <translation>Server deferred until a later attempt.</translation>
     </message>
@@ -1363,10 +1039,6 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>{0} s</translation>
     </message>
     <message>
-      <source>Procesy map: {0}; aktywne zadania: {1}. Dobór automatyczny.</source>
-      <translation>Map processes: {0}; active tasks: {1}. Automatic control.</translation>
-    </message>
-    <message>
       <source>Serwer {0}: zbyt wiele zapytań. Potrzebna jest przerwa przed ponownym pobieraniem.</source>
       <translation>Server {0}: too many requests. A cooldown is needed before retrying.</translation>
     </message>
@@ -1393,6 +1065,38 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
     <message>
       <source>Automat pozostawia 2 GiB pamięci dla QGIS i systemu. Sprawdza dostępny RAM co 5 sekund; przy niedoborze wstrzymuje uruchamianie nowych procesów. To rezerwa planowania, nie pomiar zużycia RAM.</source>
       <translation>Automatic scheduling reserves 2 GiB of memory for QGIS and the system. Available RAM is checked every 5 seconds; low memory pauses new process launches. This is a planning reserve, not a RAM usage reading.</translation>
+    </message>
+    <message>
+      <source>Proxy odrzuciło uwierzytelnianie. Sprawdź konfigurację proxy w QGIS.</source>
+      <translation>The proxy rejected authentication. Check the proxy configuration in QGIS.</translation>
+    </message>
+    <message>
+      <source>Nie można połączyć się z proxy skonfigurowanym w QGIS.</source>
+      <translation>Could not connect to the proxy configured in QGIS.</translation>
+    </message>
+    <message>
+      <source>Nie udało się zweryfikować połączenia TLS. Sprawdź zaufane certyfikaty QGIS i systemu.</source>
+      <translation>Could not verify the TLS connection. Check trusted certificates in QGIS and the system.</translation>
+    </message>
+    <message>
+      <source>Proces mapowy nie zakończył pracy. Etap: {0}; kod zakończenia: {1}; HTTP: {2}; kod sieci Qt: {3}.</source>
+      <translation>The map worker did not complete. Stage: {0}; exit code: {1}; HTTP: {2}; Qt network code: {3}.</translation>
+    </message>
+    <message>
+      <source>Zakończono</source>
+      <translation>Finished</translation>
+    </message>
+    <message>
+      <source>Zakończono z błędami</source>
+      <translation>Finished with errors</translation>
+    </message>
+    <message>
+      <source>Zasoby przy starcie: CPU {0}; dostępny RAM {1}; limit procesów map {2}. Rezerwa RAM: 2 GiB.</source>
+      <translation>Resources at startup: CPU {0}; available RAM {1}; map process limit {2}. RAM reserve: 2 GiB.</translation>
+    </message>
+    <message>
+      <source>nie rozpoznano</source>
+      <translation>not detected</translation>
     </message>
   </context>
 </TS>

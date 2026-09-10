@@ -1,9 +1,9 @@
-# qgis-project-snapshot — instrukcja 0.8.1
+# qgis-project-snapshot — instrukcja 0.9.0
 
 ## Instalacja i uruchomienie
 
 1. QGIS: **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-0.8.1.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-0.9.0.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
 
 Wymagane: QGIS 3.40, PyQt5 i GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
@@ -98,3 +98,26 @@ After export, check the report and open the archived project offline. Move the e
 folder. The final Retry button creates a separate archive of selected layers; keep
 both folders. There is no restart/resume after closing QGIS. Service usage policies
 still apply. Hover over controls for details.
+
+## Proxy i błędy połączenia (0.9.0)
+
+Nie wpisujesz proxy we wtyczce. Korzystamy z ustawień sieci aktywnego QGIS,
+w tym wyjątków i dostępnych zapisanych poświadczeń. Gdy proxy jest wyłączone,
+procesy nie włączają własnego proxy. Nie zmieniaj firmowej konfiguracji tylko
+na potrzeby archiwizacji.
+
+HTTP 407 oznacza odrzucenie uwierzytelnienia proxy. Inne komunikaty odróżniają
+problem połączenia z proxy, weryfikacji TLS i uruchomienia procesu QGIS. Raport
+zawiera etap i kody błędów, bez haseł oraz pełnych adresów usług. Nietypowe
+logowanie firmowe lub certyfikaty mogą wymagać odbioru na danym stanowisku.
+
+Przy starcie dziennik pokazuje wykryte CPU, dostępny RAM i wybrany limit procesów.
+„Rezerwa RAM: 2 GiB” oznacza założony zapas dla głównego QGIS i systemu, nie limit
+pamięci całej archiwizacji. Host bez dalszych zadań pokazuje zakończenie lub błędy.
+Dawny osobny eksporter MBTiles usunięto; w menu i na pasku jest jedna akcja.
+
+English: the plugin uses the active QGIS proxy configuration and exclusions.
+Available saved proxy credentials are transferred in memory, not written into
+the archive. HTTP 407 identifies rejected proxy authentication. TLS verification
+remains enabled. The startup log shows detected CPU/RAM and the process budget.
+The legacy standalone MBTiles exporter has been removed.

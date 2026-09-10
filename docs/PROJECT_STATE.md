@@ -1,128 +1,111 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 10 września 2026. Wersja: **0.8.1**.
-Gotowa i automatycznie sprawdzona paczka do testu służbowego. Pełnego odbioru
-źródeł firmowych nie wykonano. Sprawdź `git status` i historię przed pracą;
-nie zakładaj, że zmiany zostały zatwierdzone lub wysłane.
+Aktualizacja: 10 września 2026. Wersja **0.9.0**. Gotowa paczka po naprawie proxy,
+usunięciu dawnego eksportera i audycie Ruff. Pełny odbiór Windows oraz źródeł
+firmowych pozostaje do wykonania. Przed pracą sprawdź git status i historię;
+nie zakładaj, że zmiany tej sesji zatwierdzono lub wysłano.
 
-## Cel i trwałe ustalenia
+## Cel i zasady
 
-Zespół archiwizuje stan projektu QGIS na dany dzień: kopia projektu z zachowaną
-strukturą, kolejnością, identyfikatorami warstw, stylami i lokalnymi danymi.
-Ważne są długie pasy inwestycji, przezroczystość i bezstratna kompresja PNG
-(ZLEVEL 9), osobne renderowanie zoomów oraz wykorzystanie wielu CPU.
-Oryginalny eksporter MBTiles pozostaje osobną funkcją.
+Zespół zachowuje stan projektu QGIS i danych do późniejszego odczytu bez sieci.
+Oryginał, niezapisane edycje, ID, grupy, kolejność, style i widoczność mają być
+zachowane. Ważne są długie pasy inwestycji, przezroczystość PNG, mocna kompresja
+bezstratna i wiele rdzeni CPU. Wektory zapisuj z atrybutami; obraz zastępczy
+wymaga jawnej informacji. Nie blokuj sygnału writeProject (utrata relacji).
 
-Nie modyfikuj projektu źródłowego ani jego niezapisanych edycji. Nie blokuj sygnału
-writeProject QGIS (utrata relacji). Nie przekazuj obiektów QGIS między wątkami
-lub procesami; każdy proces tworzy własne środowisko. Końcowy GeoPackage ma
-jednego zapisującego. Wyniki częściowe/puste nie są bezwarunkowym sukcesem;
-sprawdzenie lokalnych ścieżek nie stanowi pełnej gwarancji działania offline.
+Nie przekazuj obiektów QGIS z pulpitu do wątków/procesów. Procesy tworzą własne
+QGIS, a końcowy GeoPackage ma jednego zapisującego. PNG RGBA ZLEVEL=9, niezależny
+render każdego zoomu, rzeczywista maska poligonów. Nie utożsamiaj poprawnego
+lokalnego źródła z pełnym odbiorem offline.
 
-## Bieżąca funkcjonalność
+## Zmiany 0.9.0 i wynik audytu
 
-Dotychczas: wektory i mapy w GeoPackage, rastry źródłowe w GeoTIFF, maska obszaru,
-zasoby projektu, formularze/relacje, szczegółowy postęp i raport HTML, PL/EN
-według języka QGIS, szacunkowy czas i rozmiar oraz czerwone ostrzeżenia serwera.
+- Jedna akcja archiwizacji w menu i na pasku. Usunięto dialog.py, utils.py,
+  klasę/akcję dawnego eksportera i jego tłumaczenia. Nie przywracaj starego okna.
+- Nazwa produktu: qgis-project-snapshot; klasa: ProjectSnapshotPlugin.
+  Katalog/ID `mbtiles_batch_exporter` pozostaje wyłącznie dla zgodności aktualizacji.
+- Proxy: odczyt z aktywnego QGIS i przesłanie zwykłych danych przez stdin procesu.
+  Prywatny profil procesu zawiera ustawienia bez hasła/loginu/authcfg. Zapisane,
+  rozpoznane poświadczenia są w pamięci, podawane na żądanie Qt dla właściwego proxy.
+  Obsługę wyjątków i trybu systemowego pozostawiono natywnemu QGIS/Qt.
+- Proxy wyłączone w QGIS nie jest włączane przez proces. Nie wpisujemy adresów
+  firmowych w kodzie. Nie kopiujemy bazy auth i nie wyłączamy walidacji TLS.
+- WorkerError/error.json: bezpieczny etap, kod wyjścia, HTTP i Qt. Osobne opisy
+  407, połączenia z proxy i TLS. Nigdy nie zapisuj surowych wyjątków dostawców.
+- HTTP 407 nie uruchamia kolejnych prób kafelka ani zwiększania limitu.
+- Windows: CREATE_NO_WINDOW i dodatkowy kandydat sys.prefix/python.exe.
+  Brak interpretera/awaria w automatyce nie powodują nieograniczonego zastępstwa
+  w głównym QGIS. Projekt procesu niszczymy przed jego QgsApplication.
+- Host bez pracy pokazuje zakończenie lub błędy. Log i manifest zawierają
+  zasoby wykryte przy starcie i budżet procesów.
+- Ruff 0.16.6: E/W/F/I i formatowanie, zero zgłoszeń. Limit 88 znaków jest
+  konwencją projektu. E402 wyłączono wyłącznie dla bootstrapu trzech modułów testów.
+  Brak typecheckera; nie deklaruj wykonania Bandita/detect-secrets/pip-audit.
+- Testy źródeł i paczki używają izolowanych profili QGIS.
 
-W 0.8.0 okno korzysta wyłącznie z automatyki. Ręczne wybory procesów i limitu
-serwera oraz przycisk rekomendacji zastępuje tabela hostów i rzeczywiste
-wykorzystanie procesów. Tabela pozostaje dostępna podczas eksportu.
+Pełny opis: [audyt i odbiór 0.9.0](validation-0.9.0.md).
+Nie zweryfikowano firmowego proxy Windows, PAC/SSO/NTLM/Kerberos/Socks5 ani wszystkich
+wariantów authcfg. Nie przenosimy niestandardowego magazynu certyfikatów profilu.
+To ograniczenia odbioru i zakresu konfiguracji; test HTTP Basic nie dowodzi obsługi
+każdej infrastruktury. Użytkownik nie powinien podawać proxy agentowi — wtyczka
+ma korzystać z konfiguracji QGIS.
 
-- Start od jednej mapy na host; wzrost o jeden po co najmniej 15 s i 10 sukcesach,
-  gdy jest kolejka i miejsce. Dwa okna bez 10% poprawy powodują cofnięcie
-  i zatrzymanie wzrostu. Sufit osiem map na host.
-- HTTP 429/503 i trzy kolejne timeouty ograniczają host; Retry-After (sekundy/data)
-  lub przerwy 30/60/120 s. Po przerwie jedna próba brakującego kafelka.
-  Trzy nieudane próby powrotu albo oczekiwanie ponad pięć minut odkładają host.
-  Inne hosty pracują dalej; 503 nie przesądza przyczyny niedostępności.
-- Globalny budżet: minimum z 32, 2 × CPU i RAM przy rezerwie 2 GiB oraz
-  1 GiB/proces; nieznany RAM ogranicza do dwóch. RAM sprawdzany co pięć sekund;
-  niska pamięć zatrzymuje wzrost i uruchamianie nowych procesów.
-- Dyskowy rejestr SQLite każdej mapy pamięta także poprawne przezroczyste kafelki.
-  Początkowe pobranie i najwyżej dwie dodatkowe rundy uzupełniają tylko braki
-  w tym samym archiwum. Udane fragmenty nie są pobierane ponownie.
-- Manifest ma wersję 4 i historię automatu, przerw, pamięci oraz napraw.
-  Nie zapisuj poświadczeń ani pełnych adresów usług w tej diagnostyce.
+## Bieżące zachowanie
 
-Sterowanie dotyczy zadań mapowych, nie dokładnej liczby HTTP/s. Automat jest
-heurystyką, nie pomiarem przepustowości ani gwarancją maksymalnej szybkości.
-Nie testuje serwera dodatkowymi żądaniami. Standardowe ograniczenia OSM obowiązują.
+`create_archive(adaptive=False)` zachowuje API stałych limitów; GUI używa wyłącznie
+automatyki. Start 1 mapa/host, wzrost po 15 s i 10 sukcesach przy kolejce i zasobach.
+Dwa okna bez 10% poprawy cofają limit i kończą wzrost. HTTP 429/503 i trzy kolejne
+timeouty zmniejszają limit i rozpoczynają przerwę. Retry-After sekundy/data,
+inaczej 30/60/120 s; po przerwie jedna próba rzeczywiście brakującego kafelka.
+Trzy nieudane powroty lub oczekiwanie ponad pięć minut odkładają host.
 
-## Punkty wejścia dla implementacji
+Sufit 8 map/host; globalnie min(32, 2 × CPU, RAM po rezerwie 2 GiB przy
+1 GiB/proces), minimum 1. Nieznany RAM ogranicza do 2. RAM sprawdzamy co pięć sekund;
+presja pamięci blokuje wzrost i nowe procesy. Czekające procesy też liczą się do RAM.
+To zadania mapowe, nie dokładna liczba HTTP/s, pomiar łącza czy gwarancja maksimum.
+WFS, MSSQL, rastry źródłowe i wektory z edycjami nie są zrównoleglane przez automat.
 
-- `adaptive.py`: HostPolicy, atomowe pliki protokołu 1 i WorkerGate.
-- `parallel_archive.py`: istniejąca kolejka, niezależny koordynator co 0,5 s,
-  sprawiedliwy przydział hostów, RAM, bramki dla procesów i głównego QGIS.
-- `raster_archive.py`: obserwacja błędów HTTP, bramka przed renderowaniem,
-  rejestr kafelków i uzupełnianie bez odtwarzania tabeli.
-- `archive_worker.py`: izolowane QGIS, statystyki i zamykanie bramki.
-- `archive.py`: `create_archive(adaptive=False, server_activity=...)` zachowuje
-  zgodny tryb stały API. Okno przekazuje `adaptive=True`.
-- `archive_dialog.py`: odczyt stanu hostów, PL/EN, anulowanie, wynik i ostrzeżenia.
+Dyskowy rejestr każdej mapy pamięta również poprawne przezroczyste kafelki.
+Początkowy zapis i najwyżej dwie dodatkowe rundy uzupełniają tylko braki w bieżącym
+archiwum. Brak wznawiania po zamknięciu QGIS i pamięci limitów między eksportami.
+Prywatne rejestry są sprzątane. Manifest 4 zachowuje historię i statystyki.
 
-Awaria procesu/brak interpretera w trybie adaptacyjnym nie może powodować
-ponowienia w głównym QGIS z pominięciem limitów. Mapy wymagające głównej ścieżki
-(np. authcfg) używają wspólnej bramki. Nie zwiększamy równoległości MSSQL,
-wektorów z edycjami ani rastrów źródłowych. Czekające procesy liczą się do RAM.
-Prywatne rejestry są usuwane po pracy; manifest zachowuje podsumowanie.
+Podczas pracy można przewijać listy, rozwijać grupy i czytać podpowiedzi.
+Zmiana parametrów i checkboxów jest zablokowana; przywracamy flagi w finally.
+Nie usuwaj ItemIsEnabled, bo blokuje nawigację. Natywne synchroniczne odczyty
+w głównym QGIS nadal mogą na chwilę zatrzymać obsługę zdarzeń.
 
-Uczenie i automatyczna naprawa dotyczą wyłącznie bieżącego eksportu: brak
-pamięci limitów między uruchomieniami i wznawiania po zamknięciu QGIS.
-Ręczny przycisk ponowienia na końcowym ekranie zaznacza failed/cancelled/empty/partial,
-odznacza saved/excluded i tworzy **nowe** archiwum wybranych warstw.
+Końcowy ręczny przycisk ponowienia zaznacza failed/cancelled/empty/partial,
+odznacza saved/excluded i tworzy nowe archiwum wybranych warstw. Nie myl go
+z automatycznym uzupełnianiem kafelków w bieżącym eksporcie.
 
-Tłumaczenia: `i18n.py`, katalog Qt `en.ts` + `en.qm` (345 tłumaczeń).
-Po zmianach tekstów uruchom lrelease i testy zgodności szablonów.
-Szacunki na jedną mapę nadal używają modelu 0,2–2 s i 10–250 KiB PNG/kafelek;
-nie są pomiarem ani gwarantowanymi granicami. Nie dziel czasu jednej mapy przez CPU.
+PL/EN: i18n.py + en.ts/en.qm, 273 tłumaczenia. Po zmianach uruchom lrelease.
+Szacunek jednej mapy: 0,2–2 s i 10–250 KiB PNG/kafelek; nie jest to gwarancja.
+Ikony SVG: archive icon.svg, cpu.svg, ram.svg; inne przyciski używają QStyle.
 
-## Opisy i ikony 0.8.1
+## Paczka i kontrole
 
-README PL i osobny README.en.md opisują zastosowanie, obsługę, przepływ danych,
-ograniczenia i wykonane kontrole. Metadane QGIS mają opisy PL/EN, autora,
-repozytorium, zgłoszenia, tagi i changelog. Wzorem redakcyjnym było repozytorium
-`jaroslaw-sadowski/qgis-poprawka-odwzorowawcza`; nie przenosiliśmy deklaracji
-jego kontroli bezpieczeństwa ani obsługi QGIS 4 do naszego produktu.
+- `dist/qgis-project-snapshot-0.9.0.zip`: 96 880 bajtów, 21 plików.
+- SHA-256: `106992555dea5cb46130adb670acf3dd0bef8527e76a429cda0dd24319f0f307`.
+- **70/70 testów ZIP-a**, bez pominięć, 59,582 s; pełne źródła: 57,994 s.
+- Ubuntu, QGIS 3.40.15, GDAL 3.12.2, Python 3.14.4, PyQt5, Qt offscreen.
+- Testy lokalnego proxy: poprawne Basic, wyłączenie, wyjątki, 407, awaria startu,
+  brak poświadczeń w archiwum i brak niesprzątniętych katalogów procesu.
+- Ruff check i format --check: 23 pliki Python, OK. Składnia, CRC, źródła/ZIP
+  i diff --check: OK. Bez nowych zależności wymaganych przez wtyczkę.
+- Benchmark 0.8.0 jest historyczny: stały 57,706 s, adaptacyjny 58,323 s,
+  identyczne PNG sześciu map. Nie wykonywano nowego pomiaru po audycie.
 
-Piktogram mapy w pudełku: `icon.svg` (metadane, pasek, akcja i okno archiwizacji).
-Drobne autorskie SVG `cpu.svg` i `ram.svg` oznaczają procesy i rezerwę pamięci;
-pozostałe przyciski używają natywnych ikon QStyle. Budowa pakuje SVG, poprzedni
-nieużywany icon.png usunięto. Nie potrzeba nowych zależności. RAM w oknie to
-wyraźnie opisana rezerwa 2 GiB, nie wskaźnik bieżącego zużycia pamięci.
+## Następny krok i pliki
 
-## Zweryfikowany wynik
+Odbiór ZIP-a 0.9.0 na komputerze użytkownika z już skonfigurowanym proxy QGIS.
+MSSQL działa tylko w sieci firmowej, trzy rastry projektu są tu nieobecne.
+Nie zgaduj adresów ani nie proś ponownie o poświadczenia. Sprawdzenie wszystkich
+warstw, uwierzytelniania, stylów, formularzy, relacji i wydruków wymaga stanowiska
+firmowego oraz późniejszej próby offline.
 
-- `dist/qgis-project-snapshot-0.8.1.zip`: 104 679 bajty, 22 pliki.
-- SHA-256: `8e37c1e8d6fbc6913ed6494de821f81fbdaa93f86499092bf74d0392119bd5c1`.
-- **65/65 testów końcowego ZIP-a**, bez pominięć, QGIS 3.40.15,
-  GDAL 3.12.2, Python 3.14.4, PyQt5, Ubuntu; testy Qt offscreen.
-- Benchmark sześciu map/dwóch lokalnych hostów: stały 57,706 s, automatyczny
-  58,323 s; po 1014 żądań, identyczne PNG, maksimum cztery procesy.
-  To pomiar syntetyczny, nie dowód przyspieszenia w produkcji.
-- Szczegóły: [odbiór 0.8.1](validation-0.8.1.md),
-  [benchmark](benchmark-0.8.0.json). Starsze odbiory pozostają historyczne.
-
-Budowa: `python3 scripts/build_plugin.py`; dist jest ignorowany przez Git.
-Po zmianie plików pakowanych przebuduj ZIP i ponów odbiór. Źródło prawdy:
-`mbtiles_batch_exporter/`, wersja w `metadata.txt`. Identyfikator instalacji
-pozostaje `mbtiles_batch_exporter` dla zgodności aktualizacji; nazwa widoczna
-to qgis-project-snapshot. Nie opublikowano GitHub Release ani wydania w katalogu QGIS.
-
-## Ograniczenia i następny krok
-
-MSSQL użytkownika działa tylko w sieci firmowej; tutaj nie ma DNS/dostępu,
-a trzy rastry projektu są nieobecne. Nie zgaduj adresów i nie proś ponownie
-o poświadczenia bez zmiany warunków. Windows nie został odebrany.
-
-Następny krok: test służbowy według [instrukcji zespołu](team-guide.md), obejmujący
-MSSQL, lokalne rastry, uwierzytelnianie, wszystkie warstwy, długi pas, style,
-etykiety, formularze, relacje i wydruki, a następnie odczyt bez sieci.
-Nie wszystkie zależności wyrażeń, fonty i dowolny kod formularzy są pakowane;
-relacje mogą wskazywać obiekty spoza obszaru. Anulowanie zachowuje ukończone,
-scalone warstwy; prywatne dane nieukończonych map są sprzątane.
-
-Mapa architektury: [architecture.md](architecture.md). Polecenia testów i budowy:
-[development.md](development.md). Reguły współpracy: [AGENTS.md](../AGENTS.md).
-Przy zgłoszeniu braku postępu analizuj rzeczywisty dziennik i stany procesów;
-nie zastępuj ich sztucznym procentem. Nie dodawaj nieuzgodnionych funkcji.
+Kod: `mbtiles_batch_exporter/`, wersja: metadata.txt. Szczegóły modułów:
+[architecture.md](architecture.md). Budowa/testy/Ruff: [development.md](development.md).
+Instrukcja użytkownika: [team-guide.md](team-guide.md), pakowana jako INSTRUKCJA.md.
+ZIP-y w ignorowanym dist; dokumenty agentów nie są pakowane. Raportów historycznych
+nie nadpisuj. Nie opublikowano GitHub Release ani wydania w katalogu QGIS.
