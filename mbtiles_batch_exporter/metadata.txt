@@ -4,7 +4,7 @@ qgisMinimumVersion=3.40
 qgisMaximumVersion=3.99
 description=PL: Archiwizuje projekt QGIS z lokalnymi danymi i mapami do późniejszego odczytu bez sieci.
     | EN: Archives a QGIS project with local data and maps for later offline use.
-version=0.9.0
+version=0.9.1
 author=Jarosław Sadowski
 email=
 about=PL
@@ -23,7 +23,8 @@ homepage=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 repository=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 tracker=https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues
 tags=archiwizacja,archive,snapshot,offline,projekt,project,geopackage,gpkg,wms,wfs,png
-changelog=0.9.0: Proxy aktywnego QGIS w procesach map, bezpieczna diagnostyka, jedna akcja archiwizacji, audyt Ruff/PEP 8.
+changelog=0.9.1: Persistent developer diagnostics for archives, workers and proxy configuration.
+    0.9.0: Proxy aktywnego QGIS w procesach map, bezpieczna diagnostyka, jedna akcja archiwizacji, audyt Ruff/PEP 8.
     0.9.0: Desktop QGIS proxy in map workers, safe diagnostics, one archive action, Ruff/PEP 8 audit.
     0.8.3: Przeglądanie listy warstw podczas eksportu. / Browse layer status during export.
     0.8.2: Procesy pomocnicze bez okien konsoli w Windows. / Background workers without console windows on Windows.

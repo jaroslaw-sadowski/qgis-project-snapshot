@@ -193,6 +193,7 @@ class ResourceTests(unittest.TestCase):
 
     def test_busy_host_does_not_block_another_host(self):
         workers = RasterWorkers.__new__(RasterWorkers)
+        workers.diagnostic = None
         workers.adaptive = False
         workers.stop = Event()
         workers.condition = Condition()

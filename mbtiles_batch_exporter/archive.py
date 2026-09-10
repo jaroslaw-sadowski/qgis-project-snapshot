@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 import time
 import xml.etree.ElementTree as ET
+from configparser import ConfigParser
 from contextlib import ExitStack, closing
 from datetime import datetime
 from hashlib import sha256
@@ -23,6 +24,8 @@ from qgis.core import (
     QgsFeatureSink,
     QgsGeometry,
     QgsMultiBandColorRenderer,
+    QgsNetworkAccessManager,
+    QgsNetworkReplyContent,
     QgsPathResolver,
     QgsProject,
     QgsRasterLayer,
@@ -30,13 +33,16 @@ from qgis.core import (
     QgsVectorFileWriter,
     QgsVectorLayer,
 )
+from qgis.PyQt.QtNetwork import QNetworkRequest
 from qgis.PyQt.QtXml import QDomDocument
 
 from .archive_resources import ProjectResources, audit_local_layers
+from .diagnostics import Diagnostics, network_details
 from .i18n import tr
 from .parallel_archive import RasterWorkers, WorkerError
 from .raster_archive import write_raster_data, write_rendered_raster, zoom_levels
 from .resources import detect_resources, recommend
+from .worker_network import network_snapshot
 
 ARCHIVE_LIMITATIONS = [
     "Obrazy usług mapowych odtwarzają tylko wybrany obszar i poziomy zoomu.",
@@ -491,10 +497,41 @@ def create_archive(
                 server_activity(parallel.server_activity())
 
     with (
+        Diagnostics(output_folder / (name + ".diagnostic.jsonl")) as diagnostic,
         TemporaryDirectory(prefix=".archive-", dir=output_folder) as temporary,
         ExitStack() as processes,
     ):
         staging = Path(temporary)
+        metadata = ConfigParser()
+        metadata.read(Path(__file__).with_name("metadata.txt"), encoding="utf-8")
+        diagnostic.emit(
+            "configuration",
+            plugin_version=metadata.get("general", "version"),
+            project_crs=project.crs().authid(),
+            zoom_min=zoom_min,
+            zoom_max=zoom_max,
+            qgis=Qgis.QGIS_VERSION,
+            gdal=gdal.VersionInfo(),
+            adaptive=adaptive,
+            workers=workers,
+            resources=resources,
+            network=network_details(network_snapshot()),
+        )
+
+        def network_finished(reply):
+            status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
+            if reply.error() or (status and status >= 400):
+                diagnostic.emit(
+                    "main_network_error",
+                    http_status=status,
+                    qt_error=int(reply.error()),
+                )
+
+        network_signal = QgsNetworkAccessManager.instance().finished[
+            QgsNetworkReplyContent
+        ]
+        network_signal.connect(network_finished)
+        processes.callback(network_signal.disconnect, network_finished)
         snapshot = staging / "_source.qgz"
         progress(
             tr(
@@ -524,6 +561,7 @@ def create_archive(
                     workers,
                     per_server_limit,
                     adaptive,
+                    diagnostic=diagnostic,
                 )
             )
         for record in records:
@@ -578,6 +616,14 @@ def create_archive(
                                     )
                                 ),
                             )
+                            diagnostic.emit(
+                                "vector_read",
+                                layer_index=completed + 1,
+                                provider=record["provider"],
+                                features=count,
+                                empty=count == 0,
+                                provider_error_count=len(layer.dataProvider().errors()),
+                            )
                             record.update(
                                 status="saved",
                                 table=table,
@@ -592,7 +638,13 @@ def create_archive(
                             )
                         except InterruptedError:
                             raise
-                        except Exception:
+                        except Exception as error:
+                            diagnostic.error(
+                                "layer_attempt_exception",
+                                error,
+                                layer_index=completed + 1,
+                                provider=record["provider"],
+                            )
                             _remove_table(database, table)
                             record["attempts"].append(
                                 {
@@ -638,7 +690,13 @@ def create_archive(
                             )
                         except InterruptedError:
                             raise
-                        except Exception:
+                        except Exception as error:
+                            diagnostic.error(
+                                "layer_attempt_exception",
+                                error,
+                                layer_index=completed + 1,
+                                provider=record["provider"],
+                            )
                             record["attempts"].append(
                                 {
                                     "method": "raster_data",
@@ -672,7 +730,13 @@ def create_archive(
                                 )
                             except InterruptedError:
                                 raise
-                            except Exception:
+                            except Exception as error:
+                                diagnostic.error(
+                                    "layer_attempt_exception",
+                                    error,
+                                    layer_index=completed + 1,
+                                    provider=record["provider"],
+                                )
                                 if adaptive:
                                     # Never bypass host policy with a main-thread retry.
                                     raise
@@ -748,11 +812,19 @@ def create_archive(
                         ),
                     )
                 except WorkerError as error:
+                    diagnostic.emit(
+                        "worker_failure",
+                        layer_index=completed + 1,
+                        details=error.details,
+                    )
                     _remove_table(database, table)
                     record.update(
                         status="failed", reason=str(error), worker_error=error.details
                     )
-                except Exception:
+                except Exception as error:
+                    diagnostic.error(
+                        "layer_exception", error, layer_index=completed + 1
+                    )
                     _remove_table(database, table)
                     record.update(
                         status="failed",
@@ -760,6 +832,13 @@ def create_archive(
                             "Nie udało się zapisać danych ani obrazu tej warstwy."
                         ),
                     )
+            diagnostic.emit(
+                "layer_result",
+                layer_index=completed + 1,
+                provider=record["provider"],
+                status=record["status"],
+                feature_count=record.get("feature_count"),
+            )
             record["finished_at"] = datetime.now().astimezone().isoformat()
             completed += 1
             layer_status(dict(record), completed, total)
@@ -769,6 +848,7 @@ def create_archive(
             tr("Kończenie zadań pomocniczych i porządkowanie plików tymczasowych…")
         )
         adaptive_report = parallel.adaptive_report() if adaptive and parallel else None
+        diagnostic.emit("adaptive_summary", details=adaptive_report)
         if adaptive and parallel:
             server_activity(parallel.server_activity())
         processes.close()
@@ -930,5 +1010,10 @@ def create_archive(
                 tr("Folder docelowy już istnieje. Nie nadpisano archiwum.")
             )
         progress(tr("Udostępnianie gotowego folderu archiwum…"))
+        diagnostic.emit(
+            "archive_result", status=manifest["status"], cancelled=manifest["cancelled"]
+        )
         staging.rename(destination)
+        diagnostic.path.rename(destination / "diagnostic.jsonl")
+        diagnostic.path = destination / "diagnostic.jsonl"
     return destination

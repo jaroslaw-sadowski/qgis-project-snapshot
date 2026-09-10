@@ -122,6 +122,10 @@ class ProxyTests(unittest.TestCase):
                 server_activity=rows.extend,
             )
         manifest = json.loads((folder / "manifest.json").read_text())
+        self.diagnostic_events = [
+            json.loads(line)
+            for line in (folder / "diagnostic.jsonl").read_text().splitlines()
+        ]
         self.assertFalse((folder / ".workers").exists())
         for path in folder.rglob("*"):
             if path.is_file():
@@ -140,6 +144,12 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(manifest["parallel"]["completed_in_workers"], 1)
         self.assertTrue(manifest["local_layer_audit"]["passed"])
         self.assertTrue(self.proxy_requests)
+        self.assertTrue(
+            any(
+                e.get("details", {}).get("event") == "proxy_authentication_requested"
+                for e in self.diagnostic_events
+            )
+        )
         self.assertEqual(rows[-1]["state"], "finished")
 
     def test_proxy_disabled_and_no_proxy_exclusion_use_direct_connection(self):

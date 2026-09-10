@@ -1,9 +1,9 @@
-# qgis-project-snapshot — instrukcja 0.9.0
+# qgis-project-snapshot — instrukcja 0.9.1
 
 ## Instalacja i uruchomienie
 
 1. QGIS: **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-0.9.0.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-0.9.1.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
 
 Wymagane: QGIS 3.40, PyQt5 i GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
@@ -99,7 +99,7 @@ folder. The final Retry button creates a separate archive of selected layers; ke
 both folders. There is no restart/resume after closing QGIS. Service usage policies
 still apply. Hover over controls for details.
 
-## Proxy i błędy połączenia (0.9.0)
+## Proxy i błędy połączenia (0.9.1)
 
 Nie wpisujesz proxy we wtyczce. Korzystamy z ustawień sieci aktywnego QGIS,
 w tym wyjątków i dostępnych zapisanych poświadczeń. Gdy proxy jest wyłączone,
@@ -121,3 +121,20 @@ Available saved proxy credentials are transferred in memory, not written into
 the archive. HTTP 407 identifies rejected proxy authentication. TLS verification
 remains enabled. The startup log shows detected CPU/RAM and the process budget.
 The legacy standalone MBTiles exporter has been removed.
+
+## Plik diagnostyczny dla developera (0.9.1)
+
+Każdy rozpoczęty eksport zapisuje `diagnostic.jsonl` obok `raport.html` i
+`manifest.json`, również przy wyniku częściowym lub anulowaniu. Jeżeli eksport
+zakończy się wyjątkiem przed utworzeniem archiwum, log pozostaje w wybranym
+folderze zapisu jako `<nazwa_archiwum>.diagnostic.jsonl`. Błędy walidacji opcji
+przed rozpoczęciem eksportu nie tworzą pliku. Brak miejsca lub uprawnień do zapisu
+może uniemożliwić zapis diagnostyki.
+
+Do analizy problemu przekaż wszystkie trzy pliki oraz log z okna. Diagnostyka
+zawiera czas, wersje środowiska, zasoby, wyniki warstw, zdarzenia procesów,
+kody HTTP/Qt i miejsca wyjątków w kodzie. Nie zawiera haseł, loginów, pełnych
+adresów usług, treści wyjątków dostawców ani wartości atrybutów obiektów.
+Konfiguracja proxy i zaobserwowane żądanie uwierzytelnienia są rozróżniane;
+brak żądania uwierzytelnienia nie oznacza, że proxy nie było używane.
+Wynik pusty jest oznaczany w diagnostyce, ale nie dowodzi poprawności źródła.

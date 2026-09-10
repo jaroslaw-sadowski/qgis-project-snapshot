@@ -7,11 +7,14 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from .diagnostics import Diagnostics, network_details
 from .i18n import tr
 
 
 def main():
     folder = Path(sys.argv[1])
+    diagnostic = Diagnostics(folder / "diagnostic.jsonl")
+    diagnostic.emit("worker_bootstrap")
     stage = "bootstrap"
     network_error = {}
     project = gate = None
@@ -69,12 +72,14 @@ def main():
         app.initQgis()
         app.setMaxThreads(1)
         stage = "network_setup"
-        configure_network(network)
+        configure_network(network, diagnostic)
+        diagnostic.emit("worker_network_configuration", **network_details(network))
 
         def finished(reply):
             status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
             if reply.error() != QNetworkReply.NoError or (status and status >= 400):
                 network_error.update(http_status=status, qt_error=int(reply.error()))
+                diagnostic.emit("network_error", stage=stage, **network_error)
 
         QgsNetworkAccessManager.instance().finished[QgsNetworkReplyContent].connect(
             finished
@@ -97,6 +102,7 @@ def main():
         layer = project.mapLayer(parameters["layer_id"])
         if layer is None or not layer.isValid():
             raise RuntimeError()
+        diagnostic.emit("source_opened", valid=layer.isValid())
         stage = "render"
         result = write_rendered_raster(
             layer,
@@ -117,8 +123,10 @@ def main():
         stage = "result_write"
         (folder / "result.json").write_text(json.dumps(result), encoding="utf-8")
     except InterruptedError:
+        diagnostic.emit("worker_cancelled", stage=stage)
         return 2
-    except Exception:
+    except Exception as error:
+        diagnostic.error("worker_exception", error, stage=stage)
         # Codes only: provider exceptions may contain URLs and credentials.
         (folder / "error.json").write_text(
             json.dumps(

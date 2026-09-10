@@ -28,7 +28,7 @@ def network_snapshot():
     }
 
 
-def configure_network(snapshot):
+def configure_network(snapshot, diagnostic=None):
     """Called before opening a layer in a worker's isolated QGIS profile."""
     if snapshot.get("version") != 1:
         raise ValueError("Unsupported network protocol")
@@ -48,6 +48,8 @@ def configure_network(snapshot):
     credentials = snapshot["credentials"]
 
     def authenticate(proxy, authenticator):
+        if diagnostic:
+            diagnostic.emit("proxy_authentication_requested")
         if (
             proxy.hostName() == credentials["host"]
             and proxy.port() == credentials["port"]

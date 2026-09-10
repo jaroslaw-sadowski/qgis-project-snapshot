@@ -156,7 +156,9 @@ class RasterWorkers:
         workers,
         per_server_limit=2,
         adaptive=False,
+        diagnostic=None,
     ):
+        self.diagnostic = diagnostic
         self.network = network_snapshot()
         self.folder = staging / ".workers"
         self.folder.mkdir(mode=0o700)
@@ -429,7 +431,9 @@ class RasterWorkers:
                     self.rows = rows
                     self.condition.notify_all()
                 self.stop.wait(0.5)
-        except Exception:
+        except Exception as error:
+            if self.diagnostic:
+                self.diagnostic.error("coordinator_exception", error)
             # A broken coordinator must never leave unrestricted workers running.
             self.coordinator_failed = True
             self.stop.set()
@@ -575,6 +579,28 @@ class RasterWorkers:
             except Exception as caught:
                 error = caught
             finally:
+                if self.diagnostic:
+                    if error is not None:
+                        self.diagnostic.error(
+                            "worker_exception", error, job=folder.name
+                        )
+                    worker_log = folder / "diagnostic.jsonl"
+                    try:
+                        lines = worker_log.read_text(encoding="utf-8").splitlines()
+                    except OSError:
+                        lines = []
+                        self.diagnostic.emit("worker_log_unavailable", job=folder.name)
+                    for line in lines:
+                        try:
+                            self.diagnostic.emit(
+                                "worker_event",
+                                job=folder.name,
+                                details=json.loads(line),
+                            )
+                        except ValueError:
+                            self.diagnostic.emit(
+                                "worker_log_incomplete", job=folder.name
+                            )
                 with self.condition:
                     if self.adaptive:
                         self._read_job(self.jobs[folder.name], time.monotonic())
@@ -635,6 +661,10 @@ class RasterWorkers:
             )
         except OSError:
             raise WorkerError("process_start") from None
+        if self.diagnostic:
+            self.diagnostic.emit(
+                "worker_started", job=folder.name, worker_pid=process.pid
+            )
         with process:
             try:
                 process.stdin.write(json.dumps(self.network).encode("utf-8"))
@@ -649,6 +679,10 @@ class RasterWorkers:
                     if time.monotonic() - stopping > 5:
                         process.kill()
                 time.sleep(0.05)
+            if self.diagnostic:
+                self.diagnostic.emit(
+                    "worker_exit", job=folder.name, exit_code=process.returncode
+                )
             if self.stop.is_set():
                 if self.coordinator_failed:
                     raise RuntimeError(

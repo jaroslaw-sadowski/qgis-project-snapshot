@@ -1,9 +1,27 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 10 września 2026. Wersja **0.9.0**. Gotowa paczka po naprawie proxy,
-usunięciu dawnego eksportera i audycie Ruff. Pełny odbiór Windows oraz źródeł
-firmowych pozostaje do wykonania. Przed pracą sprawdź git status i historię;
-nie zakładaj, że zmiany tej sesji zatwierdzono lub wysłano.
+Aktualizacja: 10 września 2026. Wersja **0.9.1** — diagnostyka eksportu.
+Test firmowy 0.9.0 wykazał niekompletny wynik: zapisano 39/211 warstw,
+172 mapy nieudane, wszystkie trzy WFS puste, coordinator_failed=true.
+Nie uznawaj wcześniejszych testów Ubuntu za potwierdzenie działania na Windows.
+Przyczyna awarii koordynatora pozostaje nieustalona; wersja 0.9.1 dodaje
+informacje potrzebne do jej rozpoznania, nie deklaruje naprawy tego błędu.
+
+## Zmiana 0.9.1
+
+- Zawsze po rozpoczęciu eksportu powstaje log diagnostyczny JSONL: przy gotowym
+  archiwum `diagnostic.jsonl`, przy wyjątku `<nazwa_archiwum>.diagnostic.jsonl`
+  w wybranym folderze nadrzędnym. Walidacja opcji poprzedza rozpoczęcie logowania.
+- Typy i miejsca wyjątków, errno/winerror, kody HTTP/Qt, start/wyjście procesów,
+  konfiguracja proxy bez adresów i poświadczeń, zdarzenia żądania uwierzytelnienia.
+- Wektory: liczba obiektów, oznaczenie pustego odczytu i liczba błędów dostawcy.
+  Sam brak obiektów nadal nie dowodzi prawidłowego odczytu WFS.
+- Prywatne logi procesów zbierane przed sprzątaniem. Brak surowego stderr,
+  treści wyjątków, zmiennych lokalnych, pełnych adresów i danych obiektów.
+- Główne zdarzenia warstw: numer wybranej warstwy; procesy: techniczna tabela.
+  Log nie jest sumowany w manifeście, ponieważ jest dopisywany do końca eksportu.
+- Nie potwierdzamy trasy każdego żądania wyłącznie na podstawie ustawień proxy.
+- Raport weryfikacji: [0.9.1](validation-0.9.1.md).
 
 ## Cel i zasady
 

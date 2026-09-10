@@ -113,3 +113,20 @@ diagnozy i do 20 przykładów błędów kafelków na mapę.
 | parallel_archive.py, archive_worker.py | Izolacja QGIS, procesy i scalanie |
 | adaptive.py, resources.py | Polityka hostów, bramka i budżet zasobów |
 | worker_network.py | Proxy QGIS przekazywane do procesów |
+
+## Diagnostyka 0.9.1
+
+`diagnostics.py` zapisuje strukturalny JSONL bez dodatkowych zależności. Główny
+proces zapisuje plik obok katalogu roboczego i przenosi go do końcowego archiwum.
+Przy wyjątku plik pozostaje poza usuwanym stagingiem. Procesy mają prywatne logi;
+nadzorca zbiera je po zakończeniu procesu przed usunięciem katalogu mapy.
+Nie ma równoległego zapisu wielu procesów do wspólnego pliku. Wątki nadzorcy
+używają blokady. Błąd zapisu logu nie może zatrzymać sprzątania ani koordynatora.
+
+Wyjątki: typ, errno/winerror, nazwy plików kodu, funkcje i numery linii; bez
+wiadomości, źródłowych linii kodu, ścieżek użytkownika i zmiennych lokalnych.
+Sieć: konfiguracja proxy bez adresów i poświadczeń, żądania uwierzytelnienia,
+kody błędów Qt/HTTP. Nie deklarujemy obserwacji rzeczywistej trasy każdego żądania.
+Główne zdarzenia warstw odnoszą się do numeru wybranej warstwy; procesy do
+technicznej nazwy tabeli. Log jest dopisywany do końca, nie należy do sha256
+manifestu. Nie przechwytujemy surowego stderr GDAL/QGIS ze względu na dane źródeł.

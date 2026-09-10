@@ -118,6 +118,12 @@ class ArchiveTests(unittest.TestCase):
         original_path_type = self.project.filePathStorage()
         result = self.archive()
         manifest = self.manifest(result)
+        events = [
+            json.loads(line)
+            for line in (result / "diagnostic.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(events[-1]["event"], "archive_end")
+        self.assertTrue(any(e["event"] == "vector_read" for e in events))
         self.assertEqual(manifest["status"], "partial")
         self.assertEqual([row["feature_count"] for row in manifest["layers"]], [3, 1])
         self.assertEqual(len({row["table"] for row in manifest["layers"]}), 2)
@@ -285,7 +291,10 @@ class ArchiveTests(unittest.TestCase):
         self.assertTrue(self.project.isDirty())
         self.assertEqual(self.original.read_bytes(), self.original_bytes)
         self.assertFalse(list(self.folder.glob(".archive-*")))
-        self.assertFalse(list(self.folder.glob("*_archive_*")))
+        logs = list(self.folder.glob("*_archive_*.diagnostic.jsonl"))
+        self.assertEqual(len(logs), 1)
+        self.assertIn('"archive_exception"', logs[0].read_text())
+        self.assertFalse([p for p in self.folder.glob("*_archive_*") if p.is_dir()])
 
     def test_repeated_archive_never_overwrites_previous(self):
         first = self.archive()
