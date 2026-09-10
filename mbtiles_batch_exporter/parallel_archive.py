@@ -418,12 +418,11 @@ class RasterWorkers:
                                 # maps.
                                 probing = [j for j in candidates if j.get("probing")]
                                 allowed = (probing or candidates)[:1]
-                                if not allowed and not any(
-                                    j["state"].get("running") or not j["state"]
-                                    for j in jobs
-                                ):
-                                    policy.blocked = True
-                                    policy.change(now, "no_retryable_tiles")
+                                # A worker may still be preparing its ledger or
+                                # finishing a map whose last tile exhausted its
+                                # attempts. Wait for a real missing tile, possibly
+                                # from the next queued map, instead of blocking
+                                # unrelated services on the same host.
                         for job in jobs:
                             job["probing"] = policy.recovering and job in allowed
                             write_state(
@@ -599,7 +598,16 @@ class RasterWorkers:
                         )
                         and (
                             not self.adaptive
-                            or (self.memory_ok and not self.policies[host].recovering)
+                            or (
+                                self.memory_ok
+                                and (
+                                    not self.policies[host].recovering
+                                    or (
+                                        time.monotonic() >= self.policies[host].until
+                                        and self.active_hosts.get(host, 0) == 0
+                                    )
+                                )
+                            )
                         )
                     ),
                     None,
@@ -620,17 +628,25 @@ class RasterWorkers:
                             self.queue.remove((host, future, folder))
                     if not self.queue:
                         return
-                    # Queue may have changed while removing deferred hosts.
-                    index = next(
+                    # Prefer another server before a second task on a busy one.
+                    # min preserves queue order when active counts are equal.
+                    index = min(
                         (
                             i
                             for i, (host, _, _) in enumerate(self.queue)
                             if self.memory_ok
-                            and not self.policies[host].recovering
+                            and (
+                                not self.policies[host].recovering
+                                or (
+                                    time.monotonic() >= self.policies[host].until
+                                    and self.active_hosts.get(host, 0) == 0
+                                )
+                            )
                             and self.active_hosts.get(host, 0)
                             < self.policies[host].limit
                         ),
-                        None,
+                        key=lambda i: self.active_hosts.get(self.queue[i][0], 0),
+                        default=None,
                     )
                 if index is None:
                     self.condition.wait(0.1)

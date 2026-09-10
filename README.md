@@ -17,7 +17,7 @@ modyfikować i udostępniać na warunkach [licencji](LICENSE).
 ## Jak używać
 
 Wymaga QGIS 3.40 z PyQt5 oraz GDAL co najmniej 3.7. Interfejs wybiera polski
-lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.4**.
+lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.5**.
 
 1. Zainstaluj paczkę przez **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
 2. Otwórz projekt i wybierz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**
@@ -29,7 +29,9 @@ lub angielski według języka QGIS. Aktualna wersja do testów: **0.9.4**.
 
 Pobieranie korzysta z proxy skonfigurowanego w aktywnym QGIS, jego wyjątków
 i dostępnych zapisanych poświadczeń. Nie trzeba wpisywać ich we wtyczce.
-Automatycznie dobiera liczbę zadań do CPU, RAM i odpowiedzi każdego serwera. Okno pokazuje aktywne zadania, limity, kolejki, przerwy i dziennik.
+Automatycznie dobiera liczbę zadań do CPU, RAM i odpowiedzi każdego serwera.
+Preferuje pracę na różnych serwerach równocześnie, z jednym lub najwyżej dwoma
+zadaniami na host. Okno pokazuje aktywne zadania, limity, kolejki, przerwy i dziennik.
 Podczas eksportu uzupełnia tylko brakujące kafelki w tym samym archiwum.
 Ręczne ponowienie z końcowego ekranu tworzy nowe archiwum wybranych warstw.
 
@@ -56,7 +58,7 @@ oprogramowania i brak gwarancji opisuje [licencja](LICENSE).
 
 ## Wykonane kontrole
 
-- 70 testów QGIS: zapis i odczyt danych, mapy, raport, PL/EN, anulowanie,
+- 108 testów QGIS w wersji 0.9.5: zapis i odczyt danych, mapy, raport, PL/EN, anulowanie,
   ograniczenia serwerów i uzupełnianie braków.
 - Test instalacyjnego ZIP-a: natywne wykrywanie i ładowanie w QGIS, okno archiwizacji,
   wyłączenie wtyczki oraz uruchomienie testów na kodzie z paczki.
@@ -68,17 +70,17 @@ oprogramowania i brak gwarancji opisuje [licencja](LICENSE).
 Środowisko testowe: Ubuntu, QGIS 3.40.15. Windows, MSSQL i kompletny projekt
 firmowy wymagają odbioru na stanowisku użytkownika. To kontrole lokalne,
 nie certyfikat QGIS ani gwarancja poprawności dowolnego projektu.
-[Raporty i dokumentacja](docs/README.md).
+[Odbiór 0.9.5](docs/validation-0.9.5.md) · [Raporty i dokumentacja](docs/README.md).
 
 ## Paczka i rozwój
 
-Repozytorium zawiera źródła. Aby przygotować ZIP **0.9.4**, uruchom:
+Repozytorium zawiera źródła. Aby przygotować ZIP **0.9.5**, uruchom:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-Paczka `qgis-project-snapshot-0.9.4.zip` i suma SHA-256 powstaną w `dist/`.
+Paczka `qgis-project-snapshot-0.9.5.zip` i suma SHA-256 powstaną w `dist/`.
 Ten katalog nie jest przechowywany w Git. Samo przygotowanie ZIP-a nie oznacza
 publikacji w katalogu wtyczek QGIS.
 

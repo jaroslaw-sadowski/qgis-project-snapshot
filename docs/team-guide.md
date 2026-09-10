@@ -1,9 +1,9 @@
-# qgis-project-snapshot — instrukcja 0.9.4
+# qgis-project-snapshot — instrukcja 0.9.5
 
 ## Instalacja i uruchomienie
 
 1. QGIS: **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-0.9.4.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-0.9.5.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz **Wtyczki → qgis-project-snapshot → Archiwizuj projekt…**.
 
 Wymagane: QGIS 3.40, PyQt5 i GDAL 3.7 lub nowszy. Sprawdzono Ubuntu;
@@ -30,11 +30,13 @@ Nad nią widać wykorzystanie procesów map. Limity dotyczą zadań mapowych, ni
 liczby żądań HTTP na sekundę — dostawca QGIS może wysyłać kilka żądań dla jednego zadania.
 
 Automat zaczyna od 1 zadania na host. Po co najmniej 15 sekundach i 10 poprawnych
-kafelkach może dodać jedno zadanie, jeśli są następne mapy do pobrania. Sprawdza,
+kafelkach może zwiększyć limit do 2, jeśli są następne mapy do pobrania. Sprawdza,
 czy zwiększanie faktycznie poprawia szybkość. Po błędzie przeciążenia albo dwóch
 oknach bez poprawy wraca o krok i nie zwiększa już obciążenia w tym eksporcie.
 Dalsze problemy mogą je jeszcze zmniejszyć. CPU i dostępny RAM ograniczają
-łączną liczbę procesów; nieznany RAM oznacza ostrożny limit.
+łączną liczbę procesów; nieznany RAM oznacza ostrożny limit. Pierwszeństwo mają
+serwery z mniejszą liczbą aktywnych procesów: wolny proces obsłuży najpierw
+oczekujący serwer bez pobierania, zanim uruchomi drugą mapę zajętego serwera.
 
 To heurystyka, nie gwarancja najszybszego ustawienia. Krótki eksport może skończyć
 się przed zwiększeniem równoległości. Pojedyncza mapa nadal jest obsługiwana przez
@@ -84,7 +86,8 @@ Open **Plugins → qgis-project-snapshot → Archive project…**. Choose the fo
 area, layers and zooms, then **Create archive**. Concurrency is automatic. The
 server table shows active tasks/limit, queue, successful tiles/s, state and cooldown.
 
-Each host starts at one map task. After successful windows, concurrency may grow.
+Each host starts at one map task. After successful windows, it may grow to two.
+Servers with fewer active processes get priority; multiple servers can run together.
 Errors or no speed gain reduce the limit and stop further growth for this export.
 CPU/RAM constrain processes. This controls map tasks, not exact HTTP requests/sec.
 
@@ -139,9 +142,9 @@ Konfiguracja proxy i zaobserwowane żądanie uwierzytelnienia są rozróżniane;
 brak żądania uwierzytelnienia nie oznacza, że proxy nie było używane.
 Wynik pusty jest oznaczany w diagnostyce, ale nie dowodzi poprawności źródła.
 
-## Próba poprawki Windows 0.9.4
+## Próba poprawki Windows 0.9.5
 
-1. Zainstaluj ZIP 0.9.4 przez „Wtyczki → Zarządzanie i instalowanie wtyczek →
+1. Zainstaluj ZIP 0.9.5 przez „Wtyczki → Zarządzanie i instalowanie wtyczek →
    Instaluj z ZIP”, zamknij cały QGIS i uruchom go ponownie. Sprawdź wersję
    w menedżerze wtyczek. Zachowaj firmowe ustawienia proxy.
 2. Użyj tego samego komputera. W projekcie źródłowym wybierz mały obszar,
@@ -163,12 +166,13 @@ Wynik pusty jest oznaczany w diagnostyce, ale nie dowodzi poprawności źródła
 Dopiero po poprawnym małym teście zwiększ liczbę warstw i zoom do 20.
 Jeśli ponownie wystąpi błąd, najpierw przekaż log z tej wersji. Diagnostyka
 rozróżnia `ipc_replace_retry`, `ipc_replace_recovered` i `ipc_replace_failed`.
-Ta poprawka dotyczy awarii plików sterujących; nie potwierdza jeszcze poprawnego
-odczytu wszystkich firmowych WFS ani przyczyny ich wcześniejszych pustych wyników.
+Wersja 0.9.5 zawiera poprawkę blokad plików sterujących i powrotu serwera po
+przerwie. Nie potwierdza jeszcze poprawnego odczytu wszystkich firmowych WFS
+ani przyczyny ich wcześniejszych pustych wyników.
 
 ## Rozszerzona diagnostyka 0.9.3
 
-Użyj wersji 0.9.4 do opisanej wyżej próby — zawiera także poprawkę blokad Windows.
+Użyj wersji 0.9.5 do opisanej wyżej próby — zawiera także poprawkę blokad Windows.
 `diagnostic.jsonl` dodatkowo podaje:
 
 - powiązanie numeru wybranej warstwy z technicznym identyfikatorem procesu;
@@ -214,3 +218,36 @@ eksport, gdy co najmniej jedna mapa ma status zakończony, i sprawdź zachowany 
 Dopiero później zwiększ obszar i zoom. Dla obszaru z dostarczonego raportu zoom
 16–20 oznaczał 3644 kafelki na mapę, a dla 172 map szacunkowo do 626 768 operacji.
 Pobieranie dużego projektu nadal może długo trwać; czas zależy od serwerów i RAM.
+
+## Powrót po przerwie i tempo w 0.9.5
+
+Po wyczerpaniu trzech prób jednego kafelka automat może sprawdzić powrót serwera
+na następnym brakującym fragmencie, również z kolejnej mapy. Odczekuje wymaganą
+przerwę i dopuszcza jedną próbę. Udanych fragmentów nie pobiera ponownie;
+wyczerpany kafelek pozostaje oznaczony jako brak. Naprawia to przedwczesne
+odkładanie całej kolejki serwera w poprzedniej wersji.
+
+Kilka różnych serwerów może pracować równocześnie. Przy dostępnych około
+4,4 GiB RAM obecna ostrożna reguła pozwala na dwa procesy; poniżej 4 GiB budżet
+spada do jednego. Przy 6 GiB dostępnego RAM wynosi cztery, jeśli pozwala CPU
+i kolejka. Chodzi o pamięć dostępną w danej chwili, nie zainstalowaną w komputerze.
+Zamknięcie niepotrzebnych aplikacji może zwolnić RAM. Wtyczka zachowuje rezerwę
+2 GiB i szacunek 1 GiB na proces, także gdy inne serwery czekają.
+
+Przykładowy obszar około 153 ha miał 66 kafelków na mapę przy zoomie 13–17,
+a około 3650 przy 13–20. To ponad 55 razy więcej pracy. Ustaw szczegółowość
+potrzebną do dokumentowania projektu; wtyczka nie obniża jej automatycznie.
+Nie obiecujemy konkretnego przyspieszenia na usługach produkcyjnych.
+
+Do próby 0.9.5 wybierz kilka widocznych map z co najmniej trzech różnych hostów,
+w tym mapy serwera, który poprzednio zgłosił błąd. Zacznij od tego samego małego
+obszaru i zoomów 13–17. Sprawdź raport i treść archiwum bez sieci, a następnie
+przekaż `diagnostic.jsonl`, `manifest.json` i `raport.html`. WFS sprawdź na obszarze,
+gdzie w oryginalnej warstwie rzeczywiście widać obiekty.
+
+English: 0.9.5 can use the next missing tile to recover a server after another tile
+exhausts its three attempts. Scheduling favors idle servers before a second task
+on a busy server, with at most two tasks per host. The global CPU/RAM budget remains
+conservative. Test several visible maps on different hosts at zooms 13–17, check
+them offline, and keep the report, manifest and diagnostic log. Empty WFS output
+still requires comparison with known visible source features.

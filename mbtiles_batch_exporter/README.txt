@@ -1,4 +1,4 @@
-qgis-project-snapshot 0.9.4
+qgis-project-snapshot 0.9.5
 
 PL: Zachowaj dane i wygląd projektu QGIS, zanim zmienią się źródłowe usługi
 lub bazy. Wtyczka tworzy kopię projektu, lokalne wektory i mapy PNG

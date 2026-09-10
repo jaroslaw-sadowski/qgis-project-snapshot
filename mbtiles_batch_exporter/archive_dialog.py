@@ -145,10 +145,12 @@ class ArchiveDialog(QDialog):
         self.servers.setToolTip(
             tr(
                 (
-                    "Automat zaczyna od 1 zadania na serwer. Zwiększa "
-                    "obciążenie po sukcesach i cofa je przy błędach lub "
-                    "braku przyspieszenia. Limity dotyczą map, nie dokładnej "
-                    "liczby żądań HTTP."
+                    "Automat zaczyna od 1 zadania na serwer i może zwiększyć "
+                    "limit do 2 po udanych pobraniach. Pierwszeństwo mają "
+                    "serwery z mniejszą liczbą aktywnych procesów. Błędy lub "
+                    "brak przyspieszenia zmniejszają obciążenie. CPU i RAM "
+                    "ograniczają łączną liczbę procesów. Limity dotyczą map, "
+                    "nie dokładnej liczby żądań HTTP."
                 )
             )
         )

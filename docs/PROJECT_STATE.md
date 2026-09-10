@@ -1,6 +1,48 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 10 września 2026. Wersja **0.9.4** — odbiór gotowych map, dynamiczny budżet i timeouty QGIS.
+Aktualizacja: 10 września 2026. Wersja **0.9.5** — powrót po przerwie i pierwszeństwo różnych serwerów.
+
+## Najnowszy ukończony przebieg 0.9.4 i poprawka 0.9.5
+
+Eksport firmowy z 10 września, 16:53–17:22, trwał 28 min 49,545 s; nie anulowano
+pracy, coordinator_failed=false. 211 warstw: 61 saved, 116 empty, 33 failed,
+1 partial. Wszystkie 139 ukończonych procesów zakończyły się kodem 0 i ich mapy
+zostały scalone. Zapisano 1867 PNG z treścią. 90 map całkowicie przezroczystych,
+26 miało treść na części zoomów; nie utożsamiaj statusu empty z brakiem wszystkich
+kafelków. Trzy WFS zapisane jako saved, ale odebrano zero obiektów bez błędu;
+przyczyna nadal nieustalona. Same aux.xml to statystyki, nie raster ani dowód
+uszkodzenia GPKG. Rzeczywistego GPKG do audytu nie dostarczono.
+
+Bug: po trzech timeoutach kafelek wyczerpywał próby. Następny brakujący fragment
+miał attempts=0, więc recoverable=False; koordynator odkładał cały host przez
+no_retryable_tiles bez próby powrotu. To wyjaśnia 33 niepobrane mapy i jedną
+częściową. 0.9.5 dopuszcza pojedynczą próbę następnego brakującego kafelka/mapy
+po przerwie. Limit trzech prób kafelka, trzech nieudanych powrotów i Retry-After
+pozostaje. W adaptacji wszystkie błędy renderowania rozlicza rejestr; brak
+ukrytych dodatkowych retry/subdivision dla HTTP500/innych błędów.
+
+Dwa procesy działały przez 1323 s (76,5% przebiegu), z tego około 1201 s na
+różnych hostach według pierwszych zarejestrowanych odpowiedzi. To nakładanie
+życia procesów, nie dokładny pomiar równoczesnych żądań HTTP. Screenshot 1/1
+pokazywał chwilowy budżet. Start: CPU14 i 4,36 GiB dostępnego RAM; budżet zmieniał
+się 26 razy między 1 i 2 przy granicy 4 GiB. Zachowano ostrożne liczenie RAM.
+0.9.5 preferuje kwalifikujące hosty z mniejszą liczbą aktywnych procesów, adaptive
+ma sufit 2/host (stałe API bez zmiany). PNG, zoomy i timeout/proxy QGIS bez zmian.
+Przy tym obszarze zoom 13–20 oznacza około 55 razy więcej kafelków niż 13–17;
+nie obiecuj przyspieszenia równoważącego tak duży wzrost zadania.
+
+Benchmark 0.9.5: identyczne PNG, stały 57,365 s / 4 procesy, adaptacyjny
+87,136 s / 2 procesy. Bieżący RAM ograniczył tylko automat; to nie jest
+porównanie szybkości przy równych zasobach ani pomiar przyspieszenia poprawki.
+Źródła: 108/108 testów w 94,178 s, bez pominięć. Gotowy ZIP: 108/108 w 93,161 s,
+bez pominięć, ładowanie QGIS i PL/EN poprawne. Ruff i kontrola formatowania
+53 plików Python poprawne. ZIP 109 583 bajty, 22 pliki, SHA-256 i pełny odbiór:
+[validation-0.9.5.md](validation-0.9.5.md).
+Następna próba: ZIP 0.9.5 na firmowym Windows, mały obszar i kilka widocznych map
+z różnych hostów, porównanie offline oraz WFS z widocznymi obiektami w oryginale.
+
+## Historia wcześniejszych awarii
+
 Test firmowy 0.9.0 wykazał niekompletny wynik: zapisano 39/211 warstw,
 172 mapy nieudane, wszystkie trzy WFS puste, coordinator_failed=true.
 Nie uznawaj wcześniejszych testów Ubuntu za potwierdzenie działania na Windows.
@@ -19,7 +61,7 @@ Testy wykonano na Ubuntu; nie stanowią odbioru Windows ani osobnego testu WMTS.
 
 ## Audyt przebiegu 0.9.3 i zmiany 0.9.4
 
-Najnowszy raport firmowy: 3 h 42 min, anulowany. Koordynator działał, wszystkie
+Raport firmowy 0.9.3: 3 h 42 min, anulowany. Koordynator działał, wszystkie
 198 ponowień blokad IPC zakończyły się powodzeniem. Dziewięć procesów ukończyło
 mapy, ale stara pętla scaliła tylko pierwszy wynik. Osiem gotowych map usunięto
 przy anulowaniu, mimo 5422 kafelków z treścią w tych wynikach. Cztery mapy były
@@ -162,7 +204,7 @@ timeouty zmniejszają limit i rozpoczynają przerwę. Retry-After sekundy/data,
 inaczej 30/60/120 s; po przerwie jedna próba rzeczywiście brakującego kafelka.
 Trzy nieudane powroty lub oczekiwanie ponad pięć minut odkładają host.
 
-Sufit 8 map/host; globalnie min(32, 2 × CPU, RAM po rezerwie 2 GiB przy
+Sufit 2 map/host w trybie adaptacyjnym; globalnie min(32, 2 × CPU, RAM po rezerwie 2 GiB przy
 1 GiB/proces), minimum 1. Nieznany RAM ogranicza do 2. RAM sprawdzamy co pięć sekund;
 presja pamięci blokuje wzrost i nowe procesy. Czekające procesy też liczą się do RAM.
 To zadania mapowe, nie dokładna liczba HTTP/s, pomiar łącza czy gwarancja maksimum.
@@ -182,11 +224,11 @@ Końcowy ręczny przycisk ponowienia zaznacza failed/cancelled/empty/partial,
 odznacza saved/excluded i tworzy nowe archiwum wybranych warstw. Nie myl go
 z automatycznym uzupełnianiem kafelków w bieżącym eksporcie.
 
-PL/EN: i18n.py + en.ts/en.qm, 273 tłumaczenia. Po zmianach uruchom lrelease.
+PL/EN: i18n.py + en.ts/en.qm, 278 tłumaczeń. Po zmianach uruchom lrelease.
 Szacunek jednej mapy: 0,2–2 s i 10–250 KiB PNG/kafelek; nie jest to gwarancja.
 Ikony SVG: archive icon.svg, cpu.svg, ram.svg; inne przyciski używają QStyle.
 
-## Paczka i kontrole
+## Historyczna paczka i kontrole 0.9.0
 
 - `dist/qgis-project-snapshot-0.9.0.zip`: 96 880 bajtów, 21 plików.
 - SHA-256: `106992555dea5cb46130adb670acf3dd0bef8527e76a429cda0dd24319f0f307`.
@@ -197,11 +239,11 @@ Ikony SVG: archive icon.svg, cpu.svg, ram.svg; inne przyciski używają QStyle.
 - Ruff check i format --check: 23 pliki Python, OK. Składnia, CRC, źródła/ZIP
   i diff --check: OK. Bez nowych zależności wymaganych przez wtyczkę.
 - Benchmark 0.8.0 jest historyczny: stały 57,706 s, adaptacyjny 58,323 s,
-  identyczne PNG sześciu map. Nie wykonywano nowego pomiaru po audycie.
+  identyczne PNG sześciu map. Nowszy pomiar 0.9.5 opisano na początku tego dokumentu.
 
 ## Następny krok i pliki
 
-Odbiór ZIP-a 0.9.0 na komputerze użytkownika z już skonfigurowanym proxy QGIS.
+Odbiór ZIP-a 0.9.5 na komputerze użytkownika z już skonfigurowanym proxy QGIS.
 MSSQL działa tylko w sieci firmowej, trzy rastry projektu są tu nieobecne.
 Nie zgaduj adresów ani nie proś ponownie o poświadczenia. Sprawdzenie wszystkich
 warstw, uwierzytelniania, stylów, formularzy, relacji i wydruków wymaga stanowiska

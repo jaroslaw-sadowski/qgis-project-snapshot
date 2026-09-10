@@ -333,12 +333,11 @@ def _render_tile(
                     warnings.append(str(error))
                 if gate or str(error).startswith("[HTTP 429]"):
                     raise  # Do not amplify an explicit rate limit with tile retries.
-            if getattr(error, "status", None) in (401, 403, 404, 407) or (
-                gate and isinstance(error, TimeoutError)
-            ):
+            if gate or getattr(error, "status", None) in (401, 403, 404, 407):
+                # Adaptive maps have one disk ledger governing all attempts.
+                # Nested immediate retries/subdivision would bypass its budget,
+                # especially when a recovery probe fails with a different error.
                 raise
-            if gate:
-                gate.outcome(error)
             # Some providers cache the empty image produced by a failed request.
             # Invalidate only the disposable clone before trying again.
             if layer.dataProvider() is not None:

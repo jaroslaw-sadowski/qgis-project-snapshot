@@ -468,7 +468,7 @@ def create_archive(
     if adaptive:
         resources = detect_resources()
         workers = recommend(resources["cpu"], resources["memory"], True)
-        per_server_limit = 8
+        per_server_limit = 2
         memory_text = (
             f"{resources['memory'] / 1024**3:.1f} GiB"
             if resources["memory"] is not None

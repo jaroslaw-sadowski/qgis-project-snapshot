@@ -12,6 +12,12 @@
 
 Raporty są zapisem historycznym; aktualne priorytety znajdują się w stanie projektu.
 
+- [Odbiór 0.9.5 — powrót hosta i praca wielu serwerów](validation-0.9.5.md)
+- [Pomiar 0.9.5 — dane i różne budżety RAM](benchmark-0.9.5.json)
+- [Odbiór 0.9.4 — gotowe mapy, RAM i timeouty](validation-0.9.4.md)
+- [Odbiór 0.9.3 — diagnostyka sieci i odczytu](validation-0.9.3.md)
+- [Odbiór 0.9.2 — atomowe pliki sterujące na Windows](validation-0.9.2.md)
+- [Odbiór 0.9.1 — log diagnostyczny](validation-0.9.1.md)
 - [Krok 3 — zasoby i równoległość](validation-step3.md)
 - [Krok 4 — odbiór i wydajność](validation-step4.md)
 - [Surowe pomiary benchmarku](benchmark-step4.json)

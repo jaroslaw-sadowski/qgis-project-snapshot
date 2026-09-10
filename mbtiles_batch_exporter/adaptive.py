@@ -223,8 +223,11 @@ class WorkerGate:
 
     def before(self, retry=False):
         self.state.update(
-            waiting=True, running=False, retry=retry, repairing=retry, recoverable=retry
+            waiting=True, running=False, retry=retry, repairing=retry, recoverable=True
         )
+        # The caller requests only missing ledger tiles. A tile that has never
+        # been attempted is also a valid recovery probe when a previous tile
+        # has exhausted its own retry budget.
         self.publish()
         last_live = time.monotonic()
         while True:
@@ -244,11 +247,7 @@ class WorkerGate:
                     self.events = [
                         event for event in self.events if event["sequence"] > ack
                     ]
-                    if (
-                        command.get("allowed")
-                        and ack >= self.required_ack
-                        and (not command.get("probe") or retry)
-                    ):
+                    if command.get("allowed") and ack >= self.required_ack:
                         self.command = command
                         self.state.update(waiting=False, running=True)
                         self.started = time.monotonic()

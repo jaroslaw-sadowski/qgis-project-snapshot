@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (0.9.0)
+# Działanie i ograniczenia archiwizacji (0.9.5)
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
@@ -36,7 +36,7 @@ Mapy z głównej ścieżki korzystają ze wspólnej bramki hosta.
 
 Start: jedno zadanie mapowe na host, niezależnie od ścieżek usług. Wzrost o jeden
 wymaga 15 s, 10 poprawnych kafelków, kolejki i wolnego budżetu. Dwa kolejne okna
-bez 10% poprawy przepustowości cofają limit i blokują wzrost. Sufit osiem map/host.
+bez 10% poprawy przepustowości cofają limit i blokują wzrost. Sufit dwie mapy/host.
 HTTP 429/503 i trzy kolejne timeouty zmniejszają obciążenie oraz blokują wzrost.
 503 oznacza możliwe przeciążenie lub niedostępność, nie dowód jednej przyczyny.
 
@@ -207,3 +207,25 @@ masked_out — utratę całej treści przez maskę. Nie są analizą samych odpo
 HTTP PNG. timing_seconds mierzy fazy oczekiwania/renderowania/maski/zapisu;
 nie stanowi pełnego profilu CPU ani całkowitego czasu mapy. Nie zmieniono
 kompresji PNG, jakości, reguł pustych map ani formatu GeoPackage.
+
+## Powrót hosta i przydział między serwerami (0.9.5)
+
+`WorkerGate.before` zgłasza gotowość dowolnego rzeczywiście brakującego kafelka,
+również z zerową liczbą prób. Brak gotowego fragmentu podczas przygotowania
+rejestru lub kończenia mapy nie jest powodem odłożenia hosta. Po przerwie
+koordynator dopuszcza jedną próbę; scheduler może uruchomić kolejną mapę,
+jeżeli host nie ma już aktywnego procesu. Terminy Retry-After, trzy nieudane
+powroty, ack błędów/prób i wygasające pozwolenia pozostają obowiązujące.
+W trybie adaptacyjnym każdy błąd renderowania wraca bezpośrednio do rejestru:
+nie ma dodatkowych wewnętrznych retry/subdivision poza trzema próbami kafelka.
+
+GUI/adaptive ma sufit dwóch map na host. Przy przydzielaniu wolnego procesu
+wybierany jest kwalifikujący się host z najmniejszą liczbą aktywnych procesów;
+przy remisie zachowana jest kolejność kolejki. Hosty czekające na termin przerwy
+nie kwalifikują się. Wszystkie uruchomione procesy, również czekające, nadal
+liczą się do globalnego budżetu RAM. `create_archive(adaptive=False)` zachowuje
+parametr stałego limitu oraz kolejność wyboru jak wcześniej.
+
+Nie zmieniono interwału koordynatora 0,5 s. Zwykły sukces już nie wymaga ack
+przed kolejnym kafelkiem; potwierdzenia wymagają błędy i próby powrotu. Szybsze
+odświeżanie zwiększyłoby operacje IPC bez usunięcia głównego kosztu renderowania.

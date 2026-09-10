@@ -18,7 +18,7 @@ share the code under the [licence](LICENSE).
 ## How to use
 
 Requires QGIS 3.40 with PyQt5 and GDAL 3.7 or newer. The interface selects Polish
-or English based on the QGIS language. Current version for testing: **0.9.4**.
+or English based on the QGIS language. Current version for testing: **0.9.5**.
 
 1. Install the package using **Plugins → Manage and Install Plugins → Install from ZIP**.
 2. Open your project and choose **Plugins → qgis-project-snapshot → Archive project…**
@@ -30,7 +30,9 @@ or English based on the QGIS language. Current version for testing: **0.9.4**.
 
 Downloads use the active QGIS proxy configuration, exclusions and available
 saved credentials. No separate proxy setup is needed in the plugin.
-Concurrency is adjusted using CPU, RAM and each server's responses. The window shows active tasks, limits, queues, pauses and a log.
+Concurrency is adjusted using CPU, RAM and each server's responses. Scheduling
+prioritizes different servers running together, with one or at most two tasks
+per host. The window shows active tasks, limits, queues, pauses and a log.
 During export, only missing tiles are repaired in the same archive. The manual
 retry on the result screen creates a new archive of the selected layers.
 
@@ -57,7 +59,7 @@ absence of warranty are described in the [licence](LICENSE).
 
 ## Checks performed
 
-- 70 QGIS tests covering data storage and reading, maps, reporting, Polish/English,
+- 108 QGIS tests in 0.9.5 covering data storage and reading, maps, reporting, Polish/English,
   cancellation, server limits and missing-tile repair.
 - Installation ZIP checks: native QGIS discovery and loading, the archive dialog,
   unloading and tests running against the packaged code.
@@ -69,17 +71,17 @@ absence of warranty are described in the [licence](LICENSE).
 Test environment: Ubuntu, QGIS 3.40.15. Windows, MSSQL and complete company
 projects still need acceptance on the user's workstation. These are local checks,
 not QGIS certification or a guarantee for every project.
-[Reports and documentation](docs/README.md).
+[0.9.5 validation](docs/validation-0.9.5.md) · [Reports and documentation](docs/README.md).
 
 ## Package and development
 
-The repository contains source code. To build the **0.9.4** ZIP, run:
+The repository contains source code. To build the **0.9.5** ZIP, run:
 
 ```bash
 python3 scripts/build_plugin.py
 ```
 
-This creates `qgis-project-snapshot-0.9.4.zip` and its SHA-256 checksum in `dist/`,
+This creates `qgis-project-snapshot-0.9.5.zip` and its SHA-256 checksum in `dist/`,
 which is not tracked in Git. Building a ZIP does not publish it in the QGIS plugin catalogue.
 
 [Build and tests](docs/development.md) · [Architecture](docs/architecture.md) ·

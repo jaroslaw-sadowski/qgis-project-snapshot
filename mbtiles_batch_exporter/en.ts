@@ -1003,8 +1003,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Pause</translation>
     </message>
     <message>
-      <source>Automat zaczyna od 1 zadania na serwer. Zwiększa obciążenie po sukcesach i cofa je przy błędach lub braku przyspieszenia. Limity dotyczą map, nie dokładnej liczby żądań HTTP.</source>
-      <translation>Starts with 1 task per server, increases after successful downloads and backs off on errors or no speed gain. Limits apply to map tasks, not exact HTTP request counts.</translation>
+      <source>Automat zaczyna od 1 zadania na serwer i może zwiększyć limit do 2 po udanych pobraniach. Pierwszeństwo mają serwery z mniejszą liczbą aktywnych procesów. Błędy lub brak przyspieszenia zmniejszają obciążenie. CPU i RAM ograniczają łączną liczbę procesów. Limity dotyczą map, nie dokładnej liczby żądań HTTP.</source>
+      <translation>Starts with 1 task per server and may increase the limit to 2 after successful downloads. Servers with fewer active processes get priority. Errors or no speed gain reduce the load. CPU and RAM constrain the total process count. Limits apply to map tasks, not exact HTTP request counts.</translation>
     </message>
     <message>
       <source>Rozpoczynanie</source>
