@@ -25,6 +25,7 @@ from qgis.core import (
     QgsFeatureRequest,
     QgsFeatureSink,
     QgsGeometry,
+    QgsMapLayerStyle,
     QgsMultiBandColorRenderer,
     QgsPathResolver,
     QgsProject,
@@ -39,7 +40,7 @@ from qgis.PyQt.QtXml import QDomDocument
 from .archive_resources import ProjectResources, audit_local_layers
 from .diagnostics import Diagnostics, NetworkDiagnostics, network_details
 from .i18n import tr
-from .parallel_archive import RasterWorkers, WorkerError
+from .parallel_archive import RasterWorkers, WorkerError, merge_raster
 from .raster_archive import write_raster_data, write_rendered_raster, zoom_levels
 from .resources import MAX_WORKERS, detect_resources, recommend
 from .worker_network import network_snapshot
@@ -444,6 +445,110 @@ def _ready_records(records, parallel, cancelled, progress):
             time.sleep(0.05)
 
 
+def read_resume_manifest(folder):
+    """Read archive settings without opening its project or remote sources."""
+    try:
+        manifest = json.loads((Path(folder) / "manifest.json").read_text("utf-8"))
+        if (
+            manifest["schema_version"] != 4
+            or not isinstance(manifest["layers"], list)
+            or not isinstance(manifest["sha256"], dict)
+            or not manifest["area"]["wkt"]
+            or not manifest["area"]["crs"]
+            or not 0 <= manifest["zoom_min"] <= manifest["zoom_max"] <= 24
+        ):
+            raise ValueError()
+        ids = [record["id"] for record in manifest["layers"]]
+        if len(set(ids)) != len(ids):
+            raise ValueError()
+        return manifest
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(
+            tr("Nieprawidłowy manifest archiwum do wznowienia.")
+        ) from error
+
+
+def _source_fingerprint(layer):
+    """Keep a digest of source and rendering settings, never source credentials."""
+    style = QgsMapLayerStyle()
+    style.readFromLayer(layer)
+    settings = [
+        layer.source(),
+        layer.providerType(),
+        layer.crs().toWkt(),
+        layer.subsetString() if isinstance(layer, QgsVectorLayer) else "",
+        style.xmlData(),
+    ]
+    return sha256(json.dumps(settings, ensure_ascii=False).encode()).hexdigest()
+
+
+def _copy_resume(folder, manifest, staging, progress, cancelled):
+    """Verify and copy only archive data; never use paths outside its folder."""
+    folder = Path(folder).resolve()
+    for relative, expected in manifest["sha256"].items():
+        path = Path(relative)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or "\\" in relative
+            or ":" in relative
+            or not (folder / path).resolve().is_relative_to(folder)
+        ):
+            raise ValueError(tr("Manifest zawiera ścieżkę poza folderem archiwum."))
+        if relative != "dane.gpkg" and path.parts[:1] != ("zasoby",):
+            continue
+        target = staging / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        digest = sha256()
+        progress(tr("Sprawdzanie i kopiowanie danych poprzedniego archiwum…"))
+        updated = time.monotonic()
+        with (folder / path).open("rb") as source, target.open("wb") as output:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                if cancelled():
+                    raise InterruptedError()
+                digest.update(chunk)
+                output.write(chunk)
+                if time.monotonic() - updated >= 0.1:
+                    progress(
+                        tr("Sprawdzanie i kopiowanie danych poprzedniego archiwum…")
+                    )
+                    updated = time.monotonic()
+        if digest.hexdigest() != expected:
+            raise ValueError(
+                tr("Dane poprzedniego archiwum zmieniły się lub są uszkodzone.")
+            )
+    for record in manifest["layers"]:
+        if not record.get("local_source"):
+            continue
+        table = "layer_" + sha256(record["id"].encode()).hexdigest()[:24]
+        method = record.get("method")
+        if method == "vector":
+            source = "./dane.gpkg|layername=" + table
+            provider = "ogr"
+        elif method == "raster_render":
+            source = (
+                "./dane.gpkg|option:TABLE="
+                + table
+                + "|option:ZOOM_LEVEL="
+                + str(manifest["zoom_max"])
+            )
+            provider = "gdal"
+        elif method == "raster_data":
+            source = "./zasoby/" + table + ".tif"
+            provider = "gdal"
+        else:
+            raise ValueError(tr("Nieprawidłowy manifest archiwum do wznowienia."))
+        filename = source[2:].split("|", 1)[0]
+        if (
+            (method != "raster_data" and record.get("table") != table)
+            or record["local_source"] != source
+            or record.get("local_provider") != provider
+            or filename not in manifest["sha256"]
+            or not (staging / filename).is_file()
+        ):
+            raise ValueError(tr("Brak poprawnych danych warstwy do wznowienia."))
+
+
 def create_archive(
     project,
     selected_ids,
@@ -460,6 +565,7 @@ def create_archive(
     worker_activity=lambda rows: None,
     adaptive=False,
     server_activity=lambda rows: None,
+    resume_from=None,
 ):
     """Create a partial archive; return its published directory.
 
@@ -557,6 +663,62 @@ def create_archive(
             tr("Lista warstw zmieniła się. Otwórz ponownie okno archiwizacji.")
         )
 
+    previous = {}
+    resume_manifest = None
+    for record in records:
+        if record["status"] != "excluded":
+            record["source_fingerprint"] = _source_fingerprint(
+                project.mapLayer(record["id"])
+            )
+    if resume_from is not None:
+        resume_manifest = read_resume_manifest(resume_from)
+        previous = {
+            record["id"]: record
+            for record in resume_manifest["layers"]
+            if record["status"] != "excluded"
+        }
+        if (
+            set(previous) != selected_ids
+            or resume_manifest["project_crs"] != project.crs().authid()
+            or resume_manifest["area"]["crs"] != area_crs.authid()
+            or not area.isGeosEqual(QgsGeometry.fromWkt(resume_manifest["area"]["wkt"]))
+            or resume_manifest["zoom_min"] != zoom_min
+            or resume_manifest["zoom_max"] != zoom_max
+        ):
+            raise ValueError(
+                tr("Wznawianie wymaga tych samych warstw, obszaru, CRS i zoomów.")
+            )
+        for record in records:
+            old = previous.get(record["id"])
+            if old is None:
+                continue
+            layer = project.mapLayer(record["id"])
+            if isinstance(layer, QgsVectorLayer) and layer.isModified():
+                raise ValueError(
+                    tr(
+                        "Warstwa ma niezapisane edycje. Utwórz nowe archiwum, "
+                        "aby je zachować."
+                    )
+                )
+            if old["provider"] != record["provider"] or (
+                old.get("source_fingerprint")
+                and old["source_fingerprint"] != record["source_fingerprint"]
+            ):
+                raise ValueError(
+                    tr("Źródło lub styl warstwy zmieniły się. Utwórz nowe archiwum.")
+                )
+            if old["status"] in ("saved", "empty") and old.get("local_source"):
+                record.update(
+                    old, reused=True, source_fingerprint=old.get("source_fingerprint")
+                )
+        if any(not record.get("source_fingerprint") for record in previous.values()):
+            progress(
+                tr(
+                    "Starsze archiwum: sprawdzono ID warstw i zakres. "
+                    "Zgodności źródeł i stylów nie można potwierdzić."
+                )
+            )
+
     total = len(selected_ids)
     completed = 0
     parallel = None
@@ -578,6 +740,8 @@ def create_archive(
         ExitStack() as processes,
     ):
         staging = Path(temporary)
+        if resume_manifest is not None:
+            _copy_resume(resume_from, resume_manifest, staging, progress, cancelled)
         metadata = ConfigParser()
         metadata.read(Path(__file__).with_name("metadata.txt"), encoding="utf-8")
         diagnostic.emit(
@@ -592,6 +756,7 @@ def create_archive(
             workers=workers,
             resources=resources,
             network=network_details(network_snapshot()),
+            resumed=resume_from is not None,
         )
 
         network_monitor = NetworkDiagnostics(diagnostic)
@@ -643,6 +808,18 @@ def create_archive(
             layer_index = indices[record["id"]]
             if record["status"] == "excluded":
                 continue
+            if record.get("reused"):
+                completed += 1
+                layer_status(dict(record), completed, total)
+                progress(
+                    tr("{0}: zachowano dane z poprzedniego archiwum.").format(
+                        record["name"]
+                    )
+                )
+                diagnostic.emit(
+                    "layer_reused", layer_index=layer_index, status=record["status"]
+                )
+                continue
             job = "layer_" + sha256(record["id"].encode()).hexdigest()[:24]
             network_monitor.context = job
             diagnostic.emit(
@@ -659,10 +836,14 @@ def create_archive(
             )
             completed_map = parallel and parallel.completed(record["id"])
             if cancelled() and not completed_map:
-                record.update(
-                    status="cancelled",
-                    reason=tr("Nie zapisano — archiwizacja została przerwana."),
-                )
+                old = previous.get(record["id"], {})
+                if old.get("local_source"):
+                    record.update(old, reused=True, continuation_attempt="cancelled")
+                else:
+                    record.update(
+                        status="cancelled",
+                        reason=tr("Nie zapisano — archiwizacja została przerwana."),
+                    )
                 completed += 1
                 layer_status(dict(record), completed, total)
                 continue
@@ -677,6 +858,8 @@ def create_archive(
                 table = "layer_" + sha256(layer.id().encode()).hexdigest()[:24]
                 record["attempts"] = []
                 try:
+                    if record["id"] in previous:
+                        _remove_table(database, table)
                     if isinstance(layer, QgsVectorLayer):
                         try:
                             progress(
@@ -920,6 +1103,32 @@ def create_archive(
                             "Nie udało się zapisać danych ani obrazu tej warstwy."
                         ),
                     )
+            old = previous.get(record["id"], {})
+            if old.get("local_source") and record["status"] not in ("saved", "empty"):
+                # A failed continuation must not replace a useful partial image.
+                attempt = record["status"]
+                digest = sha256()
+                with (Path(resume_from) / "dane.gpkg").open("rb") as source:
+                    updated = time.monotonic()
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                        if time.monotonic() - updated >= 0.1:
+                            progress(
+                                tr("Sprawdzanie wcześniejszego obrazu częściowego…")
+                            )
+                            updated = time.monotonic()
+                if digest.hexdigest() != resume_manifest["sha256"]["dane.gpkg"]:
+                    raise ValueError(
+                        tr("Dane poprzedniego archiwum zmieniły się lub są uszkodzone.")
+                    )
+                _remove_table(database, old["table"])
+                merge_raster(Path(resume_from) / "dane.gpkg", database, old["table"])
+                record.clear()
+                record.update(old, reused=True, continuation_attempt=attempt)
+                record["reason"] += " " + tr(
+                    "Kontynuacja nie ukończyła warstwy; zachowano wcześniejszy "
+                    "obraz częściowy."
+                )
             diagnostic.emit(
                 "layer_result",
                 layer_index=layer_index,
@@ -927,7 +1136,8 @@ def create_archive(
                 status=record["status"],
                 feature_count=record.get("feature_count"),
             )
-            record["finished_at"] = datetime.now().astimezone().isoformat()
+            if not record.get("reused"):
+                record["finished_at"] = datetime.now().astimezone().isoformat()
             completed += 1
             layer_status(dict(record), completed, total)
             progress(f"{record['name']}: {record['reason']}")
@@ -978,7 +1188,8 @@ def create_archive(
             "area": {"crs": area_crs.authid(), "wkt": area.asWkt()},
             "zoom_min": zoom_min,
             "zoom_max": zoom_max,
-            "raster_levels": levels or [],
+            "raster_levels": levels
+            or (resume_manifest.get("raster_levels", []) if resume_manifest else []),
             "adaptive": adaptive_report,
             "parallel": {
                 "mode": "adaptive" if adaptive else "fixed",
@@ -987,7 +1198,9 @@ def create_archive(
                 "peak_worker_budget": peak_workers,
                 "final_worker_budget": final_workers,
                 "per_server_limit": per_server_limit,
-                "completed_in_workers": sum("worker_pid" in r for r in records),
+                "completed_in_workers": sum(
+                    "worker_pid" in r and not r.get("reused") for r in records
+                ),
             },
             "resources": resource_report,
             "local_layer_audit": {
@@ -998,6 +1211,17 @@ def create_archive(
             "layers": records,
             "sha256": {},
         }
+        if resume_manifest is not None:
+            manifest["continuation"] = {
+                "previous_started_at": resume_manifest["started_at"],
+                "previous_manifest_sha256": sha256(
+                    (Path(resume_from) / "manifest.json").read_bytes()
+                ).hexdigest(),
+                "reused_layers": sum(bool(r.get("reused")) for r in records),
+                "source_settings_verified": all(
+                    r.get("source_fingerprint") for r in previous.values()
+                ),
+            }
         for path in sorted(staging.rglob("*")):
             if path.is_file():
                 progress(
@@ -1059,6 +1283,14 @@ def create_archive(
                 )
             )
             + "".join(f"<p>{escape(tr(text))}</p>" for text in ARCHIVE_LIMITATIONS)
+            + (
+                tr(
+                    "<p>Kontynuacja: zachowano wcześniejsze dane {0} warstw. "
+                    "Pozostałe wyniki pochodzą z bieżącego pobierania.</p>"
+                ).format(manifest["continuation"]["reused_layers"])
+                if resume_manifest is not None
+                else ""
+            )
             + tr(
                 (
                     "<p>Zakres obrazów: zoom {0}–{1}. PNG: kompresja bezstratna "

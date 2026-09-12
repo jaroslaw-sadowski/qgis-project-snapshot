@@ -210,7 +210,38 @@ class OptionsTests(unittest.TestCase):
                     finally:
                         dialog.close()
 
-    def test_empty_partial_failed_retry_but_saved_and_excluded_do_not(self):
+    def test_resume_from_new_dialog_uses_manifest_area_and_reuses_data(self):
+        first = self.dialog()
+        try:
+            first.start()
+            previous = first._result
+            self.assertIsNotNone(previous)
+        finally:
+            first.close()
+        dialog = self.dialog()
+        try:
+            with (
+                patch(
+                    "mbtiles_batch_exporter.archive_dialog.QFileDialog.getExistingDirectory",
+                    return_value=str(previous),
+                ),
+                patch.object(
+                    dialog, "_area", side_effect=AssertionError("New area used")
+                ),
+                patch("mbtiles_batch_exporter.archive._write_vector") as write,
+                patch(
+                    "mbtiles_batch_exporter.archive_dialog.QMessageBox.warning"
+                ) as warning,
+            ):
+                dialog.resume_button.click()
+            warning.assert_not_called()
+            write.assert_not_called()
+            self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
+            self.assertNotEqual(dialog._result, previous)
+        finally:
+            dialog.close()
+
+    def test_continuation_retries_partial_failed_cancelled_and_preserves_empty(self):
         layers = [self.layer] + [self.add_points(str(i), [(3, 3)]) for i in range(5)]
         dialog = self.dialog()
         try:
@@ -229,7 +260,7 @@ class OptionsTests(unittest.TestCase):
                 }
             )
             self.assertEqual(
-                dialog._selected_ids(), {layer.id() for layer in layers[1:5]}
+                dialog._selected_ids(), {layer.id() for layer in layers[2:5]}
             )
         finally:
             dialog.close()

@@ -1135,5 +1135,91 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <source>szacunek początkowy</source>
       <translation>initial estimate</translation>
     </message>
+    <message>
+      <source>Sprawdzanie i kopiowanie danych poprzedniego archiwum…</source>
+      <translation>Checking and copying data from the previous archive…</translation>
+    </message>
+    <message>
+      <source>Nieprawidłowy manifest archiwum do wznowienia.</source>
+      <translation>Invalid archive manifest for continuation.</translation>
+    </message>
+    <message>
+      <source>Manifest zawiera ścieżkę poza folderem archiwum.</source>
+      <translation>The manifest contains a path outside the archive folder.</translation>
+    </message>
+    <message>
+      <source>Dane poprzedniego archiwum zmieniły się lub są uszkodzone.</source>
+      <translation>The previous archive data has changed or is damaged.</translation>
+    </message>
+    <message>
+      <source>Brak poprawnych danych warstwy do wznowienia.</source>
+      <translation>Valid layer data for continuation is missing.</translation>
+    </message>
+    <message>
+      <source>Wznawianie wymaga tych samych warstw, obszaru, CRS i zoomów.</source>
+      <translation>Continuation requires the same layers, area, CRS and zoom levels.</translation>
+    </message>
+    <message>
+      <source>Starsze archiwum: sprawdzono ID warstw i zakres. Zgodności źródeł i stylów nie można potwierdzić.</source>
+      <translation>Older archive: layer IDs and coverage checked. Matching sources and styles cannot be verified.</translation>
+    </message>
+    <message>
+      <source>Warstwa ma niezapisane edycje. Utwórz nowe archiwum, aby je zachować.</source>
+      <translation>A layer has unsaved edits. Create a new archive to preserve them.</translation>
+    </message>
+    <message>
+      <source>Źródło lub styl warstwy zmieniły się. Utwórz nowe archiwum.</source>
+      <translation>A layer source or style has changed. Create a new archive.</translation>
+    </message>
+    <message>
+      <source>Kontynuacja nie ukończyła warstwy; zachowano wcześniejszy obraz częściowy.</source>
+      <translation>Continuation did not complete the layer; the previous partial image was retained.</translation>
+    </message>
+    <message>
+      <source>{0}: zachowano dane z poprzedniego archiwum.</source>
+      <translation>{0}: retained data from the previous archive.</translation>
+    </message>
+    <message>
+      <source>Kontynuuj to archiwum</source>
+      <translation>Continue this archive</translation>
+    </message>
+    <message>
+      <source>Skopiuj ukończone warstwy do nowego folderu i ponów brakujące lub częściowe. Przerwane warstwy są pobierane od początku. Poprzednie archiwum pozostaje dostępne.</source>
+      <translation>Copy completed layers to a new folder and retry missing or partial layers. Interrupted layers are downloaded from the start. The previous archive remains available.</translation>
+    </message>
+    <message>
+      <source>Wznów archiwum…</source>
+      <translation>Resume archive…</translation>
+    </message>
+    <message>
+      <source>W oryginalnym projekcie wskaż folder poprzedniego archiwum. Obszar i zoomy zostaną odczytane z manifestu.</source>
+      <translation>In the original project, choose the previous archive folder. Its area and zoom levels will be read from the manifest.</translation>
+    </message>
+    <message>
+      <source>Wybierz folder archiwum do wznowienia</source>
+      <translation>Choose the archive folder to resume</translation>
+    </message>
+    <message>
+      <source>
+Kontynuacja skopiuje ukończone warstwy i ponowi brakujące lub częściowe w nowym folderze. Przezroczyste zoomy nadal wymagają sprawdzenia; nie są automatycznie pobierane ponownie.</source>
+      <translation>
+Continuation will copy completed layers and retry missing or partial layers in a new folder. Transparent zoom levels still need review; they are not automatically downloaded again.</translation>
+    </message>
+    <message>
+      <source>Kontynuacja używa obszaru i zoomów poprzedniego archiwum. Ukończone warstwy zachowają wcześniejsze dane.</source>
+      <translation>Continuation uses the previous archive area and zoom levels. Completed layers will retain their earlier data.</translation>
+    </message>
+    <message>
+      <source>Przerwano przygotowanie kontynuacji. Poprzednie archiwum jest zachowane.</source>
+      <translation>Continuation preparation cancelled. The previous archive is preserved.</translation>
+    </message>
+    <message>
+      <source>Sprawdzanie wcześniejszego obrazu częściowego…</source>
+      <translation>Checking the previous partial image…</translation>
+    </message>
+    <message>
+      <source>&lt;p&gt;Kontynuacja: zachowano wcześniejsze dane {0} warstw. Pozostałe wyniki pochodzą z bieżącego pobierania.&lt;/p&gt;</source>
+      <translation>&lt;p&gt;Continuation: retained earlier data for {0} layers. The remaining results come from the current download.&lt;/p&gt;</translation>
+    </message>
   </context>
 </TS>

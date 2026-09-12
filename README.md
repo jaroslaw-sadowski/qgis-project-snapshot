@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-Polski · [English](README.en.md) · Wersja **1.0.0**
+Polski · [English](README.en.md) · Wersja **1.1.0**
 
 ## Co to jest i co robi
 
@@ -27,7 +27,7 @@ i uwierzytelnianie, wymagają sprawdzenia na własnym stanowisku.
 
 ## Jak zainstalować
 
-1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.0.0.zip`**.
+1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.1.0.zip`**.
    Użyj instalacyjnego ZIP-a wtyczki, nie ZIP-a całego repozytorium.
 2. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
 3. Wskaż paczkę i zainstaluj wtyczkę. Przy aktualizacji uruchom ponownie QGIS.
@@ -51,6 +51,24 @@ Nie wszystkie fonty, formularze i wyrażenia da się przenieść automatycznie.
 Data archiwum oznacza czas pobierania, nie jednoczesny stan wszystkich źródeł.
 Archiwum i raport mogą zawierać dane poufne — sprawdź je przed udostępnieniem.
 
+## Jak kontynuować archiwum
+
+Po zakończeniu lub anulowaniu pobierania wybierz **Kontynuuj to archiwum**.
+Po ponownym uruchomieniu QGIS otwórz oryginalny projekt, wybierz
+**Wznów archiwum…** i wskaż cały folder poprzedniego wyniku.
+
+Wtyczka sprawdzi zapisane pliki i utworzy nowy folder: skopiuje ukończone warstwy
+oraz zasoby i ponowi brakujące lub częściowe warstwy. Puste zoomy nadal wymagają
+sprawdzenia, ale nie są automatycznie pobierane ponownie. Nieukończona warstwa
+zaczyna od początku; jeśli ponowienie nie zakończy się poprawnie, wcześniejszy
+obraz częściowy pozostaje w wyniku. Poprzedni folder pozostaje bez zmian.
+
+Potrzebny jest cały folder archiwum i miejsce na jego kopię; sam raport lub JSON
+nie wystarczy. Kontynuacja używa poprzedniego obszaru i zoomów. Zmienione źródła,
+style lub niezapisane edycje wymagają nowego archiwum. Dla archiwów 1.0.0 wtyczka
+nie potwierdzi zgodności źródeł i stylów — użyj tego samego oryginalnego projektu.
+Wznawianie wymaga zapisanego wyniku; nie odzyskuje eksportu po awarii lub utracie zasilania.
+
 ## Automatyczne pobieranie równoległe
 
 Wtyczka pobiera mapy w osobnych procesach QGIS. Zaczyna od jednego zadania
@@ -61,7 +79,7 @@ lub robi przerwę. Nie trzeba ręcznie ustawiać liczby procesów.
 Okno pokazuje aktywne zadania i limity. **Warstwy w kolejce** to warstwy czekające
 na pobranie z serwera w tym samym wierszu. Automat pomaga przyspieszyć eksport,
 ale nie gwarantuje maksymalnej przepustowości. Korzysta z ustawień sieciowych
-aktywnego QGIS. Nie wznawia eksportu po zamknięciu QGIS.
+aktywnego QGIS. Kontynuacja nie zmienia zasad automatycznego obciążania serwerów.
 
 ## Licencje danych i warunki usług
 

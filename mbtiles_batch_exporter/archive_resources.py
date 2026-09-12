@@ -168,6 +168,15 @@ class ProjectResources:
                         break
                     value = feature[index]
                     if isinstance(value, str) and value:
+                        if (
+                            record.get("reused")
+                            and value.startswith("./zasoby/")
+                            and (self.folder / value)
+                            .resolve()
+                            .is_relative_to(self.folder.resolve())
+                            and (self.folder / value).is_file()
+                        ):
+                            continue
                         copied = self.copy(value, record["name"], base)
                         if copied != value and not layer.changeAttributeValue(
                             feature.id(), index, copied

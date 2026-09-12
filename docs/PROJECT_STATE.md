@@ -1,6 +1,77 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 10 września 2026. Wersja **1.0.0**, przygotowanie do katalogu QGIS.
+Aktualizacja: 12 września 2026. Wersja **1.1.0**, kontynuacja po anulowaniu.
+
+## Kontynuacja 1.1.0 i analiza ponowienia
+
+Użytkownik dostarczył wynik retry 1.0.0, świadomie anulowany po 6 h 11 min 19 s.
+158 wybranych warstw: 1 saved, 113 empty, 2 partial, 13 failed, 29 cancelled;
+53 wcześniejsze saved wykluczono. Stare pliki z `(1)` nie są już dostępne;
+porównanie opiera się na zachowanych wynikach poprzedniej analizy i nazwach warstw.
+Z wcześniejszych 11 partial 10 nie ma już braków; braki tej grupy spadły 2352→3.
+Z wcześniejszych 37 failed pięć pobrano bez braków, cztery nadal failed, 28 anulowano.
+Druga próba pogorszyła dziewięć innych warstw oraz dała nowy partial z 1130 brakami.
+Oba archiwa 1.0.0 należy zachować — nie są automatycznie połączone.
+
+W nowym logu maksimum 10 procesów, host PIG doszedł do 7. Budżet RAM 1→10,
+na końcu 5; wolna pamięć około 1,53–4,55 GiB. 117 procesów zakończyło się kodem 0,
+dwa kodem 2 przy anulowaniu; koordynator bez awarii. To nie jest pomiar CPU ani
+wykorzystania całego łącza. Do analizy wystarczają zwykle manifest i diagnostic;
+HTML powiela manifest, AUX nie potwierdza danych. Pełny folder jest potrzebny
+do wznowienia lub niezależnego sprawdzenia GPKG/QGZ. Zero obiektów wektora przy
+poprawnym odczycie bez błędów już jest prawidłowym saved, bez ponowienia.
+
+Użytkownik zlecił obsługę kontynuacji po anulowaniu. Przyjęto prosty etap na poziomie
+ukończonych warstw; zapytanie o dokładniejsze zachowanie kafelków pozostało bez odpowiedzi.
+API resume_from i przyciski PL/EN kopiują zweryfikowane dane do nowego folderu,
+zachowują saved/empty i ponawiają failed/cancelled/partial. Jeśli próba partial
+nie zostanie ukończona, zachowują poprzedni partial. Kontynuacja działa również
+po ponownym otwarciu oryginalnego projektu. Sprawdza zakres/ID/dostawców oraz
+odciski źródeł i stylów od 1.1.0; legacy 1.0.0 bez pełnej weryfikacji ustawień.
+Niezapisane edycje blokują kontynuację; zwykły nowy eksport nadal je zachowuje.
+Nie odzyskuje usuniętych kafelków ani katalogu roboczego po awarii. Nie zmieniono
+algorytmów obciążenia, timeoutów, PNG i zasad izolacji QGIS. Bez nowych zależności.
+Wyniki odbioru i paczka: [validation-1.1.0.md](validation-1.1.0.md).
+Źródła: 140/140 (120,266 s), zainstalowany ZIP: 140/140 (117,960 s), bez pominięć.
+Ruff, format, Flake8/pycodestyle, AST, skan sekretów i powtarzalność ZIP-a — OK.
+Bandit nadal 11 przejrzanych ostrzeżeń, bez nowych kategorii. Paczka 119 873 bajty,
+22 pliki; SHA-256: 39b16b8afbe4af437b1c452268e59fc08b875ea795302a5e7c34475a700b96bd.
+Nie publikowano ani nie zmieniano widoczności repozytorium.
+
+## Analiza 12 września — bez zmian algorytmów
+
+Użytkownik dostarczył raport, manifest, diagnostykę i AUX z pełnego eksportu
+1.0.0 na Windows 11 (Core Ultra 5 135U, 16 GB RAM), wykonanego 11 września
+08:58–21:57: 12 h 59 min 22 s, zoomy 0–20. Statusy 211 warstw: 53 saved,
+110 empty, 11 partial, 37 failed. Wszystkie 137 procesów zakończyło się kodem 0,
+bez awarii koordynatora; 1489 krótkich konfliktów IPC odzyskano. Same AUX nie
+potwierdzają danych: nie dostarczono GPKG ani QGZ do niezależnego sprawdzenia.
+
+Wykryto 14 logicznych CPU, sufit 28 procesów, budżet RAM do 13; z par start/exit
+wynika maksymalnie 12 uruchomionych procesów i średnio 3,70 (z oczekiwaniem).
+Ostatnie około 2 h pracował jeden proces przy budżecie 8–9 i wolnym RAM około
+4,5–5 GiB. Pomiar szczytu pracownika 310,7 MiB, estymata 466,1 MiB. Logi nie
+mierzą wykorzystania CPU, transferu ani dysku. Po błędach limity hostów pozostają
+zamrożone do końca eksportu, również po poprawnym powrocie; to ograniczenie
+adaptacji przy długich przebiegach, nie dowód zmierzonego maksimum serwera.
+
+37 failed wynika z odłożenia dwóch hostów, w tym 35 map nie uruchomiono. 11 partial
+ma 2352 brakujące kafelki. Automatyczna naprawa odzyskała 4448 kafelków w 4842
+próbach. Ręczny retry domyślnie wybiera 158 warstw (failed+partial+empty), tworzy
+nowe archiwum całych warstw; 44 ze 110 empty mają treść na części zoomów.
+
+Wszystkie 33 MSSQL i 3 WFS mają saved, ale 0 obiektów. Zapytania źródłowe zwróciły
+zero bez błędów, jeszcze przed maskowaniem/zapisem. Użytkownik nie wie, czy w tym
+obszarze powinny być obiekty, i sprawdzi to w oryginale. Te warstwy nie są zaznaczane
+przez retry. Nie uznawaj tego za rozstrzygnięty błąd ani pełny odbiór wektorów.
+
+Na etapie pierwszej analizy użytkownik prosił wyłącznie o analizę i propozycje.
+Poza zleconą później kontynuacją nie wdrażać optymalizacji bez kolejnego zlecenia.
+Kandydaci: oddzielić retry failed/partial
+od przeglądu empty, zbadać ostrożny powrót do zwiększania limitu po długiej serii
+sukcesów oraz porównać natywny timeout QGIS 5 s z dłuższym na małej próbie.
+Nie podnosić sufitów ani nie przebudowywać architektury bez pomiaru korzyści.
+Archiwum wejściowe i surowe logi pozostały poza repozytorium.
 
 ## Zakres zakończonej pracy
 

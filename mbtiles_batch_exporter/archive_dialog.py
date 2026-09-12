@@ -8,6 +8,7 @@ from html import escape
 from pathlib import Path
 
 from qgis.core import (
+    QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsGeometry,
     QgsLayerTreeGroup,
@@ -38,7 +39,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from .archive import create_archive, polygon_area
+from .archive import create_archive, polygon_area, read_resume_manifest
 from .i18n import tr
 from .raster_archive import TILE_SIZE, zoom_levels
 
@@ -278,21 +279,18 @@ class ArchiveDialog(QDialog):
         self.results.setMaximumHeight(210)
         self.results.hide()
         layout.addWidget(self.results)
-        self.retry_button = QPushButton(
-            tr("Ponów tylko niezapisane i niepełne warstwy")
-        )
+        self.retry_button = QPushButton(tr("Kontynuuj to archiwum"))
         self.retry_button.setToolTip(
             tr(
                 (
-                    "Te warstwy zaznaczono automatycznie. Powstanie osobne "
-                    "archiwum tylko z ponowionych warstw. Zachowaj również "
-                    "wcześniejszy folder; wyniki nie są automatycznie "
-                    "łączone."
+                    "Skopiuj ukończone warstwy do nowego folderu i ponów brakujące "
+                    "lub częściowe. Przerwane warstwy są pobierane od początku. "
+                    "Poprzednie archiwum pozostaje dostępne."
                 )
             )
         )
         self.retry_button.hide()
-        self.retry_button.clicked.connect(self.start)
+        self.retry_button.clicked.connect(lambda: self.start(resume_from=self._result))
         layout.addWidget(self.retry_button)
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
@@ -309,6 +307,15 @@ class ArchiveDialog(QDialog):
             )
         )
         buttons.addWidget(self.copy_button)
+        self.resume_button = QPushButton(tr("Wznów archiwum…"))
+        self.resume_button.setToolTip(
+            tr(
+                "W oryginalnym projekcie wskaż folder poprzedniego archiwum. "
+                "Obszar i zoomy zostaną odczytane z manifestu."
+            )
+        )
+        self.resume_button.clicked.connect(self._resume_archive)
+        buttons.addWidget(self.resume_button)
         buttons.addStretch()
         self.start_button = QPushButton(tr("Utwórz archiwum"))
         self.start_button.clicked.connect(self.start)
@@ -695,7 +702,14 @@ class ArchiveDialog(QDialog):
             iterator += 1
         return ids
 
-    def start(self):
+    def _resume_archive(self):
+        folder = QFileDialog.getExistingDirectory(
+            self, tr("Wybierz folder archiwum do wznowienia"), self.output_edit.text()
+        )
+        if folder:
+            self.start(resume_from=Path(folder))
+
+    def start(self, *, resume_from=None):
         if self._running:
             return
         folder = self.output_edit.text().strip()
@@ -705,6 +719,16 @@ class ArchiveDialog(QDialog):
             )
             return
         selected_ids = self._selected_ids()
+        previous = None
+        if resume_from is not None:
+            try:
+                previous = read_resume_manifest(resume_from)
+                selected_ids = {
+                    r["id"] for r in previous["layers"] if r["status"] != "excluded"
+                }
+            except (ValueError, OSError) as error:
+                QMessageBox.warning(self, tr("Archiwizacja"), str(error))
+                return
         if not selected_ids:
             QMessageBox.warning(
                 self, tr("Warstwy"), tr("Zaznacz przynajmniej jedną warstwę.")
@@ -754,6 +778,7 @@ class ArchiveDialog(QDialog):
             iterator += 1
         self.options.setEnabled(False)
         self.start_button.setEnabled(False)
+        self.resume_button.setEnabled(False)
         self.report_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.progress.setRange(0, len(selected_ids) + 1)
@@ -764,7 +789,17 @@ class ArchiveDialog(QDialog):
         self.timer.start()
         try:
             self._update_progress(tr("Wyznaczanie obszaru archiwizacji…"))
-            area, crs = self._area()
+            if previous is not None:
+                area = QgsGeometry.fromWkt(previous["area"]["wkt"])
+                crs = QgsCoordinateReferenceSystem(previous["area"]["crs"])
+                self._update_progress(
+                    tr(
+                        "Kontynuacja używa obszaru i zoomów poprzedniego archiwum. "
+                        "Ukończone warstwy zachowają wcześniejsze dane."
+                    )
+                )
+            else:
+                area, crs = self._area()
             self._result = create_archive(
                 self.project,
                 selected_ids,
@@ -773,12 +808,17 @@ class ArchiveDialog(QDialog):
                 folder,
                 cancelled=lambda: self._cancelled,
                 progress=self._update_progress,
-                zoom_min=self.zoom_min.currentData(),
-                zoom_max=self.zoom_max.currentData(),
+                zoom_min=previous["zoom_min"]
+                if previous
+                else self.zoom_min.currentData(),
+                zoom_max=previous["zoom_max"]
+                if previous
+                else self.zoom_max.currentData(),
                 adaptive=True,
                 server_activity=self._server_activity,
                 layer_status=self._layer_status,
                 worker_activity=self._worker_activity,
+                resume_from=resume_from,
             )
             self._finished_at = time.monotonic()
             self.timer.stop()
@@ -811,6 +851,16 @@ class ArchiveDialog(QDialog):
             )
             self.report_button.setEnabled(True)
             self._show_results(manifest)
+        except InterruptedError:
+            self._finished_at = time.monotonic()
+            self.status.setText(
+                tr(
+                    "Przerwano przygotowanie kontynuacji. "
+                    "Poprzednie archiwum jest zachowane."
+                )
+            )
+            self._append_log(self.status.text())
+            self.progress.setFormat(tr("Przerwano — sprawdź raport"))
         except (ValueError, OSError, RuntimeError) as error:
             self._finished_at = time.monotonic()
             self.timer.stop()
@@ -838,13 +888,14 @@ class ArchiveDialog(QDialog):
                 item.setFlags(flags)
             self.options.setEnabled(True)
             self.start_button.setEnabled(True)
+            self.resume_button.setEnabled(True)
             self.cancel_button.setEnabled(False)
 
     def _show_results(self, manifest):
         retry = {
             record["id"]
             for record in manifest["layers"]
-            if record["status"] in ("failed", "cancelled", "empty", "partial")
+            if record["status"] in ("failed", "cancelled", "partial")
         }
         lines = [self.status.text(), ""]
         for record in manifest["layers"]:
@@ -865,8 +916,9 @@ class ArchiveDialog(QDialog):
             lines.append(
                 tr(
                     (
-                        "\nZaznaczono tylko warstwy do ponowienia. Ponowna próba "
-                        "utworzy osobny folder; zachowaj oba archiwa."
+                        "\nKontynuacja skopiuje ukończone warstwy i ponowi brakujące "
+                        "lub częściowe w nowym folderze. Przezroczyste zoomy nadal "
+                        "wymagają sprawdzenia; nie są automatycznie pobierane ponownie."
                     )
                 )
             )

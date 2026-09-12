@@ -1,4 +1,4 @@
-# Przygotowanie i publikacja 1.0.0
+# Przygotowanie i publikacja 1.1.0
 
 Ten dokument jest dla opiekuna wydania. Instrukcja użytkownika znajduje się
 w [README](../README.md) i [przewodniku PL/EN](team-guide.md).
@@ -20,7 +20,7 @@ Stan sprawdzony 10 września 2026 na podstawie aktualnych stron QGIS:
 ## Zawartość wydania
 
 Nazwa: **QGIS Project Snapshot**. Identyfikator Pythona **mbtiles_batch_exporter**
-zachowuje zgodność aktualizacji. Numer **1.0.0**, experimental=False,
+zachowuje zgodność aktualizacji. Numer **1.1.0**, experimental=False,
 deprecated=False. Obsługiwany zakres: QGIS 3.40–3.x z Qt5/PyQt5 i GDAL >=3.7;
 nie deklarujemy QGIS 4/Qt6. Wtyczka nie instaluje dodatkowych bibliotek.
 
@@ -43,11 +43,17 @@ Ta wtyczka dodatkowo pobiera usługi mapowe dla wybranego obszaru i poziomów
 szczegółowości, dobiera równoległość oraz raportuje brakujące wyniki.
 Nie sugeruje zastępowania wszystkich narzędzi pakujących projekty.
 
+1.1.0 dodaje kontynuację zapisanego archiwum na poziomie warstw: sprawdza i kopiuje
+wcześniejsze dane do nowego folderu, a następnie pobiera warstwy brakujące lub
+częściowe. Obsługuje wybór folderu po restarcie QGIS, z ograniczeniami opisanymi
+w instrukcji. Nie deklarujemy odzyskiwania po awarii ani kontynuacji pojedynczego
+niedokończonego kafelka. Zasady automatycznego obciążania serwerów pozostają bez zmian.
+
 ## Weryfikacja przed wysłaniem
 
 Polecenia budowy, testów QGIS i kontroli statycznych są w
 [development.md](development.md). Wyniki konkretnej paczki i jej SHA-256 są
-w [raporcie 1.0.0](validation-1.0.0.md). Test ZIP-a sprawdza również wymagane
+w [raporcie 1.1.0](validation-1.1.0.md). Test ZIP-a sprawdza również wymagane
 metadane, ścieżki, prawa i dozwolone pliki. Testy generują własne niewielkie dane
 oraz lokalne WMS/proxy; nie wymagają projektu ani dostępu do usług autora.
 
@@ -60,21 +66,23 @@ Krótka próba ręczna bez zewnętrznych danych:
    Źródłowa warstwa powinna nadal zachować niezapisane edycje.
 
 Osobno sprawdź usługę, której warunki pozwalają na pobieranie offline, i porównaj
-obraz z oryginałem. Test Windows/macOS oraz nietypowego uwierzytelniania wymaga
+obraz z oryginałem. Sprawdź też kontynuację po świadomym anulowaniu i restarcie,
+zgodnie z [instrukcją testów](development.md#kontrole-kontynuacji-archiwum-110).
+Test Windows/macOS oraz nietypowego uwierzytelniania wymaga
 odpowiedniego stanowiska; lokalne Ubuntu nie zastępuje tych prób.
 
 ## Kroki na GitHub i w portalu QGIS
 
-1. Zatwierdź sprawdzone źródła 1.0.0 i udostępnij je w publicznym repozytorium
-   wskazanym w metadata.txt. Zalecany tag: v1.0.0. Opublikowane źródła muszą
+1. Zatwierdź sprawdzone źródła 1.1.0 i udostępnij je w publicznym repozytorium
+   wskazanym w metadata.txt. Zalecany tag: v1.1.0. Opublikowane źródła muszą
    odpowiadać przesyłanej paczce, włącznie z instrukcją.
 2. Bez logowania sprawdź README, kod, LICENSE i zgłoszenia błędów. Zmiana
    repozytorium z prywatnego na publiczne ujawnia również jego historię.
 3. Zaloguj się do plugins.qgis.org i wybierz **Upload a plugin**. Prześlij
-   **dist/qgis-project-snapshot-1.0.0.zip**, nie ZIP całego repozytorium.
+   **dist/qgis-project-snapshot-1.1.0.zip**, nie ZIP całego repozytorium.
 4. Przeczytaj wyniki skanowania i odpowiedz na ewentualne uwagi moderatorów.
    Lokalnie nie wyłączamy reguł bezpieczeństwa przez .bandit ani baseline sekretów.
-5. Po zatwierdzeniu sprawdź instalację 1.0.0 przez Menedżer wtyczek QGIS.
+5. Po zatwierdzeniu sprawdź instalację 1.1.0 przez Menedżer wtyczek QGIS.
 
 W chwili przygotowania wydania repozytorium jest **prywatne** i publiczne linki
 zwracają HTTP 404. Upublicznienie źródeł jest obowiązkowym krokiem przed zgłoszeniem.

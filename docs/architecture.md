@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (1.0.0)
+# Działanie i ograniczenia archiwizacji (1.1.0)
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
@@ -82,7 +82,52 @@ Mapę scala się po zakończeniu pobierania/naprawy; gotowe PNG są kopiowane be
 
 Anulowanie zachowuje ukończone, scalone warstwy, a nieukończone katalogi usuwa.
 Nieodpowiadające procesy są kończone po pięciu sekundach od anulowania.
-Brak wznawiania po zamknięciu QGIS i uczenia limitów między eksportami.
+Zapisany wynik można kontynuować po ponownym otwarciu oryginalnego projektu;
+nie odzyskujemy katalogów roboczych po awarii i nie uczymy limitów między eksportami.
+
+## Kontynuacja ukończonych warstw (1.1.0)
+
+`create_archive(..., resume_from=folder)` kontynuuje zapisany wynik, również
+po świadomym anulowaniu i ponownym uruchomieniu QGIS. `read_resume_manifest`
+odczytuje manifest 4 bez otwierania zarchiwizowanego projektu ani źródeł sieciowych.
+Okno bierze z manifestu obszar, zoomy i zestaw warstw. Potrzebny jest cały folder
+archiwum oraz oryginalny projekt; sam manifest nie zawiera danych do skopiowania.
+
+Kontynuacja wymaga zgodności ID wybranych warstw, dostawców, CRS projektu i obszaru,
+geometrii obszaru oraz zoomów. Rekordy od 1.1.0 zawierają `source_fingerprint`:
+SHA-256 ustawień źródła, dostawcy, CRS, filtra wektora i stylu. Manifest nie zapisuje
+surowego źródła ani poświadczeń. Zmiana odcisku blokuje kontynuację; hash nie dowodzi,
+że zawartość zdalnej bazy lub usługi pozostała taka sama. Niezapisane edycje warstw
+wybranych do kontynuacji również ją blokują. Zwykły nowy eksport nadal zachowuje
+bufor edycji bez zatwierdzania go w źródle.
+
+Archiwa 1.0.0 bez odcisku pozostają obsługiwane. Sprawdzamy ich ID, dostawców,
+obszar, CRS i zoomy, lecz nie deklarujemy zgodności źródeł i stylów. Ograniczenie
+jest zgłaszane w oknie i jako `continuation.source_settings_verified=false`.
+
+`_copy_resume` kopiuje `dane.gpkg` i pliki `zasoby/` do nowego prywatnego katalogu,
+sprawdzając SHA-256 podczas kopiowania. Odrzuca ścieżki poza archiwum oraz niezgodne
+odwołania lokalnych warstw. Poprzedni folder nie jest modyfikowany. Projekt wynikowy
+powstaje ze źródłowego projektu QGIS, z zachowaniem obecnych zasad zasobów i relacji.
+Nowy folder wymaga miejsca na kopię istniejących danych i nowe wyniki.
+
+`saved` i `empty` z `local_source` są kopiowane z oznaczeniem `reused=true`,
+bez powtórnego odczytu dostawcy lub renderowania. Status `empty` nadal oznacza
+konieczność sprawdzenia przezroczystych zoomów. `failed`, `cancelled` i `partial`
+są ponawiane od początku warstwy. Jeżeli próba nie zakończy się jako `saved` lub
+`empty`, zachowujemy wcześniejszy zapisany obraz częściowy; rekord zawiera
+`reused=true` i `continuation_attempt` z wynikiem tej próby.
+
+Sekcja `continuation` manifestu podaje czas rozpoczęcia poprzedniego archiwum,
+SHA-256 poprzedniego manifestu, liczbę użytych ponownie warstw i stan weryfikacji
+ustawień źródeł. Zdarzenie diagnostyczne `layer_reused` opisuje skopiowaną ukończoną
+warstwę. `completed_in_workers` pomija rekordy użyte ponownie. Daty skopiowanych
+warstw pozostają datami ich wcześniejszego pobrania.
+
+To kontynuacja na poziomie warstw, bez zachowania rejestru niedokończonych kafelków
+między eksportami. Nie obsługuje awarii QGIS ani utraty zasilania przed zapisaniem
+archiwum. Algorytmy obciążenia, timeouty, jakość PNG i jeden zapisujący końcowy
+GeoPackage pozostają bez zmian.
 
 ## Proxy i diagnostyka
 
@@ -116,10 +161,13 @@ zakończenie lub błędy. Licznik procesów obejmuje mapy, nie odczyty WFS/MSSQL
 Natywny synchroniczny odczyt w głównym QGIS nadal może chwilowo zatrzymać obsługę zdarzeń.
 
 Interfejs PL/EN wybiera język QGIS, następnie systemu. Katalog `en.ts`/`en.qm`
-jest pakowany. Końcowy ekran zaznacza failed/cancelled/empty/partial; ręczne
-ponowienie tworzy nowe archiwum wybranych warstw. Automatyczna naprawa kafelków
-dotyczy bieżącego eksportu. Raport HTML zawiera manifest 4, w tym historię automatu,
-diagnozy i do 20 przykładów błędów kafelków na mapę.
+jest pakowany. Końcowy ekran zaznacza failed/cancelled/partial. Przycisk
+„Kontynuuj to archiwum” używa ostatniego wyniku; „Wznów archiwum…” pozwala
+wskazać folder po restarcie. Kontynuacja zachowuje cały poprzedni wybór warstw,
+kopiując ukończone wyniki. Zwykły przycisk tworzenia archiwum eksportuje tylko
+aktualnie zaznaczone warstwy. Automatyczna naprawa kafelków dotyczy bieżącego
+eksportu. Raport HTML zawiera manifest 4, w tym historię automatu, informacje
+o kontynuacji, diagnozy i do 20 przykładów błędów kafelków na mapę.
 
 | Moduł | Rola |
 | --- | --- |

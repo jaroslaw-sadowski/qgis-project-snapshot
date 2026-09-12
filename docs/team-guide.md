@@ -1,4 +1,4 @@
-# QGIS Project Snapshot — instrukcja / user guide 1.0.0
+# QGIS Project Snapshot — instrukcja / user guide 1.1.0
 
 ## Instalacja i uruchomienie
 
@@ -7,7 +7,7 @@ z instalacji QGIS. Nie są potrzebne dodatkowe pakiety. Zapewnij dostęp do źr�
 projektu oraz miejsce na archiwum i pliki tymczasowe.
 
 1. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-1.0.0.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-1.1.0.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz projekt, następnie **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**
    lub ikonę mapy w pudełku na pasku wtyczek.
 
@@ -75,16 +75,45 @@ liczbą prób. Poprawnych kafelków nie pobiera ponownie. Odmowa uwierzytelnieni
 
 **Przerwij** działa również podczas oczekiwania. Zachowuje ukończone wyniki,
 kończy scalanie gotowych map i usuwa nieukończone pliki robocze. Poczekaj na koniec
-tego etapu przed zamknięciem QGIS. Eksport nie jest wznawiany po zamknięciu programu.
+tego etapu przed zamknięciem QGIS. Zapisany w ten sposób wynik można później kontynuować.
+
+## Kontynuacja po przerwie
+
+1. Po zakończeniu lub anulowaniu eksportu z brakami wybierz **Kontynuuj to archiwum**.
+   Jeśli QGIS był zamknięty, otwórz oryginalny projekt i okno archiwizacji,
+   wybierz **Wznów archiwum…**, następnie wskaż folder poprzedniego archiwum.
+2. Zapewnij miejsce na kopię danych oraz nowe pobrania. Potrzebny jest cały folder
+   z `manifest.json`, danymi i zasobami; sam JSON lub raport nie wystarcza.
+3. Poczekaj na sprawdzenie i skopiowanie plików. Powstanie **nowy folder**, który
+   zawiera wcześniejsze ukończone wyniki oraz wyniki kontynuacji. Poprzedni folder
+   pozostaje bez zmian.
+4. Przeczytaj nowy raport i sprawdź kopię bez sieci przed usunięciem starszego archiwum.
+
+Kontynuacja pobiera ponownie warstwy niezapisane, anulowane i częściowe.
+Ukończonych warstw, również oznaczonych jako puste (`empty`), nie pobiera ponownie,
+jeśli mają zapisane dane lokalne. **Pusty zoom nadal wymaga sprawdzenia**: może
+oznaczać brak treści w danej skali lub obszarze. Jeśli chcesz powtórzyć taką
+warstwę, zaznacz ją i wybierz **Utwórz archiwum**.
+
+Wznowienie działa na poziomie warstw: nieukończona warstwa jest pobierana od początku.
+Jeżeli ponowienie warstwy częściowej nie zakończy się poprawnie, w nowym folderze
+pozostanie wcześniejszy obraz częściowy, a raport opisze tę sytuację.
+
+Obszar, zoomy i zestaw warstw pochodzą z poprzedniego manifestu. Otwórz ten sam
+oryginalny projekt, z zachowanymi warstwami, źródłami, stylami i CRS. Kontynuacja
+odrzuca niezgodne ustawienia oraz niezapisane edycje; do zapisania nowych edycji
+użyj zwykłego **Utwórz archiwum**, które zachowuje je bez zatwierdzania w źródle.
+Archiwa 1.0.0 można kontynuować, ale nie zapisują informacji pozwalającej potwierdzić
+zgodność źródeł i stylów. Wtyczka wyświetla wtedy komunikat o tym ograniczeniu.
+
+Nie ma odzyskiwania niezakończonego eksportu po awarii QGIS lub utracie zasilania.
+Przed zamknięciem programu użyj **Przerwij** i poczekaj na zapisanie wyniku.
 
 ## Wynik i odczyt bez sieci
 
 Przeczytaj raport przez **Otwórz raport**. Lista warstw i `raport.html` wskazują
 wyniki niepełne, puste oraz błędy. `manifest.json` zawiera szczegółowy opis archiwum.
 Pusty wynik wymaga porównania ze źródłem — sam w sobie nie potwierdza poprawnego odczytu.
-
-Przycisk **Ponów tylko niezapisane i niepełne warstwy** tworzy **osobne archiwum**
-z wybranych warstw. Zachowaj także poprzedni folder; wyniki nie są automatycznie łączone.
 
 Przenieś **cały folder archiwum**, odłącz dostęp do źródłowych usług i baz,
 a następnie otwórz kopię `.qgz` w QGIS. Sprawdź mapy przy zapisanych poziomach
@@ -127,7 +156,7 @@ supplied by QGIS. No extra packages are needed. Ensure access to project sources
 enough disk space and permission to download and store the selected data.
 
 1. Choose **Plugins → Manage and Install Plugins → Install from ZIP** and select
-   `qgis-project-snapshot-1.0.0.zip`. Restart QGIS when upgrading.
+   `qgis-project-snapshot-1.1.0.zip`. Restart QGIS when upgrading.
 2. Open the project, then **Plugins → QGIS Project Snapshot → Archive project…**
    or the map-in-an-archive-box toolbar icon.
 3. Choose a folder, area, layers and zoom range, then **Create archive**.
@@ -170,13 +199,43 @@ Proxy authentication refusal (HTTP 407) stops the current map and is reported.
 
 **Cancel** also works during waits. It preserves completed results, finishes
 merging ready maps and removes incomplete working files. Wait for this to finish
-before closing QGIS. Exports cannot resume after closing the application.
+before closing QGIS. You can continue the resulting archive later.
+
+## English guide — continuing after a break
+
+1. After an incomplete export finishes or is cancelled, choose **Continue this archive**.
+   If QGIS was closed, open the original project and the archive window, choose
+   **Resume archive…**, then select the previous archive folder.
+2. Allow space for a copy of the data and new downloads. You need the entire folder
+   with `manifest.json`, data and resources; a JSON file or report alone is not enough.
+3. Wait while files are checked and copied. A **new folder** will contain the earlier
+   completed results and the continuation results. The previous folder stays unchanged.
+4. Read the new report and check the copy offline before removing the older archive.
+
+Continuation retries unsaved, cancelled and partial layers. Completed layers,
+including those marked `empty`, are copied when they have saved local data.
+**An empty zoom still needs review**: the source may have no content at that scale
+or in that area. To download such a layer again, select it and use **Create archive**.
+
+Resuming works at layer level: an unfinished layer starts again from the beginning.
+If retrying a partial layer does not complete, its earlier partial image is kept
+in the new folder and the report explains this.
+
+The previous manifest supplies the area, zooms and layer selection. Use the same
+original project, with matching layers, sources, styles and CRS. Continuation
+rejects incompatible settings and unsaved edits. Use the ordinary **Create archive**
+to include new edits without committing them to the source.
+Archives from 1.0.0 can be continued, but they lack the information needed to
+confirm source and style compatibility. The plugin reports that limitation.
+
+An unfinished export cannot be recovered after a QGIS crash or power loss.
+Before closing QGIS, use **Cancel** and wait for the result to be saved.
 
 ## English guide — results, rights and help
 
 Read the report using **Open report**. Check incomplete and empty results against
-the source. The final retry button creates a **separate archive** of selected
-layers; keep both folders because results are not merged automatically.
+the source. A continued archive includes copied results and newly downloaded
+layers. Keep the previous folder until you have checked the new result.
 
 Keep the **entire archive folder**. Disconnect from source services and databases,
 then open the copied `.qgz` in QGIS. Check map detail, features, attributes,

@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-[Polski](README.md) · English · Version **1.0.0**
+[Polski](README.md) · English · Version **1.1.0**
 
 ## What it is and what it does
 
@@ -27,7 +27,7 @@ and authentication, need checking on your own workstation.
 
 ## How to install
 
-1. Obtain the **`qgis-project-snapshot-1.0.0.zip`** release package.
+1. Obtain the **`qgis-project-snapshot-1.1.0.zip`** release package.
    Use the plugin's installation ZIP, not a ZIP of the entire repository.
 2. In QGIS, choose **Plugins → Manage and Install Plugins → Install from ZIP**.
 3. Select the package and install it. Restart QGIS when upgrading.
@@ -52,6 +52,24 @@ checking. Not all fonts, forms and expressions can be transferred automatically.
 The archive date describes acquisition time, not a simultaneous state of all
 sources. Archives and reports may contain confidential data; inspect them before sharing.
 
+## How to continue an archive
+
+After an export finishes or is cancelled, choose **Continue this archive**.
+After restarting QGIS, open the original project, choose **Resume archive…**
+and select the entire previous archive folder.
+
+The plugin checks the saved files and creates a new folder. It copies completed
+layers and resources, then retries missing or partial layers. Empty zooms still
+need review but are not downloaded again automatically. An unfinished layer
+starts again from the beginning; if the retry does not complete, its earlier
+partial image is kept in the result. The previous folder stays unchanged.
+
+You need the entire archive folder and space for a copy; a report or JSON alone
+is not enough. Continuation uses the previous area and zooms. Changed sources,
+styles or unsaved edits require a new archive. For archives from 1.0.0, source
+and style compatibility cannot be confirmed, so use the same original project.
+Resuming requires a saved result; it cannot recover an export after a crash or power loss.
+
 ## Automatic parallel downloads
 
 The plugin downloads maps in separate QGIS processes. It starts with one task
@@ -62,7 +80,7 @@ You do not need to set the number of processes manually.
 The window shows active tasks and limits. **Queued layers** counts layers waiting
 to download from the server in that row. Automatic adjustment helps speed up
 exports but does not guarantee maximum throughput. Downloads use the active
-QGIS network settings. Exports cannot resume after closing QGIS.
+QGIS network settings. Continuing an archive uses the same automatic server load rules.
 
 ## Data licences and service terms
 

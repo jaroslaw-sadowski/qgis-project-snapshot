@@ -1,4 +1,4 @@
-QGIS Project Snapshot 1.0.0
+QGIS Project Snapshot 1.1.0
 Autor / Author: Jarosław Sadowski
 
 POLSKI
@@ -13,7 +13,7 @@ QGIS 3.40 lub nowszy z serii 3.x, Qt5/PyQt5 i GDAL >= 3.7 dostarczane z QGIS.
 Bez dodatkowych pakietów. Potrzebny dostęp do źródeł, wolne miejsce na dysku
 i prawo do pobierania danych. Sprawdzono QGIS 3.40 na Ubuntu.
 W QGIS wybierz Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP i wskaż
-qgis-project-snapshot-1.0.0.zip. Przy aktualizacji uruchom ponownie QGIS.
+qgis-project-snapshot-1.1.0.zip. Przy aktualizacji uruchom ponownie QGIS.
 Instalacja z katalogu plugins.qgis.org będzie możliwa po zatwierdzeniu publikacji.
 
 Użycie i automatyka
@@ -25,6 +25,11 @@ Nie trzeba ustawiać liczby procesów. Automat nie gwarantuje maksymalnej szybko
 „Warstwy w kolejce” dotyczą serwera w tym samym wierszu.
 Przeczytaj raport, sprawdź kopię bez sieci i przenoś cały folder archiwum.
 Nie wszystkie zależności projektu są przenoszone automatycznie.
+Po przerwaniu wybierz „Kontynuuj to archiwum”. Po ponownym otwarciu oryginalnego
+projektu użyj „Wznów archiwum…” i wskaż cały poprzedni folder. Powstanie nowy
+folder z zachowanymi ukończonymi warstwami i ponowieniem brakujących lub częściowych.
+Przerwane warstwy są pobierane od początku. Potrzebne jest miejsce na kopię danych;
+poprzedni folder pozostaje bez zmian. To nie jest odzyskiwanie po awarii programu.
 Instrukcja szczegółowa: INSTRUKCJA.md.
 
 Licencje i odpowiedzialność
@@ -51,7 +56,7 @@ QGIS 3.40 or a later 3.x release, with Qt5/PyQt5 and GDAL >= 3.7 supplied by QGI
 No additional packages. Requires source access, disk space and permission to
 download the data. Tested with QGIS 3.40 on Ubuntu.
 Choose Plugins → Manage and Install Plugins → Install from ZIP, then select
-qgis-project-snapshot-1.0.0.zip. Restart QGIS when upgrading.
+qgis-project-snapshot-1.1.0.zip. Restart QGIS when upgrading.
 Installation from plugins.qgis.org will be available once publication is approved.
 
 Use and automatic downloads
@@ -63,6 +68,11 @@ No manual process count is needed. Maximum throughput is not guaranteed.
 “Queued layers” refers to the server in that row.
 Read the report, check the copy offline and keep the entire archive folder.
 Not all project dependencies can be transferred automatically.
+After cancelling, choose “Continue this archive”. After reopening the original
+project, use “Resume archive…” and select the entire previous archive folder.
+A new folder retains completed layers and retries missing or partial layers.
+Interrupted layers restart from the beginning. Space for a data copy is required;
+the previous folder stays unchanged. This does not recover from application crashes.
 See INSTRUKCJA.md for an English quick start.
 
 Data licences and responsibility

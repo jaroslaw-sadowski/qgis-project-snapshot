@@ -49,7 +49,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.0.0.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.1.0.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -121,7 +121,24 @@ Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
 
 Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
 procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
-przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md). Bieżące wydanie: [1.0.0](validation-1.0.0.md).
+przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md).
+Bieżące wydanie: [1.1.0](validation-1.1.0.md).
+
+## Kontrole kontynuacji archiwum (1.1.0)
+
+`tests/test_resume_archive.py` sprawdza kontynuację po anulowaniu, kopiowanie
+ukończonych i pustych wyników bez ponownego pobierania, integralność plików,
+zgodność ustawień, odrzucenie niezapisanych edycji i obsługę manifestu bez odcisku
+źródła. Obejmuje też zasoby użyte ponownie oraz zachowanie poprzedniego częściowego
+obrazu po nieskutecznym lub anulowanym ponowieniu. Testy okna sprawdzają przyciski
+kontynuacji i wybór archiwum w obu językach.
+
+Przy odbiorze ręcznym anuluj niewielki eksport po zapisaniu pierwszej warstwy,
+poczekaj na wynik, a następnie zamknij QGIS. Otwórz oryginalny projekt, wybierz
+„Wznów archiwum…” i wskaż cały poprzedni folder. Sprawdź nowy wynik i niezmienione
+sumy plików starego archiwum. `continuation` oraz `reused` w manifeście i zdarzenia
+`layer_reused` w diagnostyce pozwalają odróżnić skopiowane warstwy od nowego pobrania.
+Próba nie potwierdza odzyskiwania danych po awarii programu lub utracie zasilania.
 
 ## Tłumaczenia
 
