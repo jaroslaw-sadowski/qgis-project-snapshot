@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-[Polski](README.md) · English · Version **1.1.0**
+[Polski](README.md) · English · Version **1.2.0**
 
 ## What it is and what it does
 
@@ -27,7 +27,7 @@ and authentication, need checking on your own workstation.
 
 ## How to install
 
-1. Obtain the **`qgis-project-snapshot-1.1.0.zip`** release package.
+1. Obtain the **`qgis-project-snapshot-1.2.0.zip`** release package.
    Use the plugin's installation ZIP, not a ZIP of the entire repository.
 2. In QGIS, choose **Plugins → Manage and Install Plugins → Install from ZIP**.
 3. Select the package and install it. Restart QGIS when upgrading.
@@ -81,6 +81,20 @@ The window shows active tasks and limits. **Queued layers** counts layers waitin
 to download from the server in that row. Automatic adjustment helps speed up
 exports but does not guarantee maximum throughput. Downloads use the active
 QGIS network settings. Continuing an archive uses the same automatic server load rules.
+
+## Diagnosing slow downloads
+
+From version 1.2.0, the plugin automatically records CPU, memory, read/write
+operations, queues and server activity in `diagnostic.jsonl`. Computer measurements
+are taken about every 5 seconds, including while downloads are waiting. The log
+stays in the local archive folder; the plugin does not send it automatically.
+
+**`diagnostic.jsonl`** is usually enough for a typical performance review. Include
+`manifest.json` to identify layers by name or examine missing results in detail.
+HTML and AUX files are usually unnecessary for this review; keep the entire folder
+for resuming. You can manually compress a longer log into a ZIP before sharing.
+These measurements help identify slowdowns but do not establish maximum computer
+or server throughput.
 
 ## Data licences and service terms
 

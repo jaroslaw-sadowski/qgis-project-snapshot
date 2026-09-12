@@ -1,4 +1,4 @@
-QGIS Project Snapshot 1.1.0
+QGIS Project Snapshot 1.2.0
 Autor / Author: Jarosław Sadowski
 
 POLSKI
@@ -13,7 +13,7 @@ QGIS 3.40 lub nowszy z serii 3.x, Qt5/PyQt5 i GDAL >= 3.7 dostarczane z QGIS.
 Bez dodatkowych pakietów. Potrzebny dostęp do źródeł, wolne miejsce na dysku
 i prawo do pobierania danych. Sprawdzono QGIS 3.40 na Ubuntu.
 W QGIS wybierz Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP i wskaż
-qgis-project-snapshot-1.1.0.zip. Przy aktualizacji uruchom ponownie QGIS.
+qgis-project-snapshot-1.2.0.zip. Przy aktualizacji uruchom ponownie QGIS.
 Instalacja z katalogu plugins.qgis.org będzie możliwa po zatwierdzeniu publikacji.
 
 Użycie i automatyka
@@ -31,6 +31,14 @@ folder z zachowanymi ukończonymi warstwami i ponowieniem brakujących lub czę�
 Przerwane warstwy są pobierane od początku. Potrzebne jest miejsce na kopię danych;
 poprzedni folder pozostaje bez zmian. To nie jest odzyskiwanie po awarii programu.
 Instrukcja szczegółowa: INSTRUKCJA.md.
+
+Diagnostyka
+Automatyczny lokalny diagnostic.jsonl zawiera pomiary CPU, pamięci, odczytu i zapisu,
+kolejek oraz odpowiedzi serwerów. Pomiary komputera powstają co około 5 sekund,
+również podczas oczekiwania. Log nie jest wysyłany automatycznie.
+Od 1.2.0 zwykle wystarczy on do analizy wydajności. Dołącz manifest.json, gdy
+potrzebne są nazwy warstw i szczegóły braków. Do wznowienia zachowaj cały folder.
+Duży log można ręcznie spakować do ZIP-a. Pomiary nie dowodzą maksymalnej wydajności.
 
 Licencje i odpowiedzialność
 Przed eksportem sprawdź i respektuj licencje warstw oraz warunki usług:
@@ -56,7 +64,7 @@ QGIS 3.40 or a later 3.x release, with Qt5/PyQt5 and GDAL >= 3.7 supplied by QGI
 No additional packages. Requires source access, disk space and permission to
 download the data. Tested with QGIS 3.40 on Ubuntu.
 Choose Plugins → Manage and Install Plugins → Install from ZIP, then select
-qgis-project-snapshot-1.1.0.zip. Restart QGIS when upgrading.
+qgis-project-snapshot-1.2.0.zip. Restart QGIS when upgrading.
 Installation from plugins.qgis.org will be available once publication is approved.
 
 Use and automatic downloads
@@ -74,6 +82,15 @@ A new folder retains completed layers and retries missing or partial layers.
 Interrupted layers restart from the beginning. Space for a data copy is required;
 the previous folder stays unchanged. This does not recover from application crashes.
 See INSTRUKCJA.md for an English quick start.
+
+Diagnostics
+The automatic local diagnostic.jsonl records CPU, memory, read/write operations,
+queues and server responses. Computer samples are taken about every 5 seconds,
+including during waits. The log is not sent automatically.
+From 1.2.0, it is usually enough for performance analysis. Include manifest.json
+when layer names or details of missing results are needed. Keep the entire folder
+for resuming. You can manually ZIP a large log. Measurements do not prove maximum
+computer or server throughput.
 
 Data licences and responsibility
 Before exporting, check and respect layer licences and service terms for

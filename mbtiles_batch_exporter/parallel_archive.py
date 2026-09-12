@@ -381,7 +381,8 @@ class RasterWorkers:
                     for job in self.jobs.values():
                         if job["active"]:
                             self._read_job(job, now)
-                    if now >= self.next_memory_check:
+                    sampled_memory = now >= self.next_memory_check
+                    if sampled_memory:
                         memory = available_memory()
                         self.memory_available = memory
                         process_jobs = [
@@ -566,6 +567,11 @@ class RasterWorkers:
                             }
                         )
                     self.rows = rows
+                    if sampled_memory and self.diagnostic:
+                        try:
+                            self._diagnose_scheduler(now)
+                        except Exception as error:
+                            self.diagnostic.error("scheduler_probe_error", error)
                     self.condition.notify_all()
                 self.stop.wait(0.5)
         except InterruptedError:
@@ -579,6 +585,90 @@ class RasterWorkers:
             self.stop.set()
             with self.condition:
                 self.condition.notify_all()
+
+    def _diagnose_scheduler(self, now):
+        """Persist the budget and actual job states together; never affect policy."""
+        jobs = []
+        for name, job in self.jobs.items():
+            if not job["active"]:
+                continue
+            state = job["state"]
+            updated = state.get("sampled_at")
+            jobs.append(
+                {
+                    "job": name,
+                    "host": job["host"],
+                    "local": name.startswith("local_"),
+                    "running": bool(state.get("running")),
+                    "waiting": bool(state.get("waiting")),
+                    "done": bool(state.get("done")),
+                    "repairing": bool(state.get("repairing")),
+                    "recoverable": bool(state.get("recoverable")),
+                    "telemetry_age_seconds": max(0, now - updated)
+                    if isinstance(updated, (int, float))
+                    else None,
+                    "memory": state.get("memory"),
+                    "startup_memory_budget": job.get("memory_budget"),
+                    "probe": bool(job.get("probing")),
+                }
+            )
+        hosts = []
+        for row in self.rows:
+            policy = self.policies[row["host"]]
+            hosts.append(
+                {
+                    **{
+                        key: row[key]
+                        for key in (
+                            "host",
+                            "active",
+                            "processes",
+                            "limit",
+                            "queued",
+                            "rate",
+                            "state",
+                            "pause",
+                            "generation",
+                            "successes",
+                        )
+                    },
+                    "ceiling": policy.ceiling,
+                    "frozen": policy.frozen,
+                    "recovering": policy.recovering,
+                    "blocked": policy.blocked,
+                    "last_change": policy.history[-1] if policy.history else None,
+                    "window_seconds": max(0, now - policy.window_started),
+                    "window_successes": policy.successes,
+                    "baseline_rate": policy.baseline,
+                    "poor_windows": policy.poor_windows,
+                }
+            )
+        self.diagnostic.emit(
+            "scheduler_sample",
+            elapsed_seconds=now - self.origin,
+            cpu=self.cpu,
+            cpu_ceiling=self.ceiling,
+            budget=self.workers,
+            processes=sum(self.active_hosts.values()),
+            active_tasks=sum(j["running"] for j in jobs),
+            queued_layers=len(self.queue),
+            ready_to_merge=sum(
+                future.done()
+                and not future.cancelled()
+                and future.exception() is None
+                and layer_id not in self.merged
+                for layer_id, (future, _) in self.futures.items()
+            ),
+            launch_slots=self.launch_slots,
+            memory_available=self.memory_available,
+            memory_reserve=MEMORY_RESERVE,
+            worker_memory_estimate=self.worker_memory,
+            measured_peak=self.worker_peak_memory,
+            reserved_growth=self.reserved_growth,
+            memory_ok=self.memory_ok,
+            hosts=hosts,
+            jobs=jobs,
+        )
 
     def server_activity(self):
         with self.condition:

@@ -1,6 +1,44 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 12 września 2026. Wersja **1.1.0**, kontynuacja po anulowaniu.
+Aktualizacja: 12 września 2026. Wersja **1.2.0**, diagnostyka wydajności.
+
+## Pomiary 1.2.0
+
+Po pytaniu o 9/9 procesów i 7 aktywnych zadań użytkownik zlecił zbieranie danych
+do dalszych optymalizacji. Nie zlecił zmiany algorytmu obciążenia: limit nadal
+wynika z CPU/RAM i polityki hostów, a audyt nie oznacza potwierdzenia maksimum
+konkretnego komputera lub łącza. Wersja 1.2.0 dodaje obserwację, bez zmiany limitów,
+timeoutów, retry, kontynuacji, formatu/PNG oraz zasad izolacji QGIS.
+
+Natywny sampler co 5 s mierzy własny CPU/RSS/peak/I/O głównego QGIS i procesów map,
+a główny także CPU/RAM systemu i wolne miejsce. Działa w osobnym wątku bez obiektów
+QGIS, również podczas blokującego odczytu. Loguje fazy i kończy wątek przy zamknięciu.
+Próbka koordynatora co 5 s zachowuje pełne obliczenie budżetu, stan zadań i hostów,
+również bez zmiany limitu. Plan i końcowe podsumowania używają indeksów/zadań
+technicznych, bez nazw warstw, źródeł i współrzędnych. Sam diagnostic.jsonl zwykle
+wystarczy do analizy wydajności; manifest do nazw i pełniejszej oceny danych.
+
+Sieć: interwały przy postępie i na końcu, rozmiary dostępnych odpowiedzi osobno
+od deklaracji Content-Length, cache/unknown, opóźnienia i błędy. Brak odczytu to
+null, nie zero. Logi workerów dołączane po ich zakończeniu. Pomiary lokalne,
+bez automatycznej wysyłki, nowych zależności lub dodatkowych żądań testowych.
+
+Nie mylić procesowego CPU 100% (jeden logiczny CPU) z systemowym CPU 0–100%.
+Windows I/O to wszystkie transfery procesu, nie fizyczna zajętość dysku;
+Linux I/O rodzica zawiera również odebrane przez wait procesy potomne — nie
+sumować main+worker wprost. Bajty odpowiedzi QGIS nie są ruchem na całym łączu.
+Windows commit nie oznacza wielkości swap. Szczegóły: [architecture.md](architecture.md).
+Wyniki i paczka: [validation-1.2.0.md](validation-1.2.0.md).
+Końcowy pełny odbiór ZIP-a: 165/165 testów, 120,443 s, bez pominięć.
+Ruff/format, Flake8/pycodestyle, AST 36 plików, zgodność i powtarzalność paczki
+poprawne; skan sekretów bez trafień, Bandit nadal 11 przejrzanych ostrzeżeń.
+W pierwszym przebiegu źródeł poprawiono tylko test zależny od liczby odczytów
+zegara; testy polityki i pełny zestaw z ZIP-a potwierdziły zachowanie reguły.
+Paczka 127 452 bajty, 22 pliki; SHA-256:
+e36533b016d0efad0599085a0dc92fb56f239bb8df5c688d2b753cacd35a691a.
+Nie wykonywano publikacji, push ani zmiany widoczności repozytorium.
+Nie instalować aktualizacji podczas trwającego eksportu; do kolejnej próby
+zainstalować nowy ZIP i ponownie uruchomić QGIS.
 
 ## Kontynuacja 1.1.0 i analiza ponowienia
 

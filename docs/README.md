@@ -1,13 +1,13 @@
 # Dokumentacja QGIS Project Snapshot
 
-## Instrukcje i bieżące wydanie 1.1.0
+## Instrukcje i bieżące wydanie 1.2.0
 
 | Dokument | Zawartość |
 | --- | --- |
 | [README po polsku](../README.md) / [English README](../README.en.md) | Krótkie wprowadzenie, wymagania, instalacja i licencje |
-| [Instrukcja użytkownika PL/EN](team-guide.md) | Opcje eksportu, kolejka, anulowanie, kontynuacja i sprawdzenie kopii offline; w ZIP-ie jako INSTRUKCJA.md |
+| [Instrukcja użytkownika PL/EN](team-guide.md) | Eksport, kontynuacja, sprawdzenie kopii offline oraz pliki do diagnostyki; w ZIP-ie jako INSTRUKCJA.md |
 | [Przygotowanie publikacji](publishing.md) | Wymagania plugins.qgis.org i czynności związane z wydaniem |
-| [Weryfikacja 1.1.0](validation-1.1.0.md) | Wyniki kontroli bieżącego wydania oraz ograniczenia odbioru |
+| [Weryfikacja 1.2.0](validation-1.2.0.md) | Wyniki kontroli bieżącego wydania oraz ograniczenia odbioru |
 
 ## Rozwój i utrzymanie
 
@@ -28,6 +28,7 @@ Nie są instrukcją bieżącego wydania ani potwierdzeniem publikacji w katalogu
 
 | Wersja / etap | Raport | Pomiary |
 | --- | --- | --- |
+| 1.1.0 | [Kontynuacja po anulowaniu](validation-1.1.0.md) | — |
 | 1.0.0 | [Przygotowanie do katalogu QGIS](validation-1.0.0.md) | — |
 | 0.9.7 | [Równoległość według zmierzonego RAM](validation-0.9.7.md) | [JSON](benchmark-0.9.7.json) |
 | 0.9.6 | [Równoległość, nazwa i przegląd wydania](validation-0.9.6.md) | [JSON](benchmark-0.9.6.json) |

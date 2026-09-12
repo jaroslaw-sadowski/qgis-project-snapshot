@@ -1,4 +1,4 @@
-# QGIS Project Snapshot — instrukcja / user guide 1.1.0
+# QGIS Project Snapshot — instrukcja / user guide 1.2.0
 
 ## Instalacja i uruchomienie
 
@@ -7,7 +7,7 @@ z instalacji QGIS. Nie są potrzebne dodatkowe pakiety. Zapewnij dostęp do źr�
 projektu oraz miejsce na archiwum i pliki tymczasowe.
 
 1. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-1.1.0.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-1.2.0.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz projekt, następnie **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**
    lub ikonę mapy w pudełku na pasku wtyczek.
 
@@ -124,6 +124,37 @@ Nie wszystkie fonty, zasoby, formularze i zależności wyrażeń mogą zostać p
 automatycznie. Lokalne ścieżki nie wystarczają do potwierdzenia samodzielności
 projektu; sprawdź uwagi w raporcie oraz działanie kopii bez sieci.
 
+## Diagnostyka wydajności i pliki do zgłoszenia
+
+Od 1.2.0 wtyczka automatycznie zapisuje lokalny `diagnostic.jsonl`: użycie CPU,
+dostępny i zajęty RAM, operacje odczytu i zapisu, kolejki, limity procesów,
+oczekiwanie oraz obserwowane odpowiedzi serwerów. Pomiary komputera powstają
+co około 5 sekund w głównym QGIS i procesach mapowych, również gdy pobieranie
+czeka na odpowiedź. Wtyczka zapisuje też etapy pracy i końcowe wyniki warstw.
+Nie trzeba włączać dodatkowej opcji ani instalować narzędzia pomiarowego.
+Do pełnej analizy użyj logu po zakończeniu lub świadomym anulowaniu eksportu;
+poczekaj na zapisanie wyniku i dołączenie logów procesów mapowych.
+
+| Cel | Co przekazać |
+| --- | --- |
+| Typowa analiza czasu pobierania i ograniczeń liczby procesów | Zwykle sam `diagnostic.jsonl` z 1.2.0 lub nowszej wersji. |
+| Wskazanie warstw po nazwie, szczegółowe sprawdzenie kompletności | Dodatkowo `manifest.json`; HTML przedstawia te same wyniki w czytelnej postaci. |
+| Wznowienie albo sprawdzenie rzeczywistych danych w kopii | Cały folder archiwum z danymi, projektem i zasobami. Sam log nie wystarcza. |
+
+Pliki AUX zazwyczaj nie są potrzebne do analizy wydajności. Z długiego przebiegu
+powstaje większy log; można ręcznie spakować go do ZIP-a przed przekazaniem.
+Wtyczka **nie wysyła diagnostyki automatycznie**. Zapisuje nazwy serwerów;
+nowe pomiary nie zapisują nazw warstw, pełnych adresów źródeł, parametrów zapytań,
+poświadczeń, treści odpowiedzi ani współrzędnych obszaru. Sprawdź udostępniane pliki,
+zwłaszcza dodatkowy manifest i raport.
+
+Log pomoże rozróżnić ograniczenie RAM, zajętość procesora i oczekiwanie na serwer.
+Nie mierzy jednak maksymalnej przepustowości łącza lub serwera, temperatury CPU
+ani procentowej zajętości fizycznego dysku. Obserwowane bajty odpowiedzi QGIS
+nie są pomiarem całego ruchu sieciowego komputera. Brak odczytu czujnika jest
+oznaczany jako niedostępny, a nie jako zerowe obciążenie. Liczniki służą do analizy;
+wydanie 1.2.0 nie zmienia zasad dobierania liczby procesów.
+
 ## Licencje i pomoc
 
 Respektuj licencje każdej warstwy i warunki dostawców: pobieranie, kopiowanie,
@@ -142,8 +173,8 @@ Licencja samej wtyczki: **GNU GPL v2 (GPL-2.0-only)**, warunki i brak gwarancji
 w pliku `LICENSE` dołączonym do paczki. Licencja wtyczki nie obejmuje pobranych danych.
 
 [Zgłoszenia błędów i propozycje](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues):
-podaj wersję QGIS i wtyczki oraz kroki odtworzenia problemu. Pomocne są raport,
-`manifest.json`, `diagnostic.jsonl` i dziennik z okna. Jeśli eksport zakończy się
+podaj wersję QGIS i wtyczki oraz kroki odtworzenia problemu. Dobierz pliki zgodnie
+z tabelą powyżej; dziennik z okna może uzupełnić opis. Jeśli eksport zakończy się
 błędem przed utworzeniem folderu archiwum, diagnostyka może pozostać w folderze
 zapisu jako `<nazwa_archiwum>.diagnostic.jsonl`.
 Sprawdź pliki przed udostępnieniem — mogą zawierać nazwy warstw lub dane poufne.
@@ -156,7 +187,7 @@ supplied by QGIS. No extra packages are needed. Ensure access to project sources
 enough disk space and permission to download and store the selected data.
 
 1. Choose **Plugins → Manage and Install Plugins → Install from ZIP** and select
-   `qgis-project-snapshot-1.1.0.zip`. Restart QGIS when upgrading.
+   `qgis-project-snapshot-1.2.0.zip`. Restart QGIS when upgrading.
 2. Open the project, then **Plugins → QGIS Project Snapshot → Archive project…**
    or the map-in-an-archive-box toolbar icon.
 3. Choose a folder, area, layers and zoom range, then **Create archive**.
@@ -231,6 +262,36 @@ confirm source and style compatibility. The plugin reports that limitation.
 An unfinished export cannot be recovered after a QGIS crash or power loss.
 Before closing QGIS, use **Cancel** and wait for the result to be saved.
 
+## English guide — performance diagnostics and files to share
+
+From 1.2.0, the plugin automatically saves a local `diagnostic.jsonl` with CPU,
+available and resident memory, read/write operations, queues, process limits,
+waiting states and observed server responses. Computer samples are taken about
+every 5 seconds in the main QGIS process and map processes, including while
+downloads wait for replies. Work phases and final layer results are also recorded.
+No additional option or measurement tool is required.
+For a complete review, use the log after the export finishes or is deliberately
+cancelled; wait for the result and map process logs to be saved.
+
+| Purpose | Files to provide |
+| --- | --- |
+| Typical review of download time and process limits | Usually just `diagnostic.jsonl` from 1.2.0 or later. |
+| Identifying layers by name or examining completeness in detail | Also include `manifest.json`; HTML presents the same results in readable form. |
+| Resuming or checking the actual saved data | The entire archive folder, including data, project and resources. A log alone is not enough. |
+
+AUX files are usually unnecessary for performance analysis. Longer exports create
+larger logs; you can manually ZIP a log before sharing. The plugin **does not send
+diagnostics automatically**. Server names are recorded; new measurements do not
+save layer names, complete source URLs, query parameters, credentials, response
+contents or area coordinates. Check files before sharing, especially any additional
+manifest or report.
+
+The log helps distinguish memory limits, CPU use and waits for servers. It does
+not measure maximum link or server throughput, CPU temperature or physical disk
+busy percentage. Observed QGIS response bytes are not all network traffic on the
+computer. Unavailable sensor readings are recorded as unavailable, not as zero
+load. These counters support analysis; 1.2.0 does not change process allocation rules.
+
 ## English guide — results, rights and help
 
 Read the report using **Open report**. Check incomplete and empty results against
@@ -260,8 +321,8 @@ does not cover downloaded data. Author: Jarosław Sadowski. Developed through
 **vibe coding with AI assistance**.
 
 [Report a problem or suggestion](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues)
-with your QGIS and plugin versions and reproduction steps. The report,
-`manifest.json`, `diagnostic.jsonl` and window log can help. If export fails before
+with your QGIS and plugin versions and reproduction steps. Choose files using the
+table above; the window log can add context. If export fails before
 creating an archive folder, diagnostics may remain as `<archive_name>.diagnostic.jsonl`
 in the chosen output folder. Inspect files before sharing; they may include
 layer names or confidential data. Do not publish passwords, private projects

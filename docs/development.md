@@ -49,7 +49,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.1.0.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.2.0.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -122,7 +122,33 @@ Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
 Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
 procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
 przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md).
-Bieżące wydanie: [1.1.0](validation-1.1.0.md).
+Bieżące wydanie: [1.2.0](validation-1.2.0.md).
+
+## Kontrole diagnostyki wydajności (1.2.0)
+
+`test_performance_resources.py` sprawdza natywne liczniki Linux, rzeczywisty przyrost
+CPU i I/O po niewielkiej lokalnej operacji, atrapy API Windows z wartościami 64-bitowymi,
+zakres commit i I/O oraz niezależność błędów odczytu. Istniejące testy pamięci
+weryfikują niezmienioną semantykę budżetowania. `test_performance_diagnostics.py`
+oraz `test_diagnostics.py` obejmują okresowe próbki, zakończenie samplera,
+kontekst etapów, pomiary sieci i brak treści poufnych.
+Pełny odbiór oraz ograniczenia platform opisuje [raport 1.2.0](validation-1.2.0.md).
+
+W próbie ręcznej wykonaj eksport, poczekaj na kilka próbek i anuluj go zwykłym
+przyciskiem. Po zapisaniu wyniku sprawdź `performance_sample` głównego QGIS i map,
+`scheduler_sample`, `network_interval` i `layer_summary`. Brak dostępnego odczytu
+ma pozostać `null`, a nie zerem. Porównaj CPU i dostępny RAM z systemowym monitorem,
+uwzględniając inny okres próbkowania i to, że 100% CPU procesu oznacza jeden
+procesor logiczny. W Windows trzeba przeprowadzić rzeczywistą próbę — atrapy API
+nie zastępują uruchomienia na tym systemie.
+
+Orientacyjny koszt samego `performance_counters` zmierzono na lokalnym Linux
+w 200 kolejnych odczytach dla każdego wariantu: mediana 0,178 ms dla własnego
+procesu oraz 0,323 ms z danymi systemowymi. To pomiar pojedynczego odczytu,
+bez zapisu logu i bez reprezentatywnego eksportu; nie jest benchmarkiem całej
+wtyczki ani pomiarem kosztu na Windows. `probe_seconds` w nowych logach pozwala
+ocenić czas odczytu podczas właściwego przebiegu. Interpretacja liczników
+i ich ograniczenia: [architektura](architecture.md#pomiary-wydajności-120).
 
 ## Kontrole kontynuacji archiwum (1.1.0)
 

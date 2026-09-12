@@ -38,7 +38,12 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtXml import QDomDocument
 
 from .archive_resources import ProjectResources, audit_local_layers
-from .diagnostics import Diagnostics, NetworkDiagnostics, network_details
+from .diagnostics import (
+    Diagnostics,
+    NetworkDiagnostics,
+    PerformanceDiagnostics,
+    network_details,
+)
 from .i18n import tr
 from .parallel_archive import RasterWorkers, WorkerError, merge_raster
 from .raster_archive import write_raster_data, write_rendered_raster, zoom_levels
@@ -724,10 +729,13 @@ def create_archive(
     parallel = None
     notify = progress
     last_activity = 0.0
+    network_monitor = None
 
     def progress(message):
         nonlocal last_activity
         notify(message)
+        if network_monitor is not None:
+            network_monitor.flush_interval()
         if parallel and time.monotonic() - last_activity >= 0.5:
             last_activity = time.monotonic()
             worker_activity(parallel.activity())
@@ -737,10 +745,12 @@ def create_archive(
     with (
         Diagnostics(output_folder / (name + ".diagnostic.jsonl")) as diagnostic,
         TemporaryDirectory(prefix=".archive-", dir=output_folder) as temporary,
+        PerformanceDiagnostics(diagnostic, "main", output_folder) as performance,
         ExitStack() as processes,
     ):
         staging = Path(temporary)
         if resume_manifest is not None:
+            performance.set_phase("copy_previous")
             _copy_resume(resume_from, resume_manifest, staging, progress, cancelled)
         metadata = ConfigParser()
         metadata.read(Path(__file__).with_name("metadata.txt"), encoding="utf-8")
@@ -761,6 +771,27 @@ def create_archive(
 
         network_monitor = NetworkDiagnostics(diagnostic)
         processes.callback(network_monitor.close)
+        bounds = area.boundingBox()
+        diagnostic.emit(
+            "archive_plan",
+            selected_layers=len(selected_ids),
+            area_crs=area_crs.authid(),
+            area_size=area.area(),
+            bounding_width=bounds.width(),
+            bounding_height=bounds.height(),
+            area_vertices=area.constGet().nCoordinates(),
+            layers=[
+                {
+                    "index": index,
+                    "job": "layer_" + sha256(record["id"].encode()).hexdigest()[:24],
+                    "provider": record["provider"],
+                    "reused": bool(record.get("reused")),
+                }
+                for index, record in enumerate(
+                    (r for r in records if r["status"] != "excluded"), 1
+                )
+            ],
+        )
         try:
             diagnostic.emit("storage", free_bytes=shutil.disk_usage(staging).free)
         except OSError as error:
@@ -771,6 +802,7 @@ def create_archive(
                 "Przygotowanie kopii projektu. Wybrano {0} warstw; procesy map: {1}."
             ).format(total, workers)
         )
+        performance.set_phase("snapshot")
         _snapshot_project(project, snapshot)
         database = staging / "dane.gpkg"
         levels = None
@@ -781,6 +813,7 @@ def create_archive(
             for r in records
         ):
             progress(tr("Przygotowanie kolejki map dla osobnych procesów QGIS…"))
+            performance.set_phase("prepare_workers")
             levels = zoom_levels(project, area, area_crs, zoom_min, zoom_max)
             parallel = processes.enter_context(
                 RasterWorkers(
@@ -804,6 +837,7 @@ def create_archive(
             r["id"]: i + 1
             for i, r in enumerate(r for r in records if r["status"] != "excluded")
         }
+        performance.set_phase("waiting")
         for record in _ready_records(records, parallel, cancelled, progress):
             layer_index = indices[record["id"]]
             if record["status"] == "excluded":
@@ -862,6 +896,7 @@ def create_archive(
                         _remove_table(database, table)
                     if isinstance(layer, QgsVectorLayer):
                         try:
+                            performance.set_phase("vector_write", job)
                             progress(
                                 tr(
                                     (
@@ -940,6 +975,7 @@ def create_archive(
                         and layer.providerType() == "gdal"
                     ):
                         try:
+                            performance.set_phase("raster_data", job)
                             progress(
                                 tr("{0}: odczyt i kopiowanie wartości rastra…").format(
                                     layer.name()
@@ -994,6 +1030,7 @@ def create_archive(
                         result = None
                         if parallel and layer.id() in parallel.futures:
                             try:
+                                performance.set_phase("merge", job)
                                 result = parallel.take(
                                     layer.id(),
                                     database,
@@ -1036,6 +1073,8 @@ def create_archive(
                                 )
                         gate = None
                         try:
+                            if result is None:
+                                performance.set_phase("render_main", job)
                             if (
                                 adaptive
                                 and parallel
@@ -1141,6 +1180,7 @@ def create_archive(
             completed += 1
             layer_status(dict(record), completed, total)
             progress(f"{record['name']}: {record['reason']}")
+            performance.set_phase("waiting")
 
         progress(
             tr("Kończenie zadań pomocniczych i porządkowanie plików tymczasowych…")
@@ -1153,10 +1193,12 @@ def create_archive(
         final_workers = parallel.workers if parallel else workers
         processes.close()
         parallel = None
+        network_monitor = None
         worker_activity([])
         progress(
             tr("Zapisywanie projektu, lokalnych symboli, formularzy i załączników…")
         )
+        performance.set_phase("resources")
         resource_report = _local_project(
             snapshot,
             staging / (name + ".qgz"),
@@ -1166,9 +1208,11 @@ def create_archive(
         progress(
             tr("Otwieranie zapisanych warstw — kontrola dostępności lokalnych danych…")
         )
+        performance.set_phase("local_audit")
         local_failures = audit_local_layers(staging / (name + ".qgz"), records)
         snapshot.unlink()
         if database.exists():
+            performance.set_phase("integrity_check")
             progress(tr("Kontrola integralności GeoPackage…"))
             with closing(sqlite3.connect(database)) as connection:
                 if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
@@ -1222,6 +1266,7 @@ def create_archive(
                     r.get("source_fingerprint") for r in previous.values()
                 ),
             }
+        performance.set_phase("checksums")
         for path in sorted(staging.rglob("*")):
             if path.is_file():
                 progress(
@@ -1244,6 +1289,7 @@ def create_archive(
         manifest["cancelled"] = cancelled()
         manifest["finished_at"] = datetime.now().astimezone().isoformat()
         progress(tr("Zapisywanie manifestu i raportu z wynikami…"))
+        performance.set_phase("report")
         (staging / "manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
         )
@@ -1334,10 +1380,42 @@ def create_archive(
                 tr("Folder docelowy już istnieje. Nie nadpisano archiwum.")
             )
         progress(tr("Udostępnianie gotowego folderu archiwum…"))
+        for index, record in enumerate(
+            (r for r in records if r["status"] != "excluded"), 1
+        ):
+            raster = record.get("raster", {})
+            diagnostic.emit(
+                "layer_summary",
+                layer_index=index,
+                job="layer_" + sha256(record["id"].encode()).hexdigest()[:24],
+                status=record["status"],
+                method=record.get("method"),
+                reused=bool(record.get("reused")),
+                feature_count=record.get("feature_count"),
+                tile_count=record.get("tile_count"),
+                levels=[
+                    {
+                        key: level[key]
+                        for key in ("zoom", "total", "nonempty", "empty", "failed")
+                        if key in level
+                    }
+                    for level in raster.get("levels", [])
+                ],
+                stopped_early=raster.get("stopped_early"),
+                deferred=raster.get("deferred"),
+                repair_attempts=raster.get("repair_attempts"),
+                repaired=raster.get("repaired"),
+                raw_empty=raster.get("raw_empty"),
+                raw_nonempty=raster.get("raw_nonempty"),
+                masked_out=raster.get("masked_out"),
+                timing_seconds=raster.get("timing_seconds"),
+            )
+        performance.set_phase("publish")
         diagnostic.emit(
             "archive_result", status=manifest["status"], cancelled=manifest["cancelled"]
         )
         staging.rename(destination)
-        diagnostic.path.rename(destination / "diagnostic.jsonl")
-        diagnostic.path = destination / "diagnostic.jsonl"
+        with diagnostic.lock:
+            diagnostic.path.rename(destination / "diagnostic.jsonl")
+            diagnostic.path = destination / "diagnostic.jsonl"
     return destination

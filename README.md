@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-Polski · [English](README.en.md) · Wersja **1.1.0**
+Polski · [English](README.en.md) · Wersja **1.2.0**
 
 ## Co to jest i co robi
 
@@ -27,7 +27,7 @@ i uwierzytelnianie, wymagają sprawdzenia na własnym stanowisku.
 
 ## Jak zainstalować
 
-1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.1.0.zip`**.
+1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.2.0.zip`**.
    Użyj instalacyjnego ZIP-a wtyczki, nie ZIP-a całego repozytorium.
 2. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
 3. Wskaż paczkę i zainstaluj wtyczkę. Przy aktualizacji uruchom ponownie QGIS.
@@ -80,6 +80,20 @@ Okno pokazuje aktywne zadania i limity. **Warstwy w kolejce** to warstwy czekaj�
 na pobranie z serwera w tym samym wierszu. Automat pomaga przyspieszyć eksport,
 ale nie gwarantuje maksymalnej przepustowości. Korzysta z ustawień sieciowych
 aktywnego QGIS. Kontynuacja nie zmienia zasad automatycznego obciążania serwerów.
+
+## Diagnostyka długiego pobierania
+
+Od wersji 1.2.0 wtyczka automatycznie zapisuje w `diagnostic.jsonl` pomiary CPU,
+pamięci, operacji odczytu i zapisu oraz pracy kolejek i serwerów. Pomiary komputera
+powstają co około 5 sekund, również podczas oczekiwania na pobranie. Log pozostaje
+lokalnie w folderze archiwum; wtyczka nie wysyła go automatycznie.
+
+Do typowej analizy wydajności zwykle wystarczy **`diagnostic.jsonl`**. Dołącz
+`manifest.json`, gdy trzeba wskazać warstwy po nazwie lub sprawdzić szczegóły braków.
+HTML i pliki AUX zwykle nie są potrzebne do tej analizy; do wznowienia zachowaj
+cały folder. Dłuższy log możesz ręcznie spakować do ZIP-a przed przekazaniem.
+Pomiary pomagają znaleźć przyczynę spowolnienia, ale nie dowodzą maksymalnej
+wydajności komputera lub serwera.
 
 ## Licencje danych i warunki usług
 

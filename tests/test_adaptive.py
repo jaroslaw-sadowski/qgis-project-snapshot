@@ -174,13 +174,14 @@ class PolicyTests(unittest.TestCase):
     def test_expired_coordinator_permission_fails_closed(self):
         with TemporaryDirectory() as temporary:
             folder = Path(temporary)
-            gate = WorkerGate(folder, lambda: False)
+            clock = [1.0]
+            gate = WorkerGate(folder, lambda: False, lambda: clock.__setitem__(0, 12.0))
             write_state(
                 folder / "control.json", {"version": 1, "allowed": True, "expires": 0}
             )
             with patch(
                 "mbtiles_batch_exporter.adaptive.time.monotonic",
-                side_effect=[0, 11, 11],
+                side_effect=lambda: clock[0],
             ):
                 with self.assertRaises(HostDeferred):
                     gate.before()

@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (1.1.0)
+# Działanie i ograniczenia archiwizacji (1.2.0)
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
@@ -179,6 +179,88 @@ o kontynuacji, diagnozy i do 20 przykładów błędów kafelków na mapę.
 | parallel_archive.py, archive_worker.py | Izolacja QGIS, procesy i scalanie |
 | adaptive.py, resources.py | Polityka hostów, bramka i budżet zasobów |
 | worker_network.py | Proxy QGIS przekazywane do procesów |
+
+## Pomiary wydajności (1.2.0)
+
+Pomiary są obserwacją istniejącego eksportu: nie zmieniają limitów, timeoutów,
+algorytmu RAM, retry ani jakości PNG. Wykorzystują standardową bibliotekę Pythona,
+natywne liczniki systemu i istniejące sygnały QGIS, bez nowych zależności, dodatkowych
+zapytań do źródeł czy testowego ruchu sieciowego. `diagnostic.jsonl` od 1.2.0 zawiera
+zwykle wystarczający kontekst do analizy wydajności. Manifest pozostaje potrzebny
+do nazw warstw i szczegółowego odbioru kompletności, a cały folder do kontynuacji
+oraz sprawdzenia rzeczywistych danych.
+
+| Zdarzenie | Zakres |
+| --- | --- |
+| `performance_configuration` | Wersja pomiarów, rola procesu, okres próbkowania i wersja/architektura systemu. |
+| `performance_sample` | Własny czas CPU, RSS/peak, I/O, faza i czas próbki; w głównym QGIS także CPU całego systemu, RAM i wolne miejsce na docelowym woluminie. |
+| `performance_phase` | Czas rzeczywisty i własny CPU zakończonego etapu, np. przygotowania, renderowania, scalania, zasobów lub sum kontrolnych. |
+| `scheduler_sample` | Budżet i sufit CPU, liczba procesów oraz zadań kafelkowych, kolejka i gotowe wyniki do scalenia; dostępny RAM, rezerwa, estymata i zapas wzrostu procesów. |
+| `archive_plan` | Liczba i techniczne identyfikatory warstw, dostawcy, użycie poprzednich wyników, CRS oraz rozmiar i złożoność obszaru bez współrzędnych. |
+| `layer_summary` | Końcowy status, metoda, liczba obiektów/kafelków, wyniki zoomów, naprawy oraz czasy faz danej warstwy. |
+| `network_interval` | Obserwowane rozpoczęcia, odpowiedzi, oczekujące żądania, błędy, timeouty, przedziały czasu odpowiedzi i liczniki bajtów według hosta i kontekstu. |
+
+`PerformanceDiagnostics` uruchamia w każdym procesie własny wątek Pythona.
+Wątek co około 5 s odczytuje wyłącznie natywne liczniki i zapisuje zwykły JSON;
+nie dotyka żywych obiektów Qt/QGIS. Działa także podczas oczekiwania głównego wątku
+na sieć lub zapis. Pierwsza i ostatnia próbka obejmują krótkie procesy.
+`performance_counters(include_system=False)` w procesach map pomija powtarzanie
+pomiarów całego systemu. Wyjątek pomiaru jest diagnostyczny i nie zatrzymuje eksportu.
+Logi procesów map są dołączane do głównego logu po ich zakończeniu; nie stanowią
+strumienia ze wszystkich jeszcze działających procesów.
+
+`process_cpu_percent_one_core` wynika z przyrostu `time.process_time()` i czasu
+monotonicznego: 100% oznacza jeden zajęty procesor logiczny, więc wartość może
+przekraczać 100%. Pomiar obejmuje wszystkie wątki własnego procesu, bez potomków;
+w głównym QGIS również inne działające w nim zadania. `system_cpu_percent` ma
+zakres 0–100% dla mierzonego zakresu CPU. Linux odczytuje `/proc/stat`, pomija
+podwójne doliczenie guest/guest_nice, a idle obejmuje też I/O wait raportowany
+oddzielnie. Windows używa [GetSystemTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getsystemtimes):
+kernel zawiera już idle, a powyżej
+64 procesorów logicznych API mierzy bieżącą grupę procesorów, co opisuje `scope`.
+Nie jest to pomiar częstotliwości, temperatury ani ograniczenia mocy CPU.
+
+RSS/peak korzystają z istniejącego `process_memory()`. Dodatkowe dane o RAM
+pochodzą z `/proc/meminfo` albo `GlobalMemoryStatusEx`; wspólny odczyt zachowuje
+semantykę `available_memory()`. Windows `process_commit_limit_bytes` i
+`process_commit_available_bytes` opisują commit ograniczony możliwościami bieżącego
+procesu, **nie rozmiar pliku wymiany**, zgodnie z [MEMORYSTATUSEX](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-memorystatusex).
+Odczyty niedostępne mają `null`, a nie zero.
+Stałe typy struktur ctypes umożliwiają równoczesny odczyt samplera i koordynatora.
+
+`process_io` podaje źródło i zakres licznika. Linux `read_bytes`/`write_bytes`
+opisują operacje na poziomie warstwy składowania, natomiast `rchar`/`wchar`
+obejmują również cache i inne odczyty/zapisy. Linux dodaje I/O odebranych przez
+`wait` procesów potomnych do rodzica (`process_and_reaped_children`): nie sumuj
+wprost main + worker, bo policzysz część danych ponownie. Windows
+`GetProcessIoCounters` dotyczy własnego procesu (`process_only`) i wszystkich
+transferów I/O, nie tylko dysku, zgodnie z [dokumentacją API](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getprocessiocounters).
+Liczniki nie mierzą procentowej zajętości
+fizycznego dysku ani przepustowości całego łącza.
+
+Próbka koordynatora powstaje przy okresowym przeliczeniu budżetu, także gdy limit
+się nie zmienił. `jobs` rozdziela running/waiting/done, gotowość do napraw i wiek
+telemetrii; pozwala odróżnić brak próbki od aktualnego oczekiwania. `hosts` zawiera
+limit, aktywność, kolejkę, szybkość, przerwę, stan zamrożenia, ostatnią zmianę
+polityki i stan okna pomiarowego. Pełna historia zmian nadal jest w podsumowaniu
+adaptacji. Liczba procesów i liczba operacji kafelkowych nadal nie oznaczają
+liczby faktycznie równoczesnych żądań HTTP.
+
+`network_interval` opróżnia liczniki po upływie 5 s przy kolejnym wywołaniu postępu,
+a także przy zapełnieniu bufora grup i na końcu obserwacji. Bez postępu odstęp może być dłuższy;
+`interval_seconds` podaje rzeczywisty okres. Obserwacja pozostaje w wątku QGIS.
+`observed_body_bytes` oznacza dostępne bajty treści odpowiedzi;
+`declared_content_length_bytes` to osobna suma deklaracji nagłówka.
+Nie wolno ich dodawać ani uznawać za pomiar bajtów na łączu. Liczniki dostępności,
+cache i nieznanego cache pokazują pokrycie obserwacji. Czasy obejmują wyłącznie
+odpowiedzi skorelowane z rozpoczęciem żądania. Nowe interwały nie zastępują
+dotychczasowych końcowych podsumowań sieci.
+
+Plik pozostaje lokalny i nie jest automatycznie wysyłany. Nowe zdarzenia używają
+indeksów/technicznych nazw zadań oraz nazw hostów, bez nazw warstw, pełnych URL,
+parametrów zapytań, haseł, treści odpowiedzi i współrzędnych obszaru. Większy log
+można ręcznie skompresować do ZIP-a. Do pełnej analizy używaj logu po zakończeniu
+lub świadomym anulowaniu, gdy zostały zebrane logi procesów i podsumowania.
 
 ## Diagnostyka 0.9.1
 

@@ -235,6 +235,7 @@ class WorkerGate:
         self.publish()
 
     def publish(self, closing=False):
+        self.state["sampled_at"] = time.monotonic()
         if self.state["seconds"] > 0:
             now = time.monotonic()
             if closing or now >= self.next_memory_check:

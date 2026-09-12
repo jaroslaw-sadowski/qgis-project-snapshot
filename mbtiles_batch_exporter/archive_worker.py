@@ -10,7 +10,12 @@ from datetime import datetime
 from pathlib import Path
 
 from .adaptive import write_state
-from .diagnostics import Diagnostics, NetworkDiagnostics, network_details
+from .diagnostics import (
+    Diagnostics,
+    NetworkDiagnostics,
+    PerformanceDiagnostics,
+    network_details,
+)
 from .i18n import tr
 
 
@@ -18,6 +23,8 @@ def main():
     folder = Path(sys.argv[1])
     diagnostic = Diagnostics(folder / "diagnostic.jsonl")
     diagnostic.emit("worker_bootstrap")
+    performance = PerformanceDiagnostics(diagnostic, "worker")
+    performance.__enter__()
     stage = "bootstrap"
     network_error = {}
     project = gate = network_monitor = None
@@ -27,6 +34,8 @@ def main():
 
     def progress(message):
         nonlocal last_progress, last_message
+        if network_monitor:
+            network_monitor.flush_interval()
         warning = message.startswith(("[HTTP 429]", "[HTTP 503]"))
         if warning and message not in server_warnings:
             server_warnings.append(message)
@@ -75,6 +84,7 @@ def main():
             python=".".join(map(str, sys.version_info[:3])),
         )
         stage = "network_setup"
+        performance.set_phase(stage)
         configure_network(network, diagnostic)
         diagnostic.emit("worker_network_configuration", **network_details(network))
 
@@ -94,6 +104,7 @@ def main():
         project = QgsProject()
         started = datetime.now().astimezone().isoformat()
         stage = "source_open"
+        performance.set_phase(stage, parameters["table"])
         progress(tr("Otwieranie źródła mapy…"))
         if not project.read(str(folder / "source.qgs")):
             raise RuntimeError()
@@ -110,6 +121,7 @@ def main():
             maximum_scale=layer.maximumScale(),
         )
         stage = "render"
+        performance.set_phase(stage, parameters["table"])
         result = write_rendered_raster(
             layer,
             project,
@@ -146,6 +158,7 @@ def main():
         result["download_finished_at"] = datetime.now().astimezone().isoformat()
         result["worker_network"] = network_error
         stage = "result_write"
+        performance.set_phase(stage, parameters["table"])
         (folder / "result.json").write_text(json.dumps(result), encoding="utf-8")
     except InterruptedError:
         diagnostic.emit("worker_cancelled", stage=stage)
@@ -164,6 +177,7 @@ def main():
         )
         return 1
     finally:
+        performance.__exit__(None, None, None)
         if network_monitor:
             network_monitor.close()
         if gate:
