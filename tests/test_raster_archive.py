@@ -3,7 +3,6 @@
 """Real QGIS/GDAL raster tests; WMS uses a disposable loopback HTTP server."""
 
 import atexit
-import json
 import math
 import os
 import shutil
@@ -44,7 +43,12 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QBuffer, QIODevice
 from qgis.PyQt.QtGui import QColor, QImage
 
-from mbtiles_batch_exporter.archive import _remove_table, create_archive
+from mbtiles_batch_exporter.archive import (
+    _remove_table,
+    create_archive,
+    read_resume_manifest,
+)
+from mbtiles_batch_exporter.i18n import tr
 from mbtiles_batch_exporter.raster_archive import (
     _mask_image,
     _render_image,
@@ -341,12 +345,12 @@ class RasterTests(unittest.TestCase):
                 zoom_min=17,
                 zoom_max=17,
             )
-        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
+        manifest = read_resume_manifest(result)
         statuses = {r["id"]: r["status"] for r in manifest["layers"]}
         self.assertTrue(manifest["cancelled"])
         self.assertEqual(statuses[self.layer.id()], "saved")
         self.assertEqual(statuses[second.id()], "cancelled")
-        with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as db:
+        with closing(sqlite3.connect(result / tr("dane/dane.gpkg"))) as db:
             self.assertEqual(
                 db.execute("SELECT data_type FROM gpkg_contents").fetchall(),
                 [("features",)],
@@ -403,7 +407,7 @@ class RasterTests(unittest.TestCase):
             zoom_min=17,
             zoom_max=17,
         )
-        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
+        manifest = read_resume_manifest(result)
         record = next(r for r in manifest["layers"] if r["id"] == raster.id())
         self.assertEqual(record["method"], "raster_data", record)
         local_path = result / record["local_source"][2:]
@@ -575,7 +579,7 @@ class LocalWmsTests(unittest.TestCase):
             zoom_max=17,
             workers=2,
         )
-        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
+        manifest = read_resume_manifest(result)
         record = next(r for r in manifest["layers"] if r["id"] == layer.id())
         self.assertEqual(record["status"], "failed")
         self.assertIn("worker_pid", record)
@@ -618,7 +622,7 @@ class LocalWmsTests(unittest.TestCase):
             cancelled=lambda: cancelled,
             progress=progress,
         )
-        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
+        manifest = read_resume_manifest(result)
         self.assertTrue(manifest["cancelled"])
         statuses = {r["id"]: r["status"] for r in manifest["layers"]}
         self.assertEqual(statuses[self.layer.id()], "saved")
@@ -660,7 +664,7 @@ class LocalWmsTests(unittest.TestCase):
             per_server_limit=per_server_limit,
             worker_activity=lambda rows: activities.extend(rows),
         )
-        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
+        manifest = read_resume_manifest(result)
         if workers > 1:
             self.assertTrue(
                 any(
@@ -700,15 +704,15 @@ class LocalWmsTests(unittest.TestCase):
         moved = self.folder / "offline"
         self.assertEqual(
             {path.name for path in result.iterdir() if path.is_file()},
-            {next(result.glob("*.qgz")).name, "raport.html"},
+            {next(result.glob("*.qgz")).name, tr("raport.html")},
         )
         self.assertEqual(
-            {path.name for path in (result / "diagnostyka").iterdir()},
-            {"manifest.json", "diagnostic.jsonl"},
+            {path.name for path in (result / tr("diagnostyka")).iterdir()},
+            {"manifest.json", tr("diagnostyka.jsonl")},
         )
         statistics = {
             path.relative_to(result): path.read_bytes()
-            for path in (result / "dane").glob("*.aux.xml")
+            for path in (result / tr("dane")).glob("*.aux.xml")
         }
         self.assertTrue(statistics)
         shutil.move(result, moved)

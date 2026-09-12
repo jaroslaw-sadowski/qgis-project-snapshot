@@ -1,4 +1,4 @@
-# QGIS Project Snapshot — instrukcja / user guide 1.4.1
+# QGIS Project Snapshot — instrukcja / user guide 1.4.3
 
 ## Instalacja i uruchomienie
 
@@ -7,7 +7,7 @@ z instalacji QGIS. Nie są potrzebne dodatkowe pakiety. Zapewnij dostęp do źr�
 projektu oraz miejsce na archiwum i pliki tymczasowe.
 
 1. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-1.4.1.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-1.4.3.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz projekt, następnie **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**
    lub ikonę mapy w pudełku na pasku wtyczek.
 
@@ -123,7 +123,7 @@ Archiwa 1.0.0 można kontynuować, ale nie zapisują informacji pozwalającej po
 zgodność źródeł i stylów. Wtyczka wyświetla wtedy komunikat o tym ograniczeniu.
 
 Od 1.4.0 postęp map jest zapisywany podczas pobierania. Po nieoczekiwanym zamknięciu
-QGIS wybierz **Wznów archiwum…** i folder z nazwą zawierającą `.in-progress-`.
+QGIS wybierz **Wznów archiwum…** i folder z nazwą zawierającą `.w-trakcie-`.
 Okno proponuje ostatni zachowany folder z manifestem; nie uruchamia wznowienia
 samoczynnie. Nie usuwaj żadnych plików z tego folderu przed kontynuacją.
 Kontynuacja kafelków wymaga postępu zapisanego od 1.4.0. Starsze archiwa zachowują
@@ -138,14 +138,14 @@ zasilania może uniemożliwić kontynuację.
 
 Przeczytaj raport przez **Otwórz raport**. Lista warstw i `raport.html` wskazują
 wyniki niepełne, puste oraz błędy. `diagnostyka/manifest.json` zawiera szczegółowy
-opis archiwum. Od 1.4.1 w folderze głównym pozostają projekt `.qgz`, `raport.html`,
+opis archiwum. Od 1.4.2 w folderze głównym pozostają projekt `.qgz`, `raport.html`,
 `dane/` i potrzebne `zasoby/`. Dane i ich pomocnicze pliki odczytu są w `dane/`.
 Manifest, log i zachowany postęp trafiają do
 `diagnostyka/`; pusty katalog postępu jest usuwany. Do pracy otwieraj projekt,
 a do przeczytania wyników raport. Pozostałych plików nie trzeba otwierać ręcznie.
 
 Potwierdzone puste wektory w kopii projektu mają końcówkę
-`_nie-bylo-obiketow-w-zasiegu`. Zachowują pola i style. Sufiks dotyczy tylko
+`_nie-bylo-obiektow-w-zasiegu`. Zachowują pola i style. Sufiks dotyczy tylko
 prawidłowo zapisanej tabeli z zerem obiektów, której pusty wynik został potwierdzony.
 Błąd, obraz zastępczy ani niepotwierdzone puste MSSQL nie dostają tej końcówki.
 Oryginalny projekt i nazwy jego warstw pozostają bez zmian.
@@ -165,7 +165,7 @@ projektu; sprawdź uwagi w raporcie oraz działanie kopii bez sieci.
 
 ## Diagnostyka wydajności i pliki do zgłoszenia
 
-Od 1.2.0 wtyczka automatycznie zapisuje lokalny `diagnostic.jsonl`: użycie CPU,
+Wtyczka automatycznie zapisuje lokalny `diagnostyka.jsonl`: użycie CPU,
 dostępny i zajęty RAM, operacje odczytu i zapisu, kolejki, limity procesów,
 oczekiwanie oraz obserwowane odpowiedzi serwerów. Pomiary komputera powstają
 co około 5 sekund w głównym QGIS i procesach mapowych, również gdy pobieranie
@@ -174,12 +174,12 @@ Nie trzeba włączać dodatkowej opcji ani instalować narzędzia pomiarowego.
 Do pełnej analizy użyj logu po zakończeniu lub świadomym anulowaniu eksportu;
 poczekaj na zapisanie wyniku i dołączenie logów procesów mapowych.
 
-Od 1.4.1 `diagnostic.jsonl` i `manifest.json` są w podfolderze `diagnostyka/`.
+Od 1.4.2 `diagnostyka.jsonl` i `manifest.json` są w podfolderze `diagnostyka/`.
 Wybierając folder do wznowienia, wskaż całe archiwum, nie ten podfolder.
 
 | Cel | Co przekazać |
 | --- | --- |
-| Typowa analiza czasu pobierania i ograniczeń liczby procesów | Zwykle sam `diagnostic.jsonl` z 1.2.0 lub nowszej wersji. |
+| Typowa analiza czasu pobierania i ograniczeń liczby procesów | Zwykle sam `diagnostyka.jsonl` (w starszych wersjach `diagnostic.jsonl`). |
 | Wskazanie warstw po nazwie, szczegółowe sprawdzenie kompletności | Dodatkowo `manifest.json`; HTML przedstawia te same wyniki w czytelnej postaci. |
 | Wznowienie albo sprawdzenie rzeczywistych danych w kopii | Cały folder archiwum z danymi, projektem i zasobami. Sam log nie wystarcza. |
 
@@ -217,7 +217,7 @@ w pliku `LICENSE` dołączonym do paczki. Licencja wtyczki nie obejmuje pobranyc
 [Zgłoszenia błędów i propozycje](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues):
 podaj wersję QGIS i wtyczki oraz kroki odtworzenia problemu. Dobierz pliki zgodnie
 z tabelą powyżej; dziennik z okna może uzupełnić opis. Po nieoczekiwanym zakończeniu
-szukaj diagnostyki w podfolderze `diagnostyka/` zachowanego folderu `.in-progress-…`.
+szukaj diagnostyki w podfolderze `diagnostyka/` zachowanego folderu `.w-trakcie-…`.
 Sprawdź pliki przed udostępnieniem — mogą zawierać nazwy warstw lub dane poufne.
 Nie publikuj haseł, poufnych projektów ani danych firmowych.
 
@@ -228,7 +228,7 @@ supplied by QGIS. No extra packages are needed. Ensure access to project sources
 enough disk space and permission to download and store the selected data.
 
 1. Choose **Plugins → Manage and Install Plugins → Install from ZIP** and select
-   `qgis-project-snapshot-1.4.1.zip`. Restart QGIS when upgrading.
+   `qgis-project-snapshot-1.4.3.zip`. Restart QGIS when upgrading.
 2. Open the project, then **Plugins → QGIS Project Snapshot → Archive project…**
    or the map-in-an-archive-box toolbar icon.
 3. Choose a folder, area, layers and zoom range, then **Create archive**.
@@ -290,7 +290,7 @@ for later continuation.
    If QGIS was closed, open the original project and the archive window, choose
    **Resume archive…**, then select the previous archive folder.
 2. Allow space for a copy of the data and new downloads. You need the entire folder
-   with `diagnostyka/manifest.json`, data and resources; a JSON file or report alone is not enough.
+   with `diagnostics/manifest.json`, data and resources; a JSON file or report alone is not enough.
    Older archives with their manifest directly in the archive folder remain supported.
 3. Wait while files are checked and copied. A **new folder** will contain the earlier
    completed results and the continuation results. The previous folder stays unchanged.
@@ -341,7 +341,7 @@ No additional option or measurement tool is required.
 For a complete review, use the log after the export finishes or is deliberately
 cancelled; wait for the result and map process logs to be saved.
 
-From 1.4.1, `diagnostic.jsonl` and `manifest.json` are in `diagnostyka/`.
+From 1.4.2, `diagnostic.jsonl` and `manifest.json` are in `diagnostics/`.
 When resuming, select the entire archive folder, not that subfolder.
 
 | Purpose | Files to provide |
@@ -365,15 +365,15 @@ load. Recording these measurements does not start extra downloads or speed tests
 
 ## English guide — results, rights and help
 
-Open the `.qgz` project to work with the archive, or `raport.html` to review results.
-From 1.4.1, the main folder contains the project, report, `dane/` and required
-`zasoby/`. Data and their supporting read files are in `dane/`.
-The manifest, log and saved progress are grouped under `diagnostyka/`;
+Open the `.qgz` project to work with the archive, or `report.html` to review results.
+From 1.4.2, the main folder contains the project, report, `data/` and required
+`resources/`. Data and their supporting read files are in `data/`.
+The manifest, log and saved progress are grouped under `diagnostics/`;
 an empty progress folder is removed. You do not need to open those files manually.
 Keep and move the entire archive folder.
 
 Confirmed empty vector layers in the project copy receive the exact suffix
-`_nie-bylo-obiketow-w-zasiegu`. Fields and styles remain. It applies only to
+`_no-features-in-area`. Fields and styles remain. It applies only to
 successfully saved zero-feature tables whose empty read was confirmed. Errors,
 fallback images and unconfirmed empty MSSQL reads do not receive this suffix.
 The original project and its layer names remain unchanged.
@@ -407,6 +407,6 @@ does not cover downloaded data. Author: Jarosław Sadowski. Developed through
 [Report a problem or suggestion](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues)
 with your QGIS and plugin versions and reproduction steps. Choose files using the
 table above; the window log can add context. After an unexpected exit, look in
-`diagnostyka/` inside the retained `.in-progress-…` folder. Inspect files before sharing; they may include
+`diagnostics/` inside the retained `.in-progress-…` folder. Inspect files before sharing; they may include
 layer names or confidential data. Do not publish passwords, private projects
 or company data.

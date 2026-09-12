@@ -1404,7 +1404,7 @@ def write_raster_data(
     layer, project, area, area_crs, staging, table, cancelled, progress
 ):
     """Preserve numerical/local GDAL rasters in lossless GeoTIFF, with a cutline."""
-    resources = Path(staging) / "zasoby"
+    resources = Path(staging) / tr("zasoby")
     resources.mkdir(exist_ok=True)
     target = resources / (table + ".tif")
     source = output = None
@@ -1597,10 +1597,12 @@ def write_raster_data(
                 "status": "saved",
                 "method": "raster_data",
                 "crs": layer.crs().authid(),
-                "local_source": f"./zasoby/{target.name}",
+                "local_source": "./" + tr("zasoby") + "/" + target.name,
                 "local_provider": "gdal",
                 "alpha_band": band_count,
+                "raster_size": [output.RasterXSize, output.RasterYSize],
                 "overview_factors": overview_factors,
+                "overview_status": "built" if overview_factors else "small_raster",
                 "reason": tr(
                     "Zapisano oryginalne wartości rastra i maskę w bezstratnym GeoTIFF."
                 ),

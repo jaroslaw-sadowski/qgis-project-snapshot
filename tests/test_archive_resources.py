@@ -12,13 +12,18 @@ from zipfile import ZipFile
 import test_archive as fixtures
 from qgis.core import (
     QgsEditorWidgetSetup,
+    QgsLayoutItemLabel,
+    QgsPrintLayout,
     QgsProject,
     QgsRelation,
     QgsRelationContext,
     QgsSvgMarkerSymbolLayer,
 )
 
-from mbtiles_batch_exporter.archive_resources import ProjectResources
+from mbtiles_batch_exporter.archive_resources import (
+    ProjectResources,
+    audit_local_layers,
+)
 from mbtiles_batch_exporter.raster_archive import _render_image
 
 
@@ -28,6 +33,46 @@ class ResourceTests(unittest.TestCase):
     add_points = fixtures.ArchiveTests.add_points
     archive = fixtures.ArchiveTests.archive
     manifest = fixtures.ArchiveTests.manifest
+
+    def test_technical_reads_preserve_layouts_styles_and_detect_missing_data(self):
+        layout = QgsPrintLayout(self.project)
+        layout.initializeDefaults()
+        layout.setName("Print layout")
+        label = QgsLayoutItemLabel(layout)
+        label.setText("Preserved text")
+        layout.addLayoutItem(label)
+        self.project.layoutManager().addLayout(layout)
+        symbol = self.layer.renderer().symbol().symbolLayer(0).properties()
+        result = self.archive()
+        manifest = self.manifest(result)
+        path = next(result.glob("*.qgz"))
+        self.assertTrue(manifest["local_layer_audit"]["passed"])
+        offline = QgsProject()
+        try:
+            self.assertTrue(offline.read(str(path)))
+            self.assertEqual(
+                offline.mapLayer(self.layer.id())
+                .renderer()
+                .symbol()
+                .symbolLayer(0)
+                .properties(),
+                symbol,
+            )
+            copied = offline.layoutManager().layoutByName("Print layout")
+            self.assertIsNotNone(copied)
+            self.assertIn(
+                "Preserved text",
+                [
+                    item.text()
+                    for item in copied.items()
+                    if isinstance(item, QgsLayoutItemLabel)
+                ],
+            )
+        finally:
+            offline.clear()
+        self.assertIsNotNone(self.project.layoutManager().layoutByName("Print layout"))
+        (result / manifest["data_file"]).unlink()
+        self.assertTrue(audit_local_layers(path, manifest["layers"]))
 
     def test_svg_attachment_and_form_survive_move_and_source_deletion(self):
         source = self.folder / "source"

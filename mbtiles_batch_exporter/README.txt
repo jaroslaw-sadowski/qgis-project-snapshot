@@ -1,4 +1,4 @@
-QGIS Project Snapshot 1.4.1
+QGIS Project Snapshot 1.4.3
 Autor / Author: Jarosław Sadowski
 
 POLSKI
@@ -13,7 +13,7 @@ QGIS 3.40 lub nowszy z serii 3.x, Qt5/PyQt5 i GDAL >= 3.7 dostarczane z QGIS.
 Bez dodatkowych pakietów. Potrzebny dostęp do źródeł, wolne miejsce na dysku
 i prawo do pobierania danych. Sprawdzono QGIS 3.40 na Ubuntu.
 W QGIS wybierz Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP i wskaż
-qgis-project-snapshot-1.4.1.zip. Przy aktualizacji uruchom ponownie QGIS.
+qgis-project-snapshot-1.4.3.zip. Przy aktualizacji uruchom ponownie QGIS.
 Instalacja z katalogu plugins.qgis.org będzie możliwa po zatwierdzeniu publikacji.
 
 Użycie i automatyka
@@ -33,7 +33,7 @@ projektu użyj „Wznów archiwum…” i wskaż cały poprzedni folder. Powstan
 folder z ukończonymi warstwami i poprawnie zapisanymi lub pustymi kafelkami map.
 Tylko brakujące kafelki otrzymają do trzech nowych prób. Nieukończony wektor zacznie
 swoją warstwę od początku. Potrzebne jest miejsce na kopię danych i cały folder.
-Po nieoczekiwanym zamknięciu QGIS wskaż folder z nazwą zawierającą .in-progress-.
+Po nieoczekiwanym zamknięciu QGIS wskaż folder z nazwą zawierającą .w-trakcie-.
 Okno podpowiada ostatni zachowany folder. Poprzednie wyniki pozostają dostępne.
 Przed planowanym zamknięciem użyj Przerwij i poczekaj na zapis; uszkodzony dysk
 lub pliki mogą uniemożliwić odzyskanie postępu.
@@ -42,13 +42,13 @@ zoomy i style, także poprawnie puste poziomy; braki nie są wypełniane inną s
 Do pracy otwieraj projekt .qgz, do sprawdzenia wyniku raport.html. Dane są w dane/,
 zasoby w zasoby/. Zachowaj je razem z projektem. Manifest, log i postęp są w diagnostyka/;
 nie trzeba otwierać ich ręcznie. Przenoś cały folder archiwum.
-Potwierdzone puste wektory w kopii mają końcówkę _nie-bylo-obiketow-w-zasiegu.
+Potwierdzone puste wektory w kopii mają końcówkę _nie-bylo-obiektow-w-zasiegu.
 Pola i styl pozostają. Błędy oraz niepotwierdzone puste MSSQL nie dostają końcówki;
 oryginalne nazwy są niezmienione.
 Instrukcja szczegółowa: INSTRUKCJA.md.
 
 Diagnostyka
-Automatyczny lokalny diagnostyka/diagnostic.jsonl zawiera pomiary CPU, pamięci, odczytu i zapisu,
+Automatyczny lokalny diagnostyka/diagnostyka.jsonl zawiera pomiary CPU, pamięci, odczytu i zapisu,
 kolejek oraz odpowiedzi serwerów. Pomiary komputera powstają co około 5 sekund,
 również podczas oczekiwania. Log nie jest wysyłany automatycznie.
 Od 1.2.0 zwykle wystarczy on do analizy wydajności. Dołącz manifest.json, gdy
@@ -79,7 +79,7 @@ QGIS 3.40 or a later 3.x release, with Qt5/PyQt5 and GDAL >= 3.7 supplied by QGI
 No additional packages. Requires source access, disk space and permission to
 download the data. Tested with QGIS 3.40 on Ubuntu.
 Choose Plugins → Manage and Install Plugins → Install from ZIP, then select
-qgis-project-snapshot-1.4.1.zip. Restart QGIS when upgrading.
+qgis-project-snapshot-1.4.3.zip. Restart QGIS when upgrading.
 Installation from plugins.qgis.org will be available once publication is approved.
 
 Use and automatic downloads
@@ -105,16 +105,16 @@ files can prevent progress recovery.
 GeoTIFFs include overviews for faster display. Maps retain separately downloaded
 zooms and styles, including correctly empty levels; missing tiles are not filled
 using another scale.
-Open the .qgz project to work with the archive, or raport.html to review results.
-Keep dane/ (data) and zasoby/ (resources) with the project. The manifest, log and saved progress
-are in diagnostyka/; there is no need to open them manually. Move the whole folder.
-Confirmed empty vector layers in the copy receive _nie-bylo-obiketow-w-zasiegu.
+Open the .qgz project to work with the archive, or report.html to review results.
+Keep data/ (data) and resources/ (resources) with the project. The manifest, log and saved progress
+are in diagnostics/; there is no need to open them manually. Move the whole folder.
+Confirmed empty vector layers in the copy receive _no-features-in-area.
 Fields and styles remain. Errors and unconfirmed empty MSSQL reads do not receive
 this suffix; original names remain unchanged.
 See INSTRUKCJA.md for an English quick start.
 
 Diagnostics
-The automatic local diagnostyka/diagnostic.jsonl records CPU, memory, read/write operations,
+The automatic local diagnostics/diagnostic.jsonl records CPU, memory, read/write operations,
 queues and server responses. Computer samples are taken about every 5 seconds,
 including during waits. The log is not sent automatically.
 From 1.2.0, it is usually enough for performance analysis. Include manifest.json

@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-Polski · [English](README.en.md) · Wersja **1.4.1**
+Polski · [English](README.en.md) · Wersja **1.4.3**
 
 ## Co to jest i co robi
 
@@ -27,7 +27,7 @@ i uwierzytelnianie, wymagają sprawdzenia na własnym stanowisku.
 
 ## Jak zainstalować
 
-1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.4.1.zip`**.
+1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.4.3.zip`**.
    Użyj instalacyjnego ZIP-a wtyczki, nie ZIP-a całego repozytorium.
 2. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
 3. Wskaż paczkę i zainstaluj wtyczkę. Przy aktualizacji uruchom ponownie QGIS.
@@ -56,11 +56,14 @@ Do pracy otwieraj **projekt `.qgz`**, a do sprawdzenia wyniku **`raport.html`**.
 `zasoby/` potrzebne zasoby, a `diagnostyka/` manifest,
 log i ewentualny postęp do wznowienia. Tych plików nie trzeba otwierać ręcznie.
 Przenoś cały folder razem; nie usuwaj jego zawartości przed wznowieniem.
+Nazwy te dotyczą polskiego interfejsu. W angielskim powstają `report.html`,
+`data/`, `resources/` i `diagnostics/`. Wznowienie obsługuje także zmianę języka.
 
 Potwierdzone puste warstwy wektorowe w kopii projektu otrzymują końcówkę
-**`_nie-bylo-obiketow-w-zasiegu`**. Nadal zawierają pola i styl, ale zero obiektów.
+**`_nie-bylo-obiektow-w-zasiegu`**. Nadal zawierają pola i styl, ale zero obiektów.
 Oryginalne nazwy pozostają bez zmian; błąd lub niepotwierdzony pusty odczyt MSSQL
 nie otrzymuje tej końcówki.
+W angielskim interfejsie końcówka to **`_no-features-in-area`**.
 
 ## Jak kontynuować archiwum
 
@@ -76,7 +79,7 @@ Starsze zerowe wyniki WFS/MSSQL oraz niepotwierdzone puste odczyty MSSQL są
 sprawdzane ponownie; poprawnie pusty wynik nadal jest prawidłowy.
 
 Od 1.4.0 postęp map jest zapisywany na bieżąco. Po nieoczekiwanym zamknięciu QGIS
-użyj **Wznów archiwum…** i wskaż folder z nazwą zawierającą `.in-progress-`.
+użyj **Wznów archiwum…** i wskaż folder z nazwą zawierającą `.w-trakcie-`.
 Okno podpowiada ostatni zachowany folder; wybór nadal należy do użytkownika.
 Puste zoomy wymagają porównania ze źródłem, ale poprawnie puste kafelki nie są
 pobierane ponownie.
@@ -113,13 +116,13 @@ aktywnego QGIS. Kontynuacja nie zmienia zasad automatycznego obciążania serwer
 
 ## Diagnostyka długiego pobierania
 
-Od wersji 1.2.0 wtyczka automatycznie zapisuje w `diagnostic.jsonl` pomiary CPU,
+Wtyczka automatycznie zapisuje w `diagnostyka.jsonl` pomiary CPU,
 pamięci, operacji odczytu i zapisu oraz pracy kolejek i serwerów. Pomiary komputera
 powstają co około 5 sekund, również podczas oczekiwania na pobranie. Log pozostaje
-lokalnie; od 1.4.1 jest w podfolderze **`diagnostyka/`**, razem z `manifest.json`.
+lokalnie; od 1.4.2 jest w podfolderze **`diagnostyka/`**, razem z `manifest.json`.
 Wtyczka nie wysyła tych plików automatycznie.
 
-Do typowej analizy wydajności zwykle wystarczy **`diagnostic.jsonl`**. Dołącz
+Do typowej analizy wydajności zwykle wystarczy **`diagnostyka.jsonl`**. Dołącz
 `manifest.json`, gdy trzeba wskazać warstwy po nazwie lub sprawdzić szczegóły braków.
 HTML i pliki AUX zwykle nie są potrzebne do tej analizy; do wznowienia zachowaj
 cały folder. Dłuższy log możesz ręcznie spakować do ZIP-a przed przekazaniem.

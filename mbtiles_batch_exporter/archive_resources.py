@@ -67,7 +67,7 @@ class ProjectResources:
             return self.files[path]
         self.progress(tr("Kopiowanie zasobów: {0}").format(owner))
         digest = sha256(str(path).encode()).hexdigest()[:20]
-        target = self.folder / "zasoby" / digest / path.name
+        target = self.folder / tr("zasoby") / digest / path.name
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
             with path.open("rb") as source, target.open("wb") as output:
@@ -102,7 +102,7 @@ class ProjectResources:
                             and not reference.startswith("#")
                         ):
                             copied = self.copy(reference, owner, path.parent)
-                            if copied.startswith("./zasoby/"):
+                            if copied.startswith("./" + tr("zasoby") + "/"):
                                 node.set(
                                     key,
                                     os.path.relpath(
@@ -115,7 +115,7 @@ class ProjectResources:
                         and node.text.strip()
                     ):
                         copied = self.copy(node.text.strip(), owner, path.parent)
-                        if copied.startswith("./zasoby/"):
+                        if copied.startswith("./" + tr("zasoby") + "/"):
                             node.text = os.path.relpath(
                                 self.folder / copied[2:], target.parent
                             )
@@ -161,23 +161,34 @@ class ProjectResources:
                 continue
             try:
                 for feature in layer.getFeatures():
-                    if self.cancelled():
+                    # Already copied attachments still need valid relative paths
+                    # when a cancelled continuation changes the output language.
+                    if self.cancelled() and not record.get("reused"):
                         self.issue(
                             record["name"], tr("Przerwano kopiowanie załączników.")
                         )
                         break
                     value = feature[index]
                     if isinstance(value, str) and value:
-                        if (
+                        copied = value
+                        if record.get("reused"):
+                            for directory in ("zasoby", "resources"):
+                                if value.startswith("./" + directory + "/"):
+                                    copied = value.replace(
+                                        "./" + directory + "/",
+                                        "./" + tr("zasoby") + "/",
+                                        1,
+                                    )
+                                    break
+                        if not (
                             record.get("reused")
-                            and value.startswith("./zasoby/")
-                            and (self.folder / value)
+                            and copied.startswith("./" + tr("zasoby") + "/")
+                            and (self.folder / copied)
                             .resolve()
                             .is_relative_to(self.folder.resolve())
-                            and (self.folder / value).is_file()
+                            and (self.folder / copied).is_file()
                         ):
-                            continue
-                        copied = self.copy(value, record["name"], base)
+                            copied = self.copy(value, record["name"], base)
                         if copied != value and not layer.changeAttributeValue(
                             feature.id(), index, copied
                         ):
@@ -337,12 +348,19 @@ class ProjectResources:
 
 def audit_local_layers(project_file, records):
     """Resolve only known local sources; never reopen original network providers."""
-    from qgis.core import QgsProject
+    from qgis.core import Qgis, QgsProject
 
     project = QgsProject()
     failures = []
     try:
-        if not project.read(str(project_file)):
+        # Keep provider validation. Layouts and editor style backups are not
+        # part of this source audit; the archived XML still contains them.
+        if not project.read(
+            str(project_file),
+            Qgis.ProjectReadFlag.DontStoreOriginalStyles
+            | Qgis.ProjectReadFlag.DontLoadLayouts
+            | Qgis.ProjectReadFlag.DontLoad3DViews,
+        ):
             return [tr("Nie można otworzyć projektu archiwalnego.")]
         for record in records:
             if not record.get("local_source"):

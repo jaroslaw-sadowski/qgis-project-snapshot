@@ -61,6 +61,10 @@ class RasterOverviewTests(unittest.TestCase):
         self.assertEqual(result["overview_factors"], [2, 4, 8])
         target = self.folder / result["local_source"][2:]
         raster = gdal.Open(str(target))
+        self.assertEqual(
+            result["raster_size"], [raster.RasterXSize, raster.RasterYSize]
+        )
+        self.assertEqual(result["overview_status"], "built")
         band = raster.GetRasterBand(1)
         mask = band.GetMaskBand()
         self.assertEqual(band.DataType, gdal.GDT_UInt16)

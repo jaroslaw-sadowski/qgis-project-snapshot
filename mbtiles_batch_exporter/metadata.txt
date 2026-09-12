@@ -3,7 +3,7 @@ name=QGIS Project Snapshot
 qgisMinimumVersion=3.40
 qgisMaximumVersion=3.99
 description=Save a QGIS project copy with local vector data, map images and an archive report for offline use.
-version=1.4.1
+version=1.4.3
 author=Jarosław Sadowski
 email=github.com.amenity983@passfwd.com
 about=Choose an area, layers and map detail to create a separate project archive. Preserves the layer tree, styles and vector attributes; saves map images as lossless PNG with transparency. Produces an HTML report and a manifest describing saved data and missing results. Keep the entire archive folder and verify it offline. Some fonts, forms and external resources require manual checks.
@@ -20,7 +20,9 @@ homepage=https://github.com/jaroslaw-sadowski/qgis-project-snapshot#readme
 repository=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 tracker=https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues
 tags=archive,snapshot,offline,project,geopackage,wms,wfs,raster,vector
-changelog=1.4.1: Mark confirmed empty vector layers in the project copy with _nie-bylo-obiketow-w-zasiegu; retain original names. Group manifests, logs and saved progress under diagnostyka/, and GeoPackage data with supporting files under dane/. Keep the project and report easy to find. Resume older archive layouts. Keep a failed retry of an unverified empty vector from aborting other results.
+changelog=1.4.3: Reduce temporary QGIS project loading overhead using native read flags. Skip unused layouts, 3D views and editor style backups in render workers and technical checks; preserve the archived project, rendering styles and provider validation. Keep adaptive server limits, memory headroom and resumable downloads.
+    1.4.2: Correct the Polish empty-vector suffix and translate it into English. Localize generated archive names, reports, data, resources and diagnostic paths. Resume older archives and switch output language while preserving saved tiles, raster values and attachments. Record GeoTIFF dimensions and overview decisions in diagnostics.
+    1.4.1: Mark confirmed empty vector layers in the project copy with _nie-bylo-obiketow-w-zasiegu; retain original names. Group manifests, logs and saved progress under diagnostyka/, and GeoPackage data with supporting files under dane/. Keep the project and report easy to find. Resume older archive layouts. Keep a failed retry of an unverified empty vector from aborting other results.
     1.4.0: Save map progress for continuation after cancellation or an unexpected QGIS exit; retain successful and empty tiles and renew missing-tile attempts. Remember the recovery folder. Add native GeoTIFF overviews and preserve correctly empty map zooms. Check WFS errors and cache before accepting empty reads, and verify source access for empty MSSQL results.
     1.3.0: Retest higher server concurrency after healthy periods, reduce sustained throughput drops and handle ordinary WMS errors without waiting for each acknowledgement. Bound new Windows processes by available commit as well as RAM. Preserve download quality and archive continuation.
     1.2.0: Record local CPU, memory, process I/O, scheduler and network measurements for diagnosing slow exports. Add periodic performance samples and final layer summaries without new dependencies or changing download limits.

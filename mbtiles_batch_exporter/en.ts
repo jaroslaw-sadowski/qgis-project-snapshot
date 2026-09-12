@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE TS>
+<?xml version='1.0' encoding='utf-8'?>
 <TS version="2.1" language="en" sourcelanguage="pl">
   <context>
     <name>qgis-project-snapshot</name>
@@ -225,7 +224,7 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
     </message>
     <message>
       <source>Pełne wyniki i diagnostyka: raport.html oraz manifest.json w folderze archiwum.</source>
-      <translation>Full results and diagnostics: raport.html and manifest.json in the archive folder.</translation>
+      <translation>Full results and diagnostics: report.html and manifest.json in the archive folder.</translation>
     </message>
     <message>
       <source> — ostatni komunikat {0} s temu; trwa powyższa czynność.</source>
@@ -1305,7 +1304,7 @@ Choose “Resume archive…” to continue.</translation>
     </message>
     <message>
       <source>Otwórz projekt .qgz w QGIS lub raport.html w przeglądarce. manifest.json i diagnostic.jsonl są w podfolderze diagnostyka. Do przenoszenia i wznowienia zachowaj cały folder archiwum.</source>
-      <translation>Open the .qgz project in QGIS or raport.html in a browser. manifest.json and diagnostic.jsonl are in the diagnostyka subfolder. Keep the entire archive folder for moving or resuming.</translation>
+      <translation>Open the .qgz project in QGIS or report.html in a browser. manifest.json and diagnostic.jsonl are in the diagnostyka subfolder. Keep the entire archive folder for moving or resuming.</translation>
     </message>
     <message>
       <source>&lt;/table&gt;&lt;details&gt;&lt;summary&gt;Szczegóły diagnostyczne&lt;/summary&gt;&lt;pre&gt;</source>
@@ -1313,7 +1312,55 @@ Choose “Resume archive…” to continue.</translation>
     </message>
     <message>
       <source>&lt;p&gt;Otwórz &lt;a href="{0}"&gt;projekt .qgz&lt;/a&gt; w QGIS. Folder &lt;b&gt;dane&lt;/b&gt; zawiera GeoPackage i pliki przyspieszające wyświetlanie. Folder &lt;b&gt;zasoby&lt;/b&gt; zawiera dodatkowe pliki projektu, jeśli były potrzebne. Folder &lt;b&gt;diagnostyka&lt;/b&gt; przechowuje szczegółowy raport techniczny, log i postęp do wznowienia. Zachowaj i przenoś cały folder archiwum.&lt;/p&gt;</source>
-      <translation>&lt;p&gt;Open the &lt;a href="{0}"&gt;.qgz project&lt;/a&gt; in QGIS. The &lt;b&gt;dane&lt;/b&gt; folder contains the GeoPackage and files that help display it faster. The &lt;b&gt;zasoby&lt;/b&gt; folder contains additional project files, if needed. The &lt;b&gt;diagnostyka&lt;/b&gt; folder stores the detailed technical report, log and progress for resuming. Keep and move the entire archive folder.&lt;/p&gt;</translation>
+      <translation>&lt;p&gt;Open the &lt;a href="{0}"&gt;.qgz project&lt;/a&gt; in QGIS. The &lt;b&gt;data&lt;/b&gt; folder contains the GeoPackage and files that help display it faster. The &lt;b&gt;resources&lt;/b&gt; folder contains additional project files, if needed. The &lt;b&gt;diagnostics&lt;/b&gt; folder stores the detailed technical report, log and progress for resuming. Keep and move the entire archive folder.&lt;/p&gt;</translation>
+    </message>
+    <message>
+      <source>Projekt</source>
+      <translation>Project</translation>
+    </message>
+    <message>
+      <source>{0}_archiwum_{1}</source>
+      <translation>{0}_archive_{1}</translation>
+    </message>
+    <message>
+      <source>stan-pobierania</source>
+      <translation>download-state</translation>
+    </message>
+    <message>
+      <source>dane/dane.gpkg</source>
+      <translation>data/data.gpkg</translation>
+    </message>
+    <message>
+      <source>zasoby</source>
+      <translation>resources</translation>
+    </message>
+    <message>
+      <source>_nie-bylo-obiektow-w-zasiegu</source>
+      <translation>_no-features-in-area</translation>
+    </message>
+    <message>
+      <source>diagnostyka</source>
+      <translation>diagnostics</translation>
+    </message>
+    <message>
+      <source>dane</source>
+      <translation>data</translation>
+    </message>
+    <message>
+      <source>diagnostyka.jsonl</source>
+      <translation>diagnostic.jsonl</translation>
+    </message>
+    <message>
+      <source>.w-trakcie-</source>
+      <translation>.in-progress-</translation>
+    </message>
+    <message>
+      <source>raport.html</source>
+      <translation>report.html</translation>
+    </message>
+    <message>
+      <source>Otwórz projekt .qgz w QGIS lub raport.html w przeglądarce. manifest.json i diagnostyka.jsonl są w podfolderze diagnostyka. Do przenoszenia i wznowienia zachowaj cały folder archiwum.</source>
+      <translation>Open the .qgz project in QGIS or report.html in a browser. manifest.json and diagnostic.jsonl are in the diagnostics subfolder. Keep the entire archive folder for moving and resuming.</translation>
     </message>
   </context>
 </TS>

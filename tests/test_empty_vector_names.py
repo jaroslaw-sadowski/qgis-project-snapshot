@@ -16,7 +16,7 @@ from qgis.core import QgsProject
 
 from mbtiles_batch_exporter import archive as archive_module
 
-SUFFIX = "_nie-bylo-obiketow-w-zasiegu"
+SUFFIX = "_nie-bylo-obiektow-w-zasiegu"
 
 
 class EmptyVectorNameTests(unittest.TestCase):

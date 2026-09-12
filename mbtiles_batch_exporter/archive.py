@@ -396,7 +396,7 @@ def _local_project(snapshot, destination, records, resources=None):
             and record.get("empty_read_verified") is True
             and record["id"] in saved
         ):
-            record["output_name"] = record["name"] + "_nie-bylo-obiketow-w-zasiegu"
+            record["output_name"] = record["name"] + tr("_nie-bylo-obiektow-w-zasiegu")
             empty_vectors.append(record)
     if empty_vectors:
         database = None
@@ -558,7 +558,13 @@ def _local_project(snapshot, destination, records, resources=None):
 
     check = QgsProject()
     try:
-        if not check.read(str(destination), QgsProject.FlagDontResolveLayers):
+        if not check.read(
+            str(destination),
+            Qgis.ProjectReadFlag.DontResolveLayers
+            | Qgis.ProjectReadFlag.DontStoreOriginalStyles
+            | Qgis.ProjectReadFlag.DontLoadLayouts
+            | Qgis.ProjectReadFlag.DontLoad3DViews,
+        ):
             raise RuntimeError(tr("Nie można ponownie otworzyć projektu archiwalnego."))
         if set(check.mapLayers()) != set(saved):
             raise RuntimeError(tr("Projekt archiwalny ma niezgodną listę warstw."))
@@ -607,20 +613,39 @@ def _ready_records(records, parallel, cancelled, progress):
 def resume_manifest_path(folder):
     """Find current manifests while retaining archives written before 1.4.1."""
     folder = Path(folder)
-    current = folder / "diagnostyka" / "manifest.json"
-    return current if current.is_file() else folder / "manifest.json"
+    for directory in ("diagnostyka", "diagnostics", ""):
+        candidate = folder / directory / "manifest.json"
+        if candidate.is_file():
+            return candidate
+    return folder / "manifest.json"
 
 
 def read_resume_manifest(folder):
     """Read archive settings without opening its project or remote sources."""
     try:
-        manifest = json.loads(resume_manifest_path(folder).read_text("utf-8"))
+        manifest_path = resume_manifest_path(folder)
+        manifest = json.loads(manifest_path.read_text("utf-8"))
+        if not isinstance(manifest, dict):
+            raise ValueError()
+        manifest.setdefault("resources_directory", "zasoby")
+        manifest.setdefault(
+            "recovery_directory",
+            (manifest_path.parent.relative_to(folder) / "download-state").as_posix(),
+        )
         if (
             manifest["schema_version"] != 4
             or not isinstance(manifest["layers"], list)
             or not isinstance(manifest["sha256"], dict)
             or manifest.get("data_file", "dane.gpkg")
-            not in ("dane.gpkg", "dane/dane.gpkg")
+            not in ("dane.gpkg", "dane/dane.gpkg", "data/data.gpkg")
+            or manifest["resources_directory"] not in ("zasoby", "resources")
+            or manifest["recovery_directory"]
+            not in (
+                "download-state",
+                "diagnostyka/download-state",
+                "diagnostyka/stan-pobierania",
+                "diagnostics/download-state",
+            )
             or not manifest["area"]["wkt"]
             or not manifest["area"]["crs"]
             or not 0 <= manifest["zoom_min"] <= manifest["zoom_max"] <= 24
@@ -658,10 +683,10 @@ def _archive_lock(folder):
 def _archive_workspace(destination):
     """Keep recovery data on exceptions; dispose only runtime source snapshots."""
     staging = Path(
-        mkdtemp(prefix=destination.name + ".in-progress-", dir=destination.parent)
+        mkdtemp(prefix=destination.name + tr(".w-trakcie-"), dir=destination.parent)
     )
-    (staging / "diagnostyka").mkdir(mode=0o700)
-    (staging / "dane").mkdir(mode=0o700)
+    (staging / tr("diagnostyka")).mkdir(mode=0o700)
+    (staging / tr("dane")).mkdir(mode=0o700)
     with _archive_lock(staging) as lock:
         try:
             yield staging, lock
@@ -690,18 +715,20 @@ def _copy_resume(folder, manifest, staging, progress, cancelled):
     folder = Path(folder).resolve()
     checkpoint = manifest.get("checkpoint") is True
     data_file = manifest.get("data_file", "dane.gpkg")
+    resources_directory = manifest["resources_directory"]
+    recovery_path = Path(manifest["recovery_directory"])
     files = dict(manifest["sha256"])
     if checkpoint:
         # An interrupted writer cannot hash a changing database. SQLite backup
         # recovers its journal and copies a consistent committed snapshot.
         files = {
             path.relative_to(folder).as_posix(): None
-            for path in [folder / data_file, *(folder / "zasoby").rglob("*")]
+            for path in [folder / data_file, *(folder / resources_directory).rglob("*")]
             if path.is_file()
         }
         for record in manifest["layers"]:
             table = "layer_" + sha256(record["id"].encode()).hexdigest()[:24]
-            cache = resume_manifest_path(folder).parent / "download-state" / table
+            cache = folder / recovery_path / table
             for name in ("raster.gpkg", "tiles.sqlite"):
                 if (cache / name).is_file():
                     files[(cache / name).relative_to(folder).as_posix()] = None
@@ -715,28 +742,28 @@ def _copy_resume(folder, manifest, staging, progress, cancelled):
             or not (folder / path).resolve().is_relative_to(folder)
         ):
             raise ValueError(tr("Manifest zawiera ścieżkę poza folderem archiwum."))
-        cache_path = (
-            path.relative_to("diagnostyka")
-            if path.parts[:2] == ("diagnostyka", "download-state")
-            else path
-        )
-        is_cache = cache_path.parts[:1] == ("download-state",)
-        if relative != data_file and path.parts[:1] != ("zasoby",) and not is_cache:
+        is_cache = path.is_relative_to(recovery_path)
+        is_resource = path.parts[:1] == (resources_directory,)
+        if relative != data_file and not is_resource and not is_cache:
             continue
-        if is_cache and (
-            len(cache_path.parts) != 3
-            or not re.fullmatch(r"layer_[0-9a-f]{24}", cache_path.parts[1])
-            or cache_path.name
-            not in {
-                name + suffix
-                for name in ("raster.gpkg", "tiles.sqlite")
-                for suffix in ("", "-journal", "-wal", "-shm")
-            }
-        ):
-            raise ValueError(tr("Nieprawidłowy manifest archiwum do wznowienia."))
-        target = staging / "diagnostyka" / cache_path if is_cache else staging / path
-        if relative == data_file:
-            target = staging / "dane" / "dane.gpkg"
+        if is_cache:
+            cache_path = path.relative_to(recovery_path)
+            if (
+                len(cache_path.parts) != 2
+                or not re.fullmatch(r"layer_[0-9a-f]{24}", cache_path.parts[0])
+                or cache_path.name
+                not in {
+                    name + suffix
+                    for name in ("raster.gpkg", "tiles.sqlite")
+                    for suffix in ("", "-journal", "-wal", "-shm")
+                }
+            ):
+                raise ValueError(tr("Nieprawidłowy manifest archiwum do wznowienia."))
+            target = staging / tr("diagnostyka") / tr("stan-pobierania") / cache_path
+        elif relative == data_file:
+            target = staging / tr("dane/dane.gpkg")
+        else:
+            target = staging / tr("zasoby") / path.relative_to(resources_directory)
         target.parent.mkdir(parents=True, exist_ok=True)
         digest = sha256()
         progress(tr("Sprawdzanie i kopiowanie danych poprzedniego archiwum…"))
@@ -817,7 +844,7 @@ def _copy_resume(folder, manifest, staging, progress, cancelled):
             )
             provider = "gdal"
         elif method == "raster_data":
-            source = "./zasoby/" + table + ".tif"
+            source = "./" + resources_directory + "/" + table + ".tif"
             provider = "gdal"
         else:
             raise ValueError(tr("Nieprawidłowy manifest archiwum do wznowienia."))
@@ -828,9 +855,11 @@ def _copy_resume(folder, manifest, staging, progress, cancelled):
             or record.get("local_provider") != provider
             or filename not in manifest["sha256"]
             or not (
-                staging / "dane" / "dane.gpkg"
+                staging / tr("dane/dane.gpkg")
                 if filename == data_file
-                else staging / filename
+                else staging
+                / tr("zasoby")
+                / Path(filename).relative_to(resources_directory)
             ).is_file()
         ):
             raise ValueError(tr("Brak poprawnych danych warstwy do wznowienia."))
@@ -910,9 +939,11 @@ def create_archive(
             tr("Wybierz poprawny, niepusty obszar archiwizacji i układ współrzędnych.")
         )
     started = datetime.now().astimezone()
-    stem = Path(project.fileName()).stem or project.title() or "Projekt"
-    stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", stem).strip(" .")[:120] or "Projekt"
-    name = f"{stem}_archive_{started:%Y%m%d}"
+    stem = Path(project.fileName()).stem or project.title() or tr("Projekt")
+    stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", stem).strip(" .")[:120] or tr(
+        "Projekt"
+    )
+    name = tr("{0}_archiwum_{1}").format(stem, started.strftime("%Y%m%d"))
     destination = output_folder / name
     if destination.exists():
         name += f"_{started:%H%M%S_%f}"
@@ -1052,19 +1083,23 @@ def create_archive(
     with (
         _archive_lock(resume_from),
         _archive_workspace(destination) as (staging, workspace_lock),
-        Diagnostics(staging / "diagnostyka" / "diagnostic.jsonl") as diagnostic,
+        Diagnostics(
+            staging / tr("diagnostyka") / tr("diagnostyka.jsonl")
+        ) as diagnostic,
         PerformanceDiagnostics(diagnostic, "main", output_folder) as performance,
         ExitStack() as processes,
     ):
         if resume_manifest is not None:
             performance.set_phase("copy_previous")
             _copy_resume(resume_from, resume_manifest, staging, progress, cancelled)
-        recovery_folder = staging / "diagnostyka" / "download-state"
+        recovery_folder = staging / tr("diagnostyka") / tr("stan-pobierania")
         recovery_folder.mkdir(exist_ok=True, mode=0o700)
         checkpoint = {
             "schema_version": 4,
             "checkpoint": True,
-            "data_file": "dane/dane.gpkg",
+            "data_file": tr("dane/dane.gpkg"),
+            "resources_directory": tr("zasoby"),
+            "recovery_directory": recovery_folder.relative_to(staging).as_posix(),
             "started_at": started.isoformat(),
             "project_crs": project.crs().authid(),
             "area": {"crs": area_crs.authid(), "wkt": area.asWkt()},
@@ -1076,14 +1111,23 @@ def create_archive(
 
         def save_checkpoint(record=None):
             for entry in records:
-                if entry.get("local_source", "").startswith("./dane.gpkg|"):
-                    entry["local_source"] = entry["local_source"].replace(
-                        "./dane.gpkg|", "./dane/dane.gpkg|", 1
-                    )
+                local_source = entry.get("local_source", "")
+                for old_data in ("dane.gpkg", "dane/dane.gpkg", "data/data.gpkg"):
+                    if local_source.startswith("./" + old_data + "|"):
+                        entry["local_source"] = local_source.replace(
+                            "./" + old_data + "|", "./" + tr("dane/dane.gpkg") + "|", 1
+                        )
+                        break
+                for old_resources in ("zasoby", "resources"):
+                    if local_source.startswith("./" + old_resources + "/"):
+                        entry["local_source"] = local_source.replace(
+                            "./" + old_resources + "/", "./" + tr("zasoby") + "/", 1
+                        )
+                        break
             # Workers write private cache databases. The final GPKG has one
             # writer, and it has closed its current operation at this boundary.
-            if (staging / "dane" / "dane.gpkg").exists():
-                with (staging / "dane" / "dane.gpkg").open("r+b") as stream:
+            if (staging / tr("dane/dane.gpkg")).exists():
+                with (staging / tr("dane/dane.gpkg")).open("r+b") as stream:
                     os.fsync(stream.fileno())
             if (
                 record
@@ -1094,7 +1138,7 @@ def create_archive(
                     os.fsync(stream.fileno())
             checkpoint["updated_at"] = datetime.now().astimezone().isoformat()
             write_state(
-                staging / "diagnostyka" / "manifest.json",
+                staging / tr("diagnostyka") / "manifest.json",
                 checkpoint,
                 durable=True,
                 diagnostic=diagnostic,
@@ -1155,7 +1199,7 @@ def create_archive(
         )
         performance.set_phase("snapshot")
         _snapshot_project(project, snapshot)
-        database = staging / "dane" / "dane.gpkg"
+        database = staging / tr("dane/dane.gpkg")
         levels = None
         parallel = None
         if (adaptive or workers > 1) and any(
@@ -1311,7 +1355,10 @@ def create_archive(
                                 feature_count=count,
                                 method="vector",
                                 crs=layer.crs().authid(),
-                                local_source="./dane/dane.gpkg|layername=" + table,
+                                local_source="./"
+                                + tr("dane/dane.gpkg")
+                                + "|layername="
+                                + table,
                                 local_provider="ogr",
                                 reason=tr("Zapisano dane i styl.")
                                 if count
@@ -1636,7 +1683,9 @@ def create_archive(
         manifest = {
             "schema_version": 4,
             "implementation_step": 3,
-            "data_file": "dane/dane.gpkg",
+            "data_file": tr("dane/dane.gpkg"),
+            "resources_directory": tr("zasoby"),
+            "recovery_directory": recovery_folder.relative_to(staging).as_posix(),
             "status": "partial",
             "cancelled": cancelled(),
             "started_at": started.isoformat(),
@@ -1684,7 +1733,7 @@ def create_archive(
         performance.set_phase("checksums")
         for path in sorted(staging.rglob("*")):
             relative = path.relative_to(staging)
-            if relative.parts[:2] == ("diagnostyka", "download-state") and (
+            if relative.parts[:2] == (tr("diagnostyka"), tr("stan-pobierania")) and (
                 len(relative.parts) != 4
                 or path.name
                 not in {
@@ -1696,7 +1745,7 @@ def create_archive(
                 continue
             if path.is_file() and path.name not in (
                 "manifest.json",
-                "diagnostic.jsonl",
+                tr("diagnostyka.jsonl"),
                 ".archive.lock",
             ):
                 progress(
@@ -1721,7 +1770,7 @@ def create_archive(
         progress(tr("Zapisywanie manifestu i raportu z wynikami…"))
         performance.set_phase("report")
         write_state(
-            staging / "diagnostyka" / "manifest.json",
+            staging / tr("diagnostyka") / "manifest.json",
             manifest,
             durable=True,
             diagnostic=diagnostic,
@@ -1749,7 +1798,7 @@ def create_archive(
             + "</tr>"
             for record in records
         )
-        (staging / "raport.html").write_text(
+        (staging / tr("raport.html")).write_text(
             tr(
                 (
                     '<!doctype html><html lang="pl"><meta '
@@ -1834,6 +1883,9 @@ def create_archive(
                 reused=bool(record.get("reused")),
                 feature_count=record.get("feature_count"),
                 tile_count=record.get("tile_count"),
+                raster_size=record.get("raster_size"),
+                overview_factors=record.get("overview_factors"),
+                overview_status=record.get("overview_status"),
                 levels=[
                     {
                         key: level[key]
@@ -1858,5 +1910,5 @@ def create_archive(
         with diagnostic.lock:
             workspace_lock.unlock()
             staging.rename(destination)
-            diagnostic.path = destination / "diagnostyka" / "diagnostic.jsonl"
+            diagnostic.path = destination / tr("diagnostyka") / tr("diagnostyka.jsonl")
     return destination

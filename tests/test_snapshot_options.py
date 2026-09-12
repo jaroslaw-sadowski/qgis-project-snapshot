@@ -128,7 +128,7 @@ class OptionsTests(unittest.TestCase):
                 self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
                 self.assertIn("Layer 1/1", dialog.log.toPlainText())
                 self.assertIn("Saved", dialog._items[self.layer.id()].text(2))
-                self.assertIn('lang="en"', (dialog._result / "raport.html").read_text())
+                self.assertIn('lang="en"', (dialog._result / "report.html").read_text())
                 self.assertEqual(dialog._selected_ids(), set())
             finally:
                 dialog.close()
@@ -359,7 +359,8 @@ class OptionsTests(unittest.TestCase):
                 "mbtiles_batch_exporter/last_resume_folder", str(legacy)
             )
             with patch(
-                "mbtiles_batch_exporter.archive_dialog.QFileDialog.getExistingDirectory",
+                "mbtiles_batch_exporter.archive_dialog."
+                "QFileDialog.getExistingDirectory",
                 return_value="",
             ) as choose:
                 dialog.resume_button.click()
@@ -376,7 +377,7 @@ class OptionsTests(unittest.TestCase):
             self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
             manifest = read_resume_manifest(dialog._result)
             record = next(r for r in manifest["layers"] if r["id"] == empty.id())
-            expected = original_name + "_nie-bylo-obiketow-w-zasiegu"
+            expected = original_name + "_nie-bylo-obiektow-w-zasiegu"
             self.assertEqual(record["output_name"], expected)
             self.assertEqual(dialog._items[empty.id()].text(0), expected)
             self.assertIn(expected, dialog.results.toPlainText())

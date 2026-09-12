@@ -166,7 +166,7 @@ class ReadyWmsTests(fixtures.unittest.TestCase):
             )
         diagnostics = [
             json.loads(line)
-            for line in (folder / "diagnostyka" / "diagnostic.jsonl")
+            for line in (folder / "diagnostyka" / "diagnostyka.jsonl")
             .read_text()
             .splitlines()
         ]

@@ -117,7 +117,7 @@ class CrashResumeTests(unittest.TestCase):
         self.assertEqual(records[layers[0].id()]["status"], "saved")
         self.assertNotEqual(records[layers[1].id()]["status"], "saved")
         cache = next(
-            (previous / "diagnostyka" / "download-state").glob("*/raster.gpkg")
+            (previous / "diagnostyka" / "stan-pobierania").glob("*/raster.gpkg")
         )
         with closing(sqlite3.connect(cache)) as database:
             table = database.execute("SELECT table_name FROM gpkg_contents").fetchone()[
@@ -148,7 +148,7 @@ class CrashResumeTests(unittest.TestCase):
         self.assertEqual(len(self.server.requests) - before, second["tile_count"] - 2)
         self.assertFalse((result / "_source.qgz").exists())
         self.assertFalse((result / ".workers").exists())
-        self.assertFalse((result / "diagnostyka" / "download-state").exists())
+        self.assertFalse((result / "diagnostyka" / "stan-pobierania").exists())
         with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as database:
             self.assertEqual(
                 database.execute("PRAGMA integrity_check").fetchone()[0], "ok"
@@ -169,6 +169,41 @@ class CrashResumeTests(unittest.TestCase):
         with archive._archive_lock(previous):
             with self.assertRaisesRegex(ValueError, "inny proces QGIS"):
                 self.capture([layer], resume_from=previous)
+
+    def test_cancelled_map_can_change_language_when_resuming(self):
+        layer = self.add_map()
+        for source_language, target_language in (("pl", "en"), ("en", "pl")):
+            with self.subTest(source=source_language, target=target_language):
+                self.server.scripted_statuses = [None, 429]
+                self.server.retry_after = "30"
+                cancelled = Event()
+
+                def status(rows):
+                    if any(row["state"] == "cooldown" for row in rows):
+                        cancelled.set()
+
+                with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE=source_language):
+                    previous, first = self.capture(
+                        [layer], cancelled=cancelled.is_set, server_activity=status
+                    )
+                self.assertTrue(first["cancelled"])
+                self.assertTrue((previous / first["recovery_directory"]).is_dir())
+                self.server.retry_after = "0"
+                before = len(self.server.requests)
+                with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE=target_language):
+                    result, manifest = self.capture([layer], resume_from=previous)
+                record = next(r for r in manifest["layers"] if r["id"] == layer.id())
+                self.assertEqual(record["status"], "saved", record)
+                self.assertEqual(record["raster"]["resumed_tiles"], 1)
+                self.assertEqual(
+                    len(self.server.requests) - before, record["tile_count"] - 1
+                )
+                self.assertFalse((result / manifest["recovery_directory"]).exists())
+                self.assertTrue(manifest["local_layer_audit"]["passed"])
+                self.assertEqual(
+                    manifest["data_file"],
+                    "data/data.gpkg" if target_language == "en" else "dane/dane.gpkg",
+                )
 
     def test_legacy_cancelled_worker_cache_is_reused_after_network_returns(self):
         layer = self.add_map()
@@ -200,7 +235,7 @@ class CrashResumeTests(unittest.TestCase):
         self.assertEqual(record["status"], "saved", record)
         self.assertEqual(record["raster"]["resumed_tiles"], 1)
         self.assertEqual(len(self.server.requests) - before, record["tile_count"] - 1)
-        self.assertFalse((result / "diagnostyka" / "download-state").exists())
+        self.assertFalse((result / "diagnostyka" / "stan-pobierania").exists())
 
 
 if __name__ == "__main__":

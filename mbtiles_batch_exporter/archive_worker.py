@@ -118,7 +118,14 @@ def main():
         stage = "source_open"
         performance.set_phase(stage, parameters["table"])
         progress(tr("Otwieranie źródła mapy…"))
-        if not project.read(str(folder / "source.qgs")):
+        # Rendering needs layer styles, but not editor backup copies, layouts
+        # or 3D views. The original snapshot remains intact for the final copy.
+        read_flags = (
+            Qgis.ProjectReadFlag.DontStoreOriginalStyles
+            | Qgis.ProjectReadFlag.DontLoadLayouts
+            | Qgis.ProjectReadFlag.DontLoad3DViews
+        )
+        if not project.read(str(folder / "source.qgs"), read_flags):
             raise RuntimeError()
         layer = project.mapLayer(parameters["layer_id"])
         if layer is None or not layer.isValid():
@@ -131,6 +138,7 @@ def main():
             scale_visibility=layer.hasScaleBasedVisibility(),
             minimum_scale=layer.minimumScale(),
             maximum_scale=layer.maximumScale(),
+            project_read_flags=int(read_flags),
         )
         stage = "render"
         performance.set_phase(stage, parameters["table"])

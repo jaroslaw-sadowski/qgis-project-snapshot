@@ -49,7 +49,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.4.1.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.4.3.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -72,6 +72,17 @@ czas, sumę RSS, pliki tymczasowe oraz identyczność PNG. Korzysta z dwóch
 kontrolowanych WMS i po próbie usuwa wygenerowane archiwa. Uruchamiaj go bez
 innych obciążających zadań. Szczegóły i ograniczenia pomiarów opisuje
 [raport kroku 4](validation-step4.md).
+
+Koszt technicznego odczytu projektu można zmierzyć osobno:
+
+```bash
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 tests/benchmark_project_read.py --output /tmp/project-read.json
+```
+
+Test tworzy 166 lokalnych rastrów w projekcie bez układów i z układami wydruku.
+Porównuje standardowy odczyt z flagami używanymi od 1.4.3, sprawdza poprawność
+warstw i identyczność pikseli. Uruchamiać bez innych obciążających zadań.
+To pomiar samego `project.read`, nie obietnica skrócenia całego pobierania.
 
 ## Przygotowanie kolejnego wydania
 
@@ -122,7 +133,7 @@ Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
 Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
 procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
 przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md).
-Bieżące wydanie: [1.4.1](validation-1.4.1.md).
+Bieżące wydanie: [1.4.2](validation-1.4.2.md).
 
 ## Kontrole adaptacji i budżetu Windows (1.3.0)
 
@@ -222,22 +233,30 @@ Potwierdzony pusty odczyt nadal ma być zachowany bez ponowienia.
 
 W odrębnej próbie z małymi lokalnymi danymi przerwij proces QGIS po zapisaniu
 części mapy, następnie wznowienie uruchom w nowym procesie z oryginalnego projektu.
-Sprawdź folder `.in-progress-`, kopię wyników, liczbę żądań tylko dla braków,
+Sprawdź folder `.w-trakcie-`, kopię wyników, liczbę żądań tylko dla braków,
 całe PNG i końcową integralność. Nie używaj do testu niezapisanej pracy użytkownika.
 Zakończenie procesu nie symuluje wszystkich skutków awarii dysku lub zasilania;
 nie jest podstawą deklaracji odporności na fizyczne uszkodzenie danych.
 Wyniki tego etapu zapisuje [raport 1.4.0](validation-1.4.0.md).
 
-## Kontrole nazw i układu folderu (1.4.1)
+## Kontrole nazw i układu folderu (1.4.2)
 
-Sprawdź sufiks `_nie-bylo-obiketow-w-zasiegu` tylko dla potwierdzonego pustego
+`test_output_language.py` sprawdza PL→EN→PL na natywnych wektorach, GeoTIFF
+i załącznikach, także po usunięciu źródłowego załącznika i anulowaniu końcowego
+zapisu. Drugi przypadek odtwarza nazwy i pola manifestu 1.4.1.
+`test_crash_resume.py` sprawdza także zmianę języka niedokończonej mapy:
+zapisany kafelek nie jest pobierany ponownie. Kontroluj raport, okno, ścieżki
+QGZ i metadane GPKG, nie tylko same ciągi znaków. Wielkość GeoTIFF i decyzja
+o piramidach muszą zgadzać się z natywnie odczytanym wynikiem.
+
+Sprawdź sufiks `_nie-bylo-obiektow-w-zasiegu` tylko dla potwierdzonego pustego
 wektora, zachowanie pól i stylu oraz niezmienioną nazwę oryginału. Błąd, raster
 pusty i niepotwierdzone MSSQL nie mogą otrzymać tego oznaczenia.
 Testy okna mają odczytać nowy manifest przez `read_resume_manifest`, wyświetlić
 `output_name` i pamiętać cały folder archiwum. Kontynuacja musi przyjmować
 również starszy manifest z folderu głównego. Sprawdź nowy zapis w `diagnostyka/`
-i brak pustego `download-state/`, bez usuwania postępu potrzebnego do wznowienia.
-Wyniki i paczkę opisuje [raport 1.4.1](validation-1.4.1.md).
+i brak pustego `stan-pobierania/`, bez usuwania postępu potrzebnego do wznowienia.
+Wyniki i paczkę opisuje [raport 1.4.2](validation-1.4.2.md).
 
 ## Tłumaczenia
 

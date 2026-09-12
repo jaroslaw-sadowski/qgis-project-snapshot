@@ -2,7 +2,6 @@
 
 """Deterministic control decisions and real QGIS tile repair invariants."""
 
-import json
 import sqlite3
 import time
 import unittest
@@ -628,9 +627,7 @@ class AdaptiveWmsTests(unittest.TestCase):
                 adaptive=True,
                 **kwargs,
             )
-        return result, json.loads(
-            (result / "diagnostyka" / "manifest.json").read_text()
-        )
+        return result, fixtures.read_resume_manifest(result)
 
     def test_windows_control_lock_recovers_and_map_is_saved(self):
         from test_ipc import windows_lock
@@ -659,7 +656,7 @@ class AdaptiveWmsTests(unittest.TestCase):
         self.assertGreater(count, 0)
         self.assertIn(
             '"ipc_replace_recovered"',
-            (folder / "diagnostyka" / "diagnostic.jsonl").read_text(),
+            (folder / "diagnostyka" / "diagnostyka.jsonl").read_text(),
         )
 
     def test_persistent_control_lock_reports_coordinator_for_queued_maps(self):
@@ -686,7 +683,7 @@ class AdaptiveWmsTests(unittest.TestCase):
         self.assertFalse((folder / ".workers").exists())
         self.assertIn(
             '"ipc_replace_failed"',
-            (folder / "diagnostyka" / "diagnostic.jsonl").read_text(),
+            (folder / "diagnostyka" / "diagnostyka.jsonl").read_text(),
         )
 
     def test_rate_limit_repairs_same_map_and_records_recovery(self):

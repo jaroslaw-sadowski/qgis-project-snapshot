@@ -1,6 +1,105 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 12 września 2026. Wersja **1.4.1**: puste warstwy i porządek w archiwum.
+Aktualizacja: 12 września 2026. Wersja **1.4.3**: optymalizacja technicznych
+odczytów QGIS i audyt drugiego obszaru.
+
+## Zmiany i odbiór 1.4.3
+
+Nowe manifest.json i diagnostic.jsonl użytkownika nadal pochodzą z **1.4.1**.
+Windows, 14 logicznych CPU, zoomy 16–19, czas 20 min 45,559 s. 205 warstw:
+76 saved, 129 empty, bez failed/partial/cancelled. 7304 pozycje kafelków,
+1916 niepustych, 5388 pustych; siedem napraw i zero końcowych braków.
+114 map całkiem przezroczystych, 15 empty zawiera obraz na innych zoomach.
+32 przejściowe konflikty plików Windows obsłużone, wszystkie 166 procesów kod 0.
+Audyt lokalnych warstw passed, zasoby bez issues; globalny status partial.
+MSSQL: jeden obiekt w jednej warstwie, **32 zera niepotwierdzone**; WFS trzy
+potwierdzone zera. Nie ma dostępu do firmowych źródeł ani wynikowego GPKG/QGZ
+użytkownika; nie deklarować poprawności tych zer bez porównania znanego obiektu.
+
+Budżet do 9, faktycznie maksymalnie 7 procesów i 7 aktywnych zadań. CPU całego
+systemu średnio 45,63%, szczyt 84,18%; wolny RAM 4,44–5,97 GiB, commit
+0,383–4,466 GiB (minimum około 393 MiB, poniżej rezerwy 768 MiB). Hosty 1–3,
+Geoportal zwiększył 1→2→3 i obniżył do 2 przy throughput_drop. Nie dowodzi to
+maksymalnego wykorzystania wszystkich zasobów; nie podniesiono limitów arbitralnie.
+Inny obszar i zoomy nie są porównaniem szybkości wersji.
+
+Przygotowanie QGIS/sieci/źródeł stanowiło 37,48% sumy etapów procesów. Wybrano
+minimalną natywną zmianę: DontStoreOriginalStyles, DontLoadLayouts, DontLoad3DViews
+przy odczycie w archive_worker oraz obu kontrolach projektu (archive i resources).
+Style renderowania i pełny oryginalny XML w archiwum pozostają. Audyt nadal
+otwiera dostawców; DontResolveLayers tylko w dotychczasowej kontroli struktury.
+Worker source_opened loguje project_read_flags. Bez zmiany pobierania, PNG,
+sterowania obciążeniem, pamięci, wznowienia i jednego zapisującego GeoPackage.
+Ponowne użycie procesów nadal wymaga osobnego prototypu/benchmarku, nie jest wdrożone.
+
+Natywny benchmark tests/benchmark_project_read.py: 166 lokalnych rastrów,
+po trzy odczyty każdego wariantu, przeplatana kolejność. Końcowe mediany
+0,627240→0,555164 s bez układów (11,49%) i 1,420105→0,747252 s z 20 układami
+(47,38%); poprawne warstwy i identyczne piksele. To pomiar samego project.read
+na Ubuntu, nie całego eksportu ani Windows. Cztery testy zasobów przeszły;
+nowy sprawdza zachowanie stylów/układu i wykrycie usuniętego pliku danych.
+
+**Końcowy ZIP: 231/231 testów, 167,453 s, bez pominięć.** Natywne WMS/WFS/proxy,
+anulowanie, SIGKILL, wznowienie, PL/EN i piksele wykonane z paczki. Ruff/format,
+Flake8 (88, E203 i E402 tylko w plikach startujących QGIS), AST 44 plików,
+337 tłumaczeń, linki i diff — OK. Skan sekretów źródeł i ZIP-a: zero. Bandit
+20 znanych przejrzanych ostrzeżeń: 15 medium, 5 low, zero high.
+ZIP **146 355 bajtów, 22 pliki**, powtarzalny SHA-256:
+fe367e14866493f916f78cc198566e30835ccdf9249138aac93f70bd69658247.
+Bez publikacji i instalacji w profilu użytkownika. Szczegóły pomiarów i odbioru:
+[validation-1.4.3.md](validation-1.4.3.md). Zmiany 1.4.2 i 1.4.3 są nadal
+niezatwierdzone w Git; zachować je przy dalszej pracy.
+
+## Zmiany i odbiór 1.4.2
+
+Przekazany rzeczywisty przebieg 1.4.1 na Windows: 205 warstw, zoomy 15–17,
+30 min 14 s, 87 saved i 118 empty, bez failed/partial/cancelled warstw i bez
+brakujących kafelków po czterech naprawach. 21 warstw empty ma obraz na innych
+zoomach, 97 jest całkowicie przezroczystych. Lokalny audyt passed, bez issues
+zasobów. To nie pełny odbiór danych bez wynikowego GPKG/QGZ i porównania źródeł.
+MSSQL zapisał 52 obiekty w 11 warstwach; 20 zerowych odczytów pozostaje
+niepotwierdzonych, dwa zera MSSQL i trzy zera WFS potwierdziła ścieżka odczytu.
+Nie prosić ponownie o dostęp do niedostępnej obecnie sieci firmowej.
+
+Maksimum pięć procesów, cztery aktywne zadania w próbkach. CPU systemu średnio
+31,61%, maksimum 82,65%; wolny RAM 2,73–4,33 GiB, dostępny commit 0,37–3,51 GiB.
+Commit spadał poniżej rezerwy 768 MiB, więc wyższe obciążenie nie było bezwarunkowo
+bezpieczne. Geoportal zwiększył limit 1→2→3, cofnął do 2 przy braku zysku i ponowił 3.
+Uruchamianie QGIS i otwieranie źródeł stanowiło około 30% sumy etapów procesów;
+ponowne użycie procesu jest propozycją do benchmarku, nie wdrożoną optymalizacją.
+Nie zmieniono algorytmu obciążenia ani jakości danych. Szczegóły i ograniczenia
+pomiarów: [validation-1.4.2.md](validation-1.4.2.md).
+
+1.4.2 używa istniejącego katalogu Qt do nazw plików i folderów. Sufiks PL:
+`_nie-bylo-obiektow-w-zasiegu`; EN: `_no-features-in-area`. Nazwy źródłowe pozostają.
+PL: `<nazwa>_archiwum_<data>`, `.w-trakcie-…`, dane/dane.gpkg, zasoby/,
+raport.html, diagnostyka/manifest.json, diagnostyka/diagnostyka.jsonl,
+diagnostyka/stan-pobierania/. EN: `_archive_`, `.in-progress-…`, data/data.gpkg,
+resources/, report.html, diagnostics/manifest.json, diagnostics/diagnostic.jsonl,
+diagnostics/download-state/. Identyfikatory techniczne i rejestr pozostają zgodne.
+Schemat manifestu nadal 4; resources_directory i recovery_directory zapisują
+położenie niezależne od języka następnego wznowienia. Odczyt stosuje znaną listę
+dozwolonych nazw i domyślne stare ścieżki, jeśli pola nie istnieją.
+
+Kontynuacja w obu kierunkach PL/EN zachowuje kafelki, źródłowe rastry, puste
+wektory i załączniki. Ich ścieżki są przepisywane także przy anulowaniu końcowego
+zapisu już skopiowanych danych. Test odtwarza dawne nazwy 1.4.1 i poprawia stary
+dopisek przy wznowieniu bez ponownego pobrania wektora. Nowa diagnostyka GeoTIFF
+zawiera raster_size, overview_factors i overview_status w manifeście oraz JSONL;
+puste listy piramid trzech wyników 1.4.1 nie miały wymiarów do niezależnej oceny.
+
+Końcowy ZIP: **230/230 testów, 167,283 s, bez pominięć**, z kodu paczki
+w izolowanym QGIS na Ubuntu. WMS/WFS/proxy, wznowienie po SIGKILL, oba języki
+i starsze układy wykonane. W pierwszym zestawie poprawiono stare oczekiwanie
+testu dotyczące angielskiej nazwy folderu przy polskim interfejsie; dodano też
+ochronę typu JSON i testy niedozwolonych ścieżek manifestu. Ruff/format,
+Flake8/pycodestyle, AST 43 plików, 337 tłumaczeń, odnośniki i diff — OK.
+Skan produkcyjnych źródeł i rozpakowanego ZIP-a bez sekretów; Bandit nadal
+20 przejrzanych ostrzeżeń (15 medium, 5 low, zero high).
+Paczka 145 887 bajtów, 22 pliki; powtarzalna SHA-256:
+054daf313028cb653736e947ad4ee911e2771696c1f681a9860ed5d4005a6a1c.
+Bez publikacji ani instalacji w profilu użytkownika. Pełny odbiór nowej wersji
+na Windows i firmowego MSSQL nadal wymaga próby na dostępnym stanowisku.
 
 ## Zmiany i odbiór 1.4.1
 

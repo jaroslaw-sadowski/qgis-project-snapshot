@@ -36,16 +36,19 @@ Ponytail jest zaleceniem, nie bezwzględnym wymogiem; poprawność i dane mają 
   Każdy zoom renderuj osobno, według rzeczywistego kształtu obszaru.
 - Wektory zapisuj jako dane z atrybutami i niezapisanymi edycjami, dopiero przy błędzie
   stosuj obraz zastępczy i wyraźnie odnotuj utratę danych w raporcie.
-- Potwierdzony pusty wektor oznaczaj w nazwie wynikowej dokładnie dopiskiem
-  `_nie-bylo-obiketow-w-zasiegu`. Błąd, niepotwierdzone zero i obraz zastępczy
+- Potwierdzony pusty wektor oznaczaj w nazwie wynikowej dopiskiem
+  `_nie-bylo-obiektow-w-zasiegu` po polsku lub `_no-features-in-area` po angielsku.
+  Błąd, niepotwierdzone zero i obraz zastępczy
   nie spełniają tego warunku. Nie zmieniaj nazwy w oryginalnym projekcie.
 - Pustego obrazu ani częściowego pobrania nie uznawaj bezwarunkowo za sukces.
   Anulowanie i awaria mają zachowywać ukończone wyniki oraz trwały rejestr i dane
-  kafelków w `download-state`, także z niedokończonych warstw. Usuwaj wyłącznie
+  kafelków w katalogu postępu, także z niedokończonych warstw. Usuwaj wyłącznie
   niepełny zapis końcowej warstwy i pliki robocze procesów, nie dane do wznowienia.
-- Projekt i raport pozostawiaj w głównym folderze archiwum, GeoPackage razem
-  z pomocniczymi AUX w `dane/`, manifest, log i stan kafelków w `diagnostyka/`.
-  Zachowuj odczyt starszego układu przy wznowieniu. Nie usuwaj potrzebnej diagnostyki.
+- Nazwy generowanych plików, folderów i dopisków mają odpowiadać językowi wtyczki.
+  Projekt i raport pozostawiaj w głównym folderze; GeoPackage z AUX w `dane/`
+  lub `data/`, manifest, log i stan kafelków w `diagnostyka/` lub `diagnostics/`.
+  Wznowienie ma czytać starsze układy i zachowywać dane także po zmianie PL/EN.
+  Nie usuwaj potrzebnej diagnostyki ani nie tłumacz nazw źródłowych użytkownika.
 - Nie deklaruj pełnej samodzielności projektu na podstawie samych lokalnych ścieżek.
   Kod formularzy, wyrażenia, zasoby i relacje mogą wymagać ręcznego odbioru.
 - Proxy pobieraj z aktywnego QGIS. Poświadczenia procesów przekazuj w pamięci,

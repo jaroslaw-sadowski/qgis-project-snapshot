@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (1.4.1)
+# Działanie i ograniczenia archiwizacji (1.4.3)
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
@@ -47,17 +47,39 @@ Kontynuacja ponawia takie zerowe odczyty oraz stare zerowe WFS/MSSQL bez v2,
 zamiast bezwarunkowo kopiować wcześniejszy `saved`. Potwierdzone puste odczyty
 pozostają prawidłowym wynikiem i nie wymagają ponownego pobrania.
 
-## Nazwy pustych wektorów i układ folderu (1.4.1)
+## Nazwy pustych wektorów i układ folderu (1.4.2)
 
-W kopii projektu `output_name` otrzymuje końcówkę `_nie-bylo-obiketow-w-zasiegu`
+Nazwy generowane wybiera istniejący katalog Qt według języka wtyczki. Nazwy
+źródłowych projektów, warstw i załączników oraz identyfikatory techniczne pozostają.
+
+| Element | Polski | English |
+| --- | --- | --- |
+| Dopisek pustego wektora | `_nie-bylo-obiektow-w-zasiegu` | `_no-features-in-area` |
+| Archiwum/projekt | `<nazwa>_archiwum_<data>` | `<name>_archive_<date>` |
+| Folder nieukończony | `.w-trakcie-…` | `.in-progress-…` |
+| GeoPackage | `dane/dane.gpkg` | `data/data.gpkg` |
+| Zasoby | `zasoby/` | `resources/` |
+| Raport | `raport.html` | `report.html` |
+| Manifest | `diagnostyka/manifest.json` | `diagnostics/manifest.json` |
+| Log | `diagnostyka/diagnostyka.jsonl` | `diagnostics/diagnostic.jsonl` |
+| Postęp | `diagnostyka/stan-pobierania/` | `diagnostics/download-state/` |
+
+Schemat manifestu nadal 4. `data_file`, `resources_directory` i
+`recovery_directory` zapisują rzeczywiste położenie danych, niezależnie od języka
+następnego wznowienia. Odczyt dopuszcza tylko znane ścieżki. Manifesty sprzed 1.4.2
+otrzymują w pamięci domyślne stare nazwy; ich pliki nie są przepisywane.
+Przy kontynuacji kopiowane dane i ścieżki załączników przechodzą do bieżącego języka.
+Prywatne identyfikatory tabel/cache i format rejestru SQLite pozostają zgodne.
+
+W kopii projektu `output_name` otrzymuje końcówkę `_nie-bylo-obiektow-w-zasiegu`
 wyłącznie dla `saved`, metody `vector`, `feature_count=0` i
 `empty_read_verified=true`. `name` nadal opisuje oryginalną warstwę; jej nazwa,
 ID i źródło nie są zmieniane w projekcie użytkownika. Sufiks nie obejmuje pustych
 obrazów, błędów ani niepotwierdzonego zerowego MSSQL. Raport i okno wyników pokazują
 nazwę kopii, zachowując informację o oryginale w manifeście.
 
-Pliki techniczne trafiają do `diagnostyka/`: `manifest.json`, `diagnostic.jsonl`
-oraz `download-state/`, jeśli jest potrzebny do kontynuacji. Pusty katalog postępu
+Pliki techniczne trafiają do `diagnostyka/`: `manifest.json`, `diagnostyka.jsonl`
+oraz `stan-pobierania/`, jeśli jest potrzebny do kontynuacji. Pusty katalog postępu
 jest usuwany. Projekt `.qgz`, `raport.html`, `dane/` i potrzebne `zasoby/` pozostają
 w folderze głównym. `dane/dane.gpkg` przechowuje wektory i mapy; pliki AUX QGIS/GDAL
 pozostają obok niego, zachowując statystyki potrzebne do szybkiego odczytu.
@@ -66,6 +88,15 @@ podfolderu lub dawnej lokalizacji; okno nadal przyjmuje cały folder archiwum.
 Nie trzeba ręcznie przenosić plików starszego wyniku przed wznowieniem.
 
 ## Procesy i automat
+
+Od 1.4.3 techniczne odczyty projektu (proces mapowy, kontrola XML i audyt
+lokalnych warstw) używają natywnych flag QGIS `DontStoreOriginalStyles`,
+`DontLoadLayouts`, `DontLoad3DViews`. Nie tworzą kopii stylów dla edytora ani
+obiektów nieużywanych układów i widoków 3D. Style do renderowania nadal są
+odczytywane; cały źródłowy XML pozostaje podstawą wynikowego projektu. Audyt
+lokalnych warstw nadal otwiera dostawców i wykrywa brak danych. Tylko osobna,
+wcześniejsza kontrola struktury XML używa `DontResolveLayers`.
+Pomiar syntetyczny i ograniczenia: [raport 1.4.3](validation-1.4.3.md).
 
 API `create_archive(..., adaptive=False)` zachowuje zgodny tryb stały. Okno używa
 wyłącznie `adaptive=True`. Procesy map mają własne QGIS; do wątków nadzorujących
@@ -200,7 +231,7 @@ obszar, CRS i zoomy, lecz nie deklarujemy zgodności źródeł i stylów. Ograni
 jest zgłaszane w oknie i jako `continuation.source_settings_verified=false`.
 
 `_copy_resume` kopiuje `dane/dane.gpkg`, pliki `zasoby/` i zachowany
-`diagnostyka/download-state/`
+`diagnostyka/stan-pobierania/`
 do nowego folderu. Zakończone archiwum weryfikuje przez SHA-256. Dla checkpointu
 SQLite backup kopiuje spójny zatwierdzony stan baz, następnie sprawdza ich
 integralność. Odrzucane są ścieżki poza archiwum i niezgodne odwołania lokalne.
@@ -223,7 +254,7 @@ ustawień źródeł. Zdarzenie diagnostyczne `layer_reused` opisuje skopiowaną 
 warstwę. `completed_in_workers` pomija rekordy użyte ponownie. Daty skopiowanych
 warstw pozostają datami ich wcześniejszego pobrania.
 
-Eksport od początku używa widocznego katalogu `nazwa.in-progress-losowy`.
+Eksport od początku używa widocznego katalogu `nazwa.w-trakcie-losowy`.
 Atomowy trwały `diagnostyka/manifest.json` z `checkpoint=true` jest zapisywany przed
 pobieraniem i po ukończeniu warstw. `checkpoint_created` przekazuje jego folder
 oknu, które zapisuje go w `QgsSettings` i podpowiada przy następnym wyborze
@@ -232,7 +263,7 @@ jest aktualizowane. Natywny `QLockFile` blokuje równoczesne wznowienie danych
 używanych przez działający proces. Pliki wykonawcze procesu i migawka źródła nie
 są wymagane do wznowienia; odtwarza je oryginalny projekt.
 
-Każda mapa ma prywatny `diagnostyka/download-state/layer_<hash>/raster.gpkg`
+Każda mapa ma prywatny `diagnostyka/stan-pobierania/layer_<hash>/raster.gpkg`
 i `tiles.sqlite`.
 Rejestr sprawdza obszar, CRS, siatkę i poziomy. Po wznowieniu uzgadnia zatwierdzone
 PNG z zapisanymi wynikami oraz ich SHA-256; rozróżnia poprawnie puste kafelki od
@@ -329,7 +360,7 @@ o kontynuacji, diagnozy i do 20 przykładów błędów kafelków na mapę.
 Pomiary są obserwacją istniejącego eksportu: nie zmieniają limitów, timeoutów,
 algorytmu RAM, retry ani jakości PNG. Wykorzystują standardową bibliotekę Pythona,
 natywne liczniki systemu i istniejące sygnały QGIS, bez nowych zależności, dodatkowych
-zapytań do źródeł czy testowego ruchu sieciowego. `diagnostic.jsonl` od 1.2.0 zawiera
+zapytań do źródeł czy testowego ruchu sieciowego. `diagnostyka.jsonl` od 1.2.0 zawiera
 zwykle wystarczający kontekst do analizy wydajności. Manifest pozostaje potrzebny
 do nazw warstw i szczegółowego odbioru kompletności, a cały folder do kontynuacji
 oraz sprawdzenia rzeczywistych danych.

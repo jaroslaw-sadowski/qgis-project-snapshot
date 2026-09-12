@@ -1,4 +1,4 @@
-# Przygotowanie i publikacja 1.4.1
+# Przygotowanie i publikacja 1.4.3
 
 Ten dokument jest dla opiekuna wydania. Instrukcja użytkownika znajduje się
 w [README](../README.md) i [przewodniku PL/EN](team-guide.md).
@@ -20,7 +20,7 @@ Stan sprawdzony 10 września 2026 na podstawie aktualnych stron QGIS:
 ## Zawartość wydania
 
 Nazwa: **QGIS Project Snapshot**. Identyfikator Pythona **mbtiles_batch_exporter**
-zachowuje zgodność aktualizacji. Numer **1.4.1**, experimental=False,
+zachowuje zgodność aktualizacji. Numer **1.4.3**, experimental=False,
 deprecated=False. Obsługiwany zakres: QGIS 3.40–3.x z Qt5/PyQt5 i GDAL >=3.7;
 nie deklarujemy QGIS 4/Qt6. Wtyczka nie instaluje dodatkowych bibliotek.
 
@@ -74,17 +74,23 @@ sufit CPU/32, Retry-After, bezstratny PNG i zasady kontynuacji. Brak nowych
 zależności. Kontrole kodu nie stanowią pomiaru przyspieszenia na zewnętrznych
 usługach ani pełnego odbioru Windows.
 
-1.4.1 oznacza potwierdzone puste wektory w kopii projektu końcówką
-`_nie-bylo-obiketow-w-zasiegu`, bez zmiany nazw oryginału. Manifest, log i zachowany
+1.4.2 oznacza potwierdzone puste wektory w kopii projektu końcówką
+`_nie-bylo-obiektow-w-zasiegu` (EN: `_no-features-in-area`), bez zmiany nazw oryginału.
+Pliki i foldery mają nazwy odpowiadające językowi wtyczki. Manifest, log i zachowany
 postęp są w `diagnostyka/`. Projekt, raport i dane pozostają łatwo dostępne;
 kontynuacja obsługuje również poprzedni układ folderu. Instrukcja przypomina,
 że do przenoszenia i wznowienia potrzebne jest całe archiwum.
 
 ## Weryfikacja przed wysłaniem
 
+1.4.3 ogranicza koszt technicznych odczytów projektu przez natywne flagi QGIS.
+Archiwum zachowuje style i układy, a audyt nadal sprawdza dostawców danych.
+Pomiar odczytu lokalnego projektu nie stanowi gwarancji szybkości pobierania
+z usług produkcyjnych ani odbioru tej wersji na Windows.
+
 Polecenia budowy, testów QGIS i kontroli statycznych są w
 [development.md](development.md). Wyniki konkretnej paczki i jej SHA-256 są
-w [raporcie 1.4.1](validation-1.4.1.md). Test ZIP-a sprawdza również wymagane
+w [raporcie 1.4.3](validation-1.4.3.md). Test ZIP-a sprawdza również wymagane
 metadane, ścieżki, prawa i dozwolone pliki. Testy generują własne niewielkie dane
 oraz lokalne WMS/proxy; nie wymagają projektu ani dostępu do usług autora.
 
@@ -108,16 +114,16 @@ odpowiedniego stanowiska; lokalne Ubuntu nie zastępuje tych prób.
 
 ## Kroki na GitHub i w portalu QGIS
 
-1. Zatwierdź sprawdzone źródła 1.4.1 i udostępnij je w publicznym repozytorium
-   wskazanym w metadata.txt. Zalecany tag: v1.4.1. Opublikowane źródła muszą
+1. Zatwierdź sprawdzone źródła 1.4.3 i udostępnij je w publicznym repozytorium
+   wskazanym w metadata.txt. Zalecany tag: v1.4.3. Opublikowane źródła muszą
    odpowiadać przesyłanej paczce, włącznie z instrukcją.
 2. Bez logowania sprawdź README, kod, LICENSE i zgłoszenia błędów. Zmiana
    repozytorium z prywatnego na publiczne ujawnia również jego historię.
 3. Zaloguj się do plugins.qgis.org i wybierz **Upload a plugin**. Prześlij
-   **dist/qgis-project-snapshot-1.4.1.zip**, nie ZIP całego repozytorium.
+   **dist/qgis-project-snapshot-1.4.3.zip**, nie ZIP całego repozytorium.
 4. Przeczytaj wyniki skanowania i odpowiedz na ewentualne uwagi moderatorów.
    Lokalnie nie wyłączamy reguł bezpieczeństwa przez .bandit ani baseline sekretów.
-5. Po zatwierdzeniu sprawdź instalację 1.4.1 przez Menedżer wtyczek QGIS.
+5. Po zatwierdzeniu sprawdź instalację 1.4.3 przez Menedżer wtyczek QGIS.
 
 W chwili przygotowania wydania repozytorium jest **prywatne** i publiczne linki
 zwracają HTTP 404. Upublicznienie źródeł jest obowiązkowym krokiem przed zgłoszeniem.

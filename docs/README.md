@@ -1,13 +1,15 @@
 # Dokumentacja QGIS Project Snapshot
 
-## Instrukcje i bieżące wydanie 1.4.1
+## Instrukcje i bieżące wydanie 1.4.3
 
 | Dokument | Zawartość |
 | --- | --- |
 | [README po polsku](../README.md) / [English README](../README.en.md) | Krótkie wprowadzenie, wymagania, instalacja i licencje |
 | [Instrukcja użytkownika PL/EN](team-guide.md) | Eksport, kontynuacja, sprawdzenie kopii offline oraz pliki do diagnostyki; w ZIP-ie jako INSTRUKCJA.md |
 | [Przygotowanie publikacji](publishing.md) | Wymagania plugins.qgis.org i czynności związane z wydaniem |
-| [Weryfikacja 1.4.1](validation-1.4.1.md) | Wyniki kontroli bieżącego wydania oraz ograniczenia odbioru |
+| [Weryfikacja 1.4.2](validation-1.4.2.md) | Audyt przebiegu 1.4.1 i odbiór nazw PL/EN |
+| [Weryfikacja 1.4.3](validation-1.4.3.md) | Drugi obszar, zużycie zasobów i optymalizacja technicznego odczytu QGIS |
+| [Weryfikacja 1.4.1](validation-1.4.1.md) | Puste warstwy i porządek w archiwum |
 
 ## Rozwój i utrzymanie
 

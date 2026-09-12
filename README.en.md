@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-[Polski](README.md) · English · Version **1.4.1**
+[Polski](README.md) · English · Version **1.4.3**
 
 ## What it is and what it does
 
@@ -27,7 +27,7 @@ and authentication, need checking on your own workstation.
 
 ## How to install
 
-1. Obtain the **`qgis-project-snapshot-1.4.1.zip`** release package.
+1. Obtain the **`qgis-project-snapshot-1.4.3.zip`** release package.
    Use the plugin's installation ZIP, not a ZIP of the entire repository.
 2. In QGIS, choose **Plugins → Manage and Install Plugins → Install from ZIP**.
 3. Select the package and install it. Restart QGIS when upgrading.
@@ -52,15 +52,17 @@ checking. Not all fonts, forms and expressions can be transferred automatically.
 The archive date describes acquisition time, not a simultaneous state of all
 sources. Archives and reports may contain confidential data; inspect them before sharing.
 
-Open the **`.qgz` project** to work with the archive, or **`raport.html`** to review
-results. `dane/` holds the GeoPackage and files that help read it faster,
-`zasoby/` holds required resources, and
-`diagnostyka/` contains the manifest, log and any saved progress for resuming.
+Open the **`.qgz` project** to work with the archive, or **`report.html`** to review
+results. `data/` holds the GeoPackage and files that help read it faster,
+`resources/` holds required resources, and
+`diagnostics/` contains the manifest, log and any saved progress for resuming.
 You do not need to open those files manually. Move the entire folder together
 and keep its contents until continuation is complete.
+Generated names follow the plugin language. The Polish interface uses
+`raport.html`, `dane/`, `zasoby/` and `diagnostyka/`. Resuming can change language.
 
 Confirmed empty vector layers in the project copy receive the exact suffix
-**`_nie-bylo-obiketow-w-zasiegu`**. Their fields and style remain, with zero features.
+**`_no-features-in-area`**. Their fields and style remain, with zero features.
 Original names stay unchanged. Errors and unconfirmed empty MSSQL reads do not
 receive this suffix.
 
@@ -118,7 +120,7 @@ QGIS network settings. Continuing an archive uses the same automatic server load
 From version 1.2.0, the plugin automatically records CPU, memory, read/write
 operations, queues and server activity in `diagnostic.jsonl`. Computer measurements
 are taken about every 5 seconds, including while downloads are waiting. The log
-stays locally; from 1.4.1, it is in **`diagnostyka/`** alongside `manifest.json`.
+stays locally; from 1.4.2, it is in **`diagnostics/`** alongside `manifest.json`.
 The plugin does not send these files automatically.
 
 **`diagnostic.jsonl`** is usually enough for a typical performance review. Include

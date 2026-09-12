@@ -39,7 +39,11 @@ from qgis.core import (
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor
 
-from mbtiles_batch_exporter.archive import create_archive, polygon_area
+from mbtiles_batch_exporter.archive import (
+    create_archive,
+    polygon_area,
+    read_resume_manifest,
+)
 from mbtiles_batch_exporter.archive_dialog import ArchiveDialog
 
 APP = QgsApplication.instance() or QgsApplication([], False)
@@ -94,9 +98,7 @@ class ArchiveTests(unittest.TestCase):
         )
 
     def manifest(self, result):
-        return json.loads(
-            (result / "diagnostyka" / "manifest.json").read_text(encoding="utf-8")
-        )
+        return read_resume_manifest(result)
 
     def test_vectors_keep_attributes_edits_styles_tree_and_source_state(self):
         second = self.add_points("Ta sama nazwa", [(6, 6)])
@@ -124,7 +126,7 @@ class ArchiveTests(unittest.TestCase):
         manifest = self.manifest(result)
         events = [
             json.loads(line)
-            for line in (result / "diagnostyka" / "diagnostic.jsonl")
+            for line in (result / "diagnostyka" / "diagnostyka.jsonl")
             .read_text()
             .splitlines()
         ]
@@ -302,9 +304,9 @@ class ArchiveTests(unittest.TestCase):
         self.assertTrue(self.project.isDirty())
         self.assertEqual(self.original.read_bytes(), self.original_bytes)
         self.assertFalse(list(self.folder.glob(".archive-*")))
-        checkpoints = list(self.folder.glob("*_archive_*.in-progress-*"))
+        checkpoints = list(self.folder.glob("*_archiwum_*.w-trakcie-*"))
         self.assertEqual(len(checkpoints), 1)
-        logs = list((checkpoints[0] / "diagnostyka").glob("diagnostic.jsonl"))
+        logs = list((checkpoints[0] / "diagnostyka").glob("diagnostyka.jsonl"))
         self.assertEqual(len(logs), 1)
         self.assertIn('"archive_exception"', logs[0].read_text())
         self.assertFalse((checkpoints[0] / "_source.qgz").exists())

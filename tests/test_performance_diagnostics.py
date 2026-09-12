@@ -277,7 +277,7 @@ class ArchivePerformanceDiagnosticsTests(unittest.TestCase):
         )
         rows = [
             json.loads(line)
-            for line in (folder / "diagnostyka" / "diagnostic.jsonl")
+            for line in (folder / "diagnostyka" / "diagnostyka.jsonl")
             .read_text()
             .splitlines()
         ]
@@ -295,7 +295,7 @@ class ArchivePerformanceDiagnosticsTests(unittest.TestCase):
         layer = self.add_map(name="Private-user-layer-79")
         self.project.setFileName(str(self.folder / "Private-project-63.qgz"))
         folder, manifest = self.capture([layer])
-        text = (folder / "diagnostyka" / "diagnostic.jsonl").read_text()
+        text = (folder / "diagnostyka" / "diagnostyka.jsonl").read_text()
         rows = [json.loads(line) for line in text.splitlines()]
         self.assertFalse(manifest["cancelled"])
         workers = [row["details"] for row in rows if row["event"] == "worker_event"]

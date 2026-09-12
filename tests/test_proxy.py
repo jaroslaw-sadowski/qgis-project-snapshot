@@ -131,7 +131,7 @@ class ProxyTests(unittest.TestCase):
         manifest = json.loads((folder / "diagnostyka" / "manifest.json").read_text())
         self.diagnostic_events = [
             json.loads(line)
-            for line in (folder / "diagnostyka" / "diagnostic.jsonl")
+            for line in (folder / "diagnostyka" / "diagnostyka.jsonl")
             .read_text()
             .splitlines()
         ]

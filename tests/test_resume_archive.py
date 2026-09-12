@@ -24,18 +24,26 @@ def legacy_resume_layout(folder):
     """Place recovery artifacts exactly where releases through 1.4.0 kept them."""
     manifest = archive_module.read_resume_manifest(folder)
     manifest.pop("data_file")
+    manifest.pop("resources_directory", None)
+    manifest.pop("recovery_directory", None)
     for record in manifest["layers"]:
         if record.get("local_source"):
             record["local_source"] = record["local_source"].replace(
                 "./dane/dane.gpkg|", "./dane.gpkg|", 1
             )
     manifest["sha256"] = {
-        name.removeprefix("dane/").removeprefix("diagnostyka/"): digest
+        name.removeprefix("dane/")
+        .removeprefix("diagnostyka/")
+        .replace("stan-pobierania/", "download-state/", 1): digest
         for name, digest in manifest["sha256"].items()
     }
     for directory in (folder / "dane", folder / "diagnostyka"):
         for path in directory.iterdir():
-            shutil.move(path, folder / path.name)
+            shutil.move(
+                path,
+                folder
+                / ("download-state" if path.name == "stan-pobierania" else path.name),
+            )
         directory.rmdir()
     (folder / "manifest.json").write_text(json.dumps(manifest))
 

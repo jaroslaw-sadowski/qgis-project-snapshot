@@ -979,7 +979,7 @@ class ArchiveDialog(QDialog):
             tr(
                 (
                     "Otwórz projekt .qgz w QGIS lub raport.html w przeglądarce. "
-                    "manifest.json i diagnostic.jsonl są w podfolderze diagnostyka. "
+                    "manifest.json i diagnostyka.jsonl są w podfolderze diagnostyka. "
                     "Do przenoszenia i wznowienia zachowaj cały folder archiwum."
                 )
             )
@@ -1120,5 +1120,5 @@ class ArchiveDialog(QDialog):
     def _open_report(self):
         if self._result:
             QDesktopServices.openUrl(
-                QUrl.fromLocalFile(str(self._result / "raport.html"))
+                QUrl.fromLocalFile(str(self._result / tr("raport.html")))
             )
