@@ -1,4 +1,4 @@
-# QGIS Project Snapshot — instrukcja / user guide 1.2.0
+# QGIS Project Snapshot — instrukcja / user guide 1.4.1
 
 ## Instalacja i uruchomienie
 
@@ -7,7 +7,7 @@ z instalacji QGIS. Nie są potrzebne dodatkowe pakiety. Zapewnij dostęp do źr�
 projektu oraz miejsce na archiwum i pliki tymczasowe.
 
 1. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-1.2.0.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-1.4.1.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz projekt, następnie **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**
    lub ikonę mapy w pudełku na pasku wtyczek.
 
@@ -45,8 +45,11 @@ Mapy pobierają osobne procesy QGIS. Nie trzeba ręcznie ustawiać ich liczby.
 Automat zaczyna od jednego zadania na serwer i zwiększa obciążenie, gdy są kolejne
 mapy, zasoby komputera na to pozwalają i rośnie szybkość pobierania.
 Uwzględnia wolny RAM, zmierzone zużycie pamięci procesów oraz odpowiedzi serwerów.
-Błędy lub brak przyspieszenia ograniczają dalszy wzrost. Jest to automatyczny dobór,
-a nie gwarancja maksymalnego wykorzystania komputera czy łącza.
+Błędy lub brak przyspieszenia ograniczają dalszy wzrost. Po okresie poprawnych
+pobrań automat ponownie próbuje zwiększyć limit o jedno zadanie. Gdy próba nie
+przynosi poprawy, wraca do niższego limitu i dłużej czeka na następną próbę.
+Utrzymujący się spadek szybkości również może obniżyć limit. Jest to automatyczny
+dobór, a nie gwarancja maksymalnego wykorzystania komputera czy łącza.
 
 Tabela pokazuje osobno dla każdego serwera:
 
@@ -61,6 +64,13 @@ ograniczają dalszy wzrost. Limity dotyczą zadań mapowych, nie dokładnej licz
 żądań HTTP. Jedna mapa jest obsługiwana przez jeden proces; wektory i rastry
 źródłowe nie korzystają z tej samej kolejki procesów mapowych.
 
+W Windows dostępny RAM nie jest jedynym ograniczeniem pamięci: system musi też
+mieć możliwość przydzielenia jej kolejnemu procesowi. Od 1.3.0 wtyczka uwzględnia
+ten dodatkowy limit przed uruchomieniem nowych map. Liczba widoczna przy RAM
+nadal oznacza pamięć fizyczną. Podpowiedź RAM pokazuje mniejszy limit przydziału,
+a w tabeli może pojawić się **Limit przydziału pamięci Windows**. Szczegóły zapisuje log.
+Przy małym zapasie działające mapy są zachowywane, a nowe czekają.
+
 ## Połączenie, przerwy i anulowanie
 
 Wtyczka korzysta z ustawień sieciowych aktywnego QGIS, w tym proxy, wyjątków
@@ -73,9 +83,10 @@ mogą pracować dalej. Brakujące kafelki uzupełnia w tym samym archiwum, z ogr
 liczbą prób. Poprawnych kafelków nie pobiera ponownie. Odmowa uwierzytelnienia proxy
 (HTTP 407) kończy pobieranie danej mapy i jest opisana w raporcie.
 
-**Przerwij** działa również podczas oczekiwania. Zachowuje ukończone wyniki,
-kończy scalanie gotowych map i usuwa nieukończone pliki robocze. Poczekaj na koniec
-tego etapu przed zamknięciem QGIS. Zapisany w ten sposób wynik można później kontynuować.
+**Przerwij** działa również podczas oczekiwania. Zachowuje ukończone wyniki
+oraz zapisany postęp map i kończy scalanie gotowych obrazów. Nieukończone pliki
+wektorów są usuwane. Poczekaj na koniec zapisu przed zamknięciem QGIS.
+Zachowaj cały wynikowy folder, aby później kontynuować.
 
 ## Kontynuacja po przerwie
 
@@ -83,21 +94,26 @@ tego etapu przed zamknięciem QGIS. Zapisany w ten sposób wynik można późnie
    Jeśli QGIS był zamknięty, otwórz oryginalny projekt i okno archiwizacji,
    wybierz **Wznów archiwum…**, następnie wskaż folder poprzedniego archiwum.
 2. Zapewnij miejsce na kopię danych oraz nowe pobrania. Potrzebny jest cały folder
-   z `manifest.json`, danymi i zasobami; sam JSON lub raport nie wystarcza.
+   z `diagnostyka/manifest.json`, danymi i zasobami; sam JSON lub raport nie wystarcza.
+   Starsze archiwa z manifestem bezpośrednio w folderze archiwum są nadal obsługiwane.
 3. Poczekaj na sprawdzenie i skopiowanie plików. Powstanie **nowy folder**, który
    zawiera wcześniejsze ukończone wyniki oraz wyniki kontynuacji. Poprzedni folder
    pozostaje bez zmian.
 4. Przeczytaj nowy raport i sprawdź kopię bez sieci przed usunięciem starszego archiwum.
 
-Kontynuacja pobiera ponownie warstwy niezapisane, anulowane i częściowe.
-Ukończonych warstw, również oznaczonych jako puste (`empty`), nie pobiera ponownie,
-jeśli mają zapisane dane lokalne. **Pusty zoom nadal wymaga sprawdzenia**: może
+Kontynuacja zachowuje ukończone warstwy, również oznaczone jako puste (`empty`),
+jeśli mają zapisane dane lokalne. W nieukończonych mapach zachowuje poprawnie
+zapisane obrazy i kafelki rozpoznane jako puste. Pobiera tylko brakujące kafelki,
+z nowym limitem do trzech prób na kafelek w danym wznowieniu. **Pusty zoom nadal wymaga sprawdzenia**: może
 oznaczać brak treści w danej skali lub obszarze. Jeśli chcesz powtórzyć taką
 warstwę, zaznacz ją i wybierz **Utwórz archiwum**.
 
-Wznowienie działa na poziomie warstw: nieukończona warstwa jest pobierana od początku.
-Jeżeli ponowienie warstwy częściowej nie zakończy się poprawnie, w nowym folderze
-pozostanie wcześniejszy obraz częściowy, a raport opisze tę sytuację.
+Nieukończona warstwa wektorowa jest pobierana od początku tylko tej warstwy.
+Ukończonych wektorów zwykle nie trzeba pobierać ponownie. Wyjątkiem są stare zerowe
+wyniki WFS/MSSQL i niepotwierdzone puste odczyty MSSQL — kontynuacja sprawdza je
+ponownie. Poprawnie pusty odczyt wektora jest prawidłowym wynikiem: lokalna warstwa
+zachowuje pola, ale ma zero obiektów. Jeśli raport prosi o porównanie MSSQL,
+sprawdź ten sam obszar w oryginalnym projekcie.
 
 Obszar, zoomy i zestaw warstw pochodzą z poprzedniego manifestu. Otwórz ten sam
 oryginalny projekt, z zachowanymi warstwami, źródłami, stylami i CRS. Kontynuacja
@@ -106,19 +122,42 @@ użyj zwykłego **Utwórz archiwum**, które zachowuje je bez zatwierdzania w ź
 Archiwa 1.0.0 można kontynuować, ale nie zapisują informacji pozwalającej potwierdzić
 zgodność źródeł i stylów. Wtyczka wyświetla wtedy komunikat o tym ograniczeniu.
 
-Nie ma odzyskiwania niezakończonego eksportu po awarii QGIS lub utracie zasilania.
-Przed zamknięciem programu użyj **Przerwij** i poczekaj na zapisanie wyniku.
+Od 1.4.0 postęp map jest zapisywany podczas pobierania. Po nieoczekiwanym zamknięciu
+QGIS wybierz **Wznów archiwum…** i folder z nazwą zawierającą `.in-progress-`.
+Okno proponuje ostatni zachowany folder z manifestem; nie uruchamia wznowienia
+samoczynnie. Nie usuwaj żadnych plików z tego folderu przed kontynuacją.
+Kontynuacja kafelków wymaga postępu zapisanego od 1.4.0. Starsze archiwa zachowują
+ukończone warstwy; nieukończona mapa bez rejestru zaczyna pobieranie warstwy od nowa.
+Jeśli ta próba się nie powiedzie, pozostaje wcześniejszy zapisany obraz częściowy.
+
+Przed planowanym zamknięciem programu użyj **Przerwij** i poczekaj na zapis.
+Odzyskiwanie wymaga czytelnych plików; uszkodzenie dysku lub plików po utracie
+zasilania może uniemożliwić kontynuację.
 
 ## Wynik i odczyt bez sieci
 
 Przeczytaj raport przez **Otwórz raport**. Lista warstw i `raport.html` wskazują
-wyniki niepełne, puste oraz błędy. `manifest.json` zawiera szczegółowy opis archiwum.
+wyniki niepełne, puste oraz błędy. `diagnostyka/manifest.json` zawiera szczegółowy
+opis archiwum. Od 1.4.1 w folderze głównym pozostają projekt `.qgz`, `raport.html`,
+`dane/` i potrzebne `zasoby/`. Dane i ich pomocnicze pliki odczytu są w `dane/`.
+Manifest, log i zachowany postęp trafiają do
+`diagnostyka/`; pusty katalog postępu jest usuwany. Do pracy otwieraj projekt,
+a do przeczytania wyników raport. Pozostałych plików nie trzeba otwierać ręcznie.
+
+Potwierdzone puste wektory w kopii projektu mają końcówkę
+`_nie-bylo-obiketow-w-zasiegu`. Zachowują pola i style. Sufiks dotyczy tylko
+prawidłowo zapisanej tabeli z zerem obiektów, której pusty wynik został potwierdzony.
+Błąd, obraz zastępczy ani niepotwierdzone puste MSSQL nie dostają tej końcówki.
+Oryginalny projekt i nazwy jego warstw pozostają bez zmian.
 Pusty wynik wymaga porównania ze źródłem — sam w sobie nie potwierdza poprawnego odczytu.
 
 Przenieś **cały folder archiwum**, odłącz dostęp do źródłowych usług i baz,
 a następnie otwórz kopię `.qgz` w QGIS. Sprawdź mapy przy zapisanych poziomach
 szczegółowości, obiekty, atrybuty, załączniki, formularze i wydruki.
-Do odczytu kopii ta wtyczka nie jest potrzebna.
+Do odczytu kopii ta wtyczka nie jest potrzebna. GeoTIFF-y mają wewnętrzne piramidy
+przyspieszające wyświetlanie po oddaleniu. Mapy udostępniają pobrane zoomy, również
+poprawnie puste, bez zmiany stylu na poszczególnych poziomach. Brakujące kafelki
+nie są zastępowane obrazami z innej skali.
 
 Nie wszystkie fonty, zasoby, formularze i zależności wyrażeń mogą zostać przeniesione
 automatycznie. Lokalne ścieżki nie wystarczają do potwierdzenia samodzielności
@@ -134,6 +173,9 @@ czeka na odpowiedź. Wtyczka zapisuje też etapy pracy i końcowe wyniki warstw.
 Nie trzeba włączać dodatkowej opcji ani instalować narzędzia pomiarowego.
 Do pełnej analizy użyj logu po zakończeniu lub świadomym anulowaniu eksportu;
 poczekaj na zapisanie wyniku i dołączenie logów procesów mapowych.
+
+Od 1.4.1 `diagnostic.jsonl` i `manifest.json` są w podfolderze `diagnostyka/`.
+Wybierając folder do wznowienia, wskaż całe archiwum, nie ten podfolder.
 
 | Cel | Co przekazać |
 | --- | --- |
@@ -152,8 +194,8 @@ Log pomoże rozróżnić ograniczenie RAM, zajętość procesora i oczekiwanie n
 Nie mierzy jednak maksymalnej przepustowości łącza lub serwera, temperatury CPU
 ani procentowej zajętości fizycznego dysku. Obserwowane bajty odpowiedzi QGIS
 nie są pomiarem całego ruchu sieciowego komputera. Brak odczytu czujnika jest
-oznaczany jako niedostępny, a nie jako zerowe obciążenie. Liczniki służą do analizy;
-wydanie 1.2.0 nie zmienia zasad dobierania liczby procesów.
+oznaczany jako niedostępny, a nie jako zerowe obciążenie. Sam zapis tych pomiarów
+nie uruchamia dodatkowych pobrań ani testów szybkości.
 
 ## Licencje i pomoc
 
@@ -174,9 +216,8 @@ w pliku `LICENSE` dołączonym do paczki. Licencja wtyczki nie obejmuje pobranyc
 
 [Zgłoszenia błędów i propozycje](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues):
 podaj wersję QGIS i wtyczki oraz kroki odtworzenia problemu. Dobierz pliki zgodnie
-z tabelą powyżej; dziennik z okna może uzupełnić opis. Jeśli eksport zakończy się
-błędem przed utworzeniem folderu archiwum, diagnostyka może pozostać w folderze
-zapisu jako `<nazwa_archiwum>.diagnostic.jsonl`.
+z tabelą powyżej; dziennik z okna może uzupełnić opis. Po nieoczekiwanym zakończeniu
+szukaj diagnostyki w podfolderze `diagnostyka/` zachowanego folderu `.in-progress-…`.
 Sprawdź pliki przed udostępnieniem — mogą zawierać nazwy warstw lub dane poufne.
 Nie publikuj haseł, poufnych projektów ani danych firmowych.
 
@@ -187,7 +228,7 @@ supplied by QGIS. No extra packages are needed. Ensure access to project sources
 enough disk space and permission to download and store the selected data.
 
 1. Choose **Plugins → Manage and Install Plugins → Install from ZIP** and select
-   `qgis-project-snapshot-1.2.0.zip`. Restart QGIS when upgrading.
+   `qgis-project-snapshot-1.4.1.zip`. Restart QGIS when upgrading.
 2. Open the project, then **Plugins → QGIS Project Snapshot → Archive project…**
    or the map-in-an-archive-box toolbar icon.
 3. Choose a folder, area, layers and zoom range, then **Create archive**.
@@ -212,7 +253,10 @@ not the entire project. Hover over controls for explanations.
 Separate QGIS processes download maps. Each server starts with one task;
 concurrency grows using available computer resources, measured process memory,
 download speed and server responses. Errors or lack of improvement limit growth.
-No manual process count is needed, and maximum throughput is not guaranteed.
+After healthy periods, it tries increasing the limit by one task again. If that
+does not help, it returns to the lower limit and waits longer before another trial.
+Sustained slowdowns may also reduce the limit. No manual process count is needed,
+and maximum throughput is not guaranteed.
 
 The server table shows **Active / limit**, **Queued layers**, **Tiles/s**, **Status**
 and **Pause**. **Queued layers** counts layers waiting to start downloading from
@@ -221,6 +265,13 @@ the server in that row, excluding layers already downloading.
 These are map task limits, not exact HTTP request counts. One process handles one
 map; vectors and source rasters do not use the same map process queue.
 
+On Windows, available physical RAM is not the only memory constraint: the system
+must also be able to commit memory to a new process. From 1.3.0, the plugin checks
+this additional limit before starting more maps. The RAM display still shows
+physical memory. Its tooltip shows the lower allocation limit, and the table may
+show **Windows memory allocation limit**. The log records further details. Existing
+maps continue when headroom is low, while new ones wait.
+
 Downloads use the active QGIS network and proxy settings, exclusions and available
 saved credentials. There is no separate proxy setup. Unusual authentication or
 certificates may need checking on your workstation. Overload or repeated timeouts
@@ -228,9 +279,10 @@ may pause one server while others continue. Server retry times are respected.
 Only missing tiles are repaired in the same archive, with limited retries.
 Proxy authentication refusal (HTTP 407) stops the current map and is reported.
 
-**Cancel** also works during waits. It preserves completed results, finishes
-merging ready maps and removes incomplete working files. Wait for this to finish
-before closing QGIS. You can continue the resulting archive later.
+**Cancel** also works during waits. It preserves completed results and saved map
+progress, and finishes merging ready images. Incomplete vector files are removed.
+Wait for saving to finish before closing QGIS. Keep the entire resulting folder
+for later continuation.
 
 ## English guide — continuing after a break
 
@@ -238,19 +290,24 @@ before closing QGIS. You can continue the resulting archive later.
    If QGIS was closed, open the original project and the archive window, choose
    **Resume archive…**, then select the previous archive folder.
 2. Allow space for a copy of the data and new downloads. You need the entire folder
-   with `manifest.json`, data and resources; a JSON file or report alone is not enough.
+   with `diagnostyka/manifest.json`, data and resources; a JSON file or report alone is not enough.
+   Older archives with their manifest directly in the archive folder remain supported.
 3. Wait while files are checked and copied. A **new folder** will contain the earlier
    completed results and the continuation results. The previous folder stays unchanged.
 4. Read the new report and check the copy offline before removing the older archive.
 
-Continuation retries unsaved, cancelled and partial layers. Completed layers,
-including those marked `empty`, are copied when they have saved local data.
+Continuation copies completed layers, including those marked `empty`, when they
+have saved local data. For unfinished maps, it retains successfully saved images
+and tiles confirmed empty. Only missing tiles are downloaded, with up to three
+new attempts per tile in that continuation.
 **An empty zoom still needs review**: the source may have no content at that scale
 or in that area. To download such a layer again, select it and use **Create archive**.
 
-Resuming works at layer level: an unfinished layer starts again from the beginning.
-If retrying a partial layer does not complete, its earlier partial image is kept
-in the new folder and the report explains this.
+An unfinished vector layer starts that layer again. Completed vector layers are
+normally reused. Older zero-feature WFS/MSSQL results and unconfirmed empty MSSQL
+reads are checked again during continuation. A correctly empty vector read is a
+valid result: the local layer retains its fields and contains zero features.
+If the report asks for an MSSQL comparison, check the same area in the original project.
 
 The previous manifest supplies the area, zooms and layer selection. Use the same
 original project, with matching layers, sources, styles and CRS. Continuation
@@ -259,8 +316,19 @@ to include new edits without committing them to the source.
 Archives from 1.0.0 can be continued, but they lack the information needed to
 confirm source and style compatibility. The plugin reports that limitation.
 
-An unfinished export cannot be recovered after a QGIS crash or power loss.
-Before closing QGIS, use **Cancel** and wait for the result to be saved.
+From 1.4.0, map progress is saved during downloads. After an unexpected QGIS exit,
+choose **Resume archive…** and the folder whose name contains `.in-progress-`.
+The dialog suggests the last available folder with a manifest; it does not resume
+automatically. Keep all files in that folder until continuation finishes.
+Tile continuation requires progress saved from 1.4.0 onward. Older archives retain
+completed layers; an unfinished map without a tile record restarts that layer.
+If the retry fails, its previously saved partial image is retained.
+
+Before a planned shutdown, use **Cancel** and wait for saving. Recovery requires
+readable files; damaged storage or files after power loss may prevent continuation.
+GeoTIFF overviews help display rasters when zoomed out. Maps retain downloaded
+zooms and their separate styles, including correctly empty levels. Missing tiles
+are not replaced with images from another scale.
 
 ## English guide — performance diagnostics and files to share
 
@@ -272,6 +340,9 @@ downloads wait for replies. Work phases and final layer results are also recorde
 No additional option or measurement tool is required.
 For a complete review, use the log after the export finishes or is deliberately
 cancelled; wait for the result and map process logs to be saved.
+
+From 1.4.1, `diagnostic.jsonl` and `manifest.json` are in `diagnostyka/`.
+When resuming, select the entire archive folder, not that subfolder.
 
 | Purpose | Files to provide |
 | --- | --- |
@@ -290,9 +361,22 @@ The log helps distinguish memory limits, CPU use and waits for servers. It does
 not measure maximum link or server throughput, CPU temperature or physical disk
 busy percentage. Observed QGIS response bytes are not all network traffic on the
 computer. Unavailable sensor readings are recorded as unavailable, not as zero
-load. These counters support analysis; 1.2.0 does not change process allocation rules.
+load. Recording these measurements does not start extra downloads or speed tests.
 
 ## English guide — results, rights and help
+
+Open the `.qgz` project to work with the archive, or `raport.html` to review results.
+From 1.4.1, the main folder contains the project, report, `dane/` and required
+`zasoby/`. Data and their supporting read files are in `dane/`.
+The manifest, log and saved progress are grouped under `diagnostyka/`;
+an empty progress folder is removed. You do not need to open those files manually.
+Keep and move the entire archive folder.
+
+Confirmed empty vector layers in the project copy receive the exact suffix
+`_nie-bylo-obiketow-w-zasiegu`. Fields and styles remain. It applies only to
+successfully saved zero-feature tables whose empty read was confirmed. Errors,
+fallback images and unconfirmed empty MSSQL reads do not receive this suffix.
+The original project and its layer names remain unchanged.
 
 Read the report using **Open report**. Check incomplete and empty results against
 the source. A continued archive includes copied results and newly downloaded
@@ -322,8 +406,7 @@ does not cover downloaded data. Author: Jarosław Sadowski. Developed through
 
 [Report a problem or suggestion](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues)
 with your QGIS and plugin versions and reproduction steps. Choose files using the
-table above; the window log can add context. If export fails before
-creating an archive folder, diagnostics may remain as `<archive_name>.diagnostic.jsonl`
-in the chosen output folder. Inspect files before sharing; they may include
+table above; the window log can add context. After an unexpected exit, look in
+`diagnostyka/` inside the retained `.in-progress-…` folder. Inspect files before sharing; they may include
 layer names or confidential data. Do not publish passwords, private projects
 or company data.

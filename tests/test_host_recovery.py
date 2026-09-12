@@ -29,6 +29,8 @@ class HostRecoveryTests(unittest.TestCase):
             None, self.folder, None, [], None, None, [], workers=2, adaptive=True
         )
         workers.next_memory_check = float("inf")
+        # Recovery tests supply a fixed, already sampled resource allowance.
+        workers.launch_slots = 2
         self.clock = 100.0
 
         def step():
@@ -321,9 +323,7 @@ class LocalWmsRecoveryTests(unittest.TestCase):
         ledgers = {}
 
         def capture_ledger(source, destination, table, cancelled):
-            with closing(
-                sqlite3.connect(source.parent / f"{table}.tiles.sqlite")
-            ) as db:
+            with closing(sqlite3.connect(source.parent / "tiles.sqlite")) as db:
                 ledgers[table] = db.execute(
                     "SELECT zoom,col,row,status,attempts FROM tiles "
                     "ORDER BY zoom,col,row"

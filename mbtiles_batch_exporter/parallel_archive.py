@@ -17,6 +17,7 @@ from contextlib import closing
 from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from threading import Condition, Event, Thread
 from zipfile import ZipFile
 
@@ -39,15 +40,18 @@ from .worker_network import network_snapshot
 def merge_raster(source, destination, table, cancelled=lambda: False):
     """Copy compressed PNG bytes unchanged; only the parent writes the final DB."""
     if not destination.exists():
-        try:
-            with source.open("rb") as original, destination.open("wb") as target:
+        with TemporaryDirectory(prefix=".merge-", dir=destination.parent) as temporary:
+            pending = Path(temporary) / destination.name
+            with source.open("rb") as original, pending.open("wb") as target:
                 for chunk in iter(lambda: original.read(1024 * 1024), b""):
                     if cancelled():
                         raise InterruptedError()
                     target.write(chunk)
-        except Exception:
-            destination.unlink(missing_ok=True)
-            raise
+                target.flush()
+                os.fsync(target.fileno())
+            if cancelled():
+                raise InterruptedError()
+            pending.replace(destination)
         return
     with gdal.ExceptionMgr():
         raster = gdal.OpenEx(
@@ -170,10 +174,14 @@ class RasterWorkers:
         cpu=None,
         cancelled=lambda: False,
         progress=lambda message: None,
+        recovery_folder=None,
     ):
         self.diagnostic = diagnostic
         self.cancelled = cancelled
         self.progress = progress
+        self.recovery_folder = (
+            Path(recovery_folder) if recovery_folder is not None else None
+        )
         self.network = network_snapshot()
         self.folder = staging / ".workers"
         self.folder.mkdir(mode=0o700)
@@ -182,6 +190,7 @@ class RasterWorkers:
         self.ceiling = min(32, 2 * self.cpu) if adaptive else workers
         self.peak_workers = workers
         self.memory_available = None
+        self.memory_budget_available = None
         self.worker_memory = MEMORY_PER_WORKER
         self.worker_peak_memory = 0
         self.reserved_growth = 0
@@ -194,7 +203,7 @@ class RasterWorkers:
         self.queue = []
         self.condition = Condition()
         self.workers = workers
-        self.launch_slots = workers
+        self.launch_slots = 0 if adaptive else workers
         self.per_server_limit = self.ceiling if adaptive else per_server_limit
         self.language = language()
         self.started = set()
@@ -205,6 +214,7 @@ class RasterWorkers:
         self.coordinator = None
         self.coordinator_failed = False
         self.memory_ok = True
+        self.memory_growth_ok = True
         self.next_memory_check = 0.0
         self.memory_history = []
         self.origin = time.monotonic()
@@ -297,6 +307,9 @@ class RasterWorkers:
                             "area_crs": crs.toWkt(Qgis.CrsWktVariant.Wkt2_2019),
                             "levels": levels,
                             "adaptive": self.adaptive,
+                            "cache_folder": str(self.recovery_folder / table)
+                            if self.recovery_folder is not None
+                            else None,
                         }
                     ),
                     encoding="utf-8",
@@ -385,6 +398,10 @@ class RasterWorkers:
                     if sampled_memory:
                         memory = available_memory()
                         self.memory_available = memory
+                        # Windows can exhaust commit while physical RAM is
+                        # still available. Keep the displayed RAM unchanged.
+                        allocation_memory = available_memory(include_commit=True)
+                        self.memory_budget_available = allocation_memory
                         process_jobs = [
                             j
                             for name, j in self.jobs.items()
@@ -423,7 +440,7 @@ class RasterWorkers:
                             )
                         budget = recommend(
                             self.cpu,
-                            memory,
+                            allocation_memory,
                             True,
                             active_workers=sum(self.active_hosts.values()),
                             worker_memory=estimate,
@@ -434,9 +451,18 @@ class RasterWorkers:
                         self.launch_slots = max(
                             0, budget - sum(self.active_hosts.values())
                         )
-                        ok = memory is None or memory >= MEMORY_RESERVE
+                        ok = (
+                            allocation_memory is None
+                            or allocation_memory >= MEMORY_RESERVE
+                        )
+                        growth_ok = ok and (
+                            allocation_memory is None
+                            or allocation_memory
+                            >= MEMORY_RESERVE + self.reserved_growth
+                        )
                         if (
                             ok != self.memory_ok
+                            or growth_ok != self.memory_growth_ok
                             or budget != self.workers
                             or estimate != self.worker_memory
                         ):
@@ -444,7 +470,9 @@ class RasterWorkers:
                                 {
                                     "at": now - self.origin,
                                     "memory_ok": ok,
+                                    "memory_growth_ok": growth_ok,
                                     "available": memory,
+                                    "budget_available": allocation_memory,
                                     "budget": budget,
                                     "worker_memory": estimate,
                                     "worker_peak_memory": self.worker_peak_memory,
@@ -457,6 +485,7 @@ class RasterWorkers:
                             getattr(self, "peak_workers", 0), budget
                         )
                         self.memory_ok = ok
+                        self.memory_growth_ok = growth_ok
                         self.next_memory_check = now + 5
                     rows = []
                     for host, policy in self.policies.items():
@@ -468,10 +497,13 @@ class RasterWorkers:
                         queued = sum(h == host for h, _, _ in self.queue)
                         policy.evaluate(
                             now,
-                            queued > 0
-                            and sum(self.active_hosts.values()) < self.workers
-                            and self.launch_slots > 0,
-                            self.memory_ok,
+                            len(jobs) > policy.limit
+                            or (
+                                queued > 0
+                                and sum(self.active_hosts.values()) < self.workers
+                                and self.launch_slots > 0
+                            ),
+                            self.memory_growth_ok,
                             active=sum(
                                 bool(
                                     not j["state"].get("done")
@@ -523,6 +555,10 @@ class RasterWorkers:
                             if policy.blocked
                             else "cooldown"
                             if policy.recovering
+                            else "commit"
+                            if not self.memory_ok
+                            and self.memory_available is not None
+                            and self.memory_available >= MEMORY_RESERVE
                             else "memory"
                             if not self.memory_ok
                             else "repairing"
@@ -549,6 +585,7 @@ class RasterWorkers:
                                 "queued": queued,
                                 "budget": self.workers,
                                 "memory_available": self.memory_available,
+                                "memory_budget_available": self.memory_budget_available,
                                 "memory_reserve": MEMORY_RESERVE,
                                 "worker_memory": self.worker_memory,
                                 "worker_memory_measured": bool(self.worker_peak_memory),
@@ -641,6 +678,9 @@ class RasterWorkers:
                     "window_successes": policy.successes,
                     "baseline_rate": policy.baseline,
                     "poor_windows": policy.poor_windows,
+                    "stable_rate": policy.stable_rate,
+                    "healthy_seconds": policy.healthy_seconds,
+                    "retry_after_healthy_seconds": policy.retry_seconds,
                 }
             )
         self.diagnostic.emit(
@@ -661,11 +701,13 @@ class RasterWorkers:
             ),
             launch_slots=self.launch_slots,
             memory_available=self.memory_available,
+            memory_budget_available=self.memory_budget_available,
             memory_reserve=MEMORY_RESERVE,
             worker_memory_estimate=self.worker_memory,
             measured_peak=self.worker_peak_memory,
             reserved_growth=self.reserved_growth,
             memory_ok=self.memory_ok,
+            memory_growth_ok=self.memory_growth_ok,
             hosts=hosts,
             jobs=jobs,
         )
@@ -754,6 +796,24 @@ class RasterWorkers:
                     self.queue.clear()
                 if not self.queue:
                     return
+                if self.adaptive:
+                    # These results need neither RAM nor a new worker. Finish
+                    # them even while memory pressure blocks all new starts.
+                    for host, future, folder in list(self.queue):
+                        if self.policies[host].blocked:
+                            future.set_result(
+                                {
+                                    "status": "failed",
+                                    "method": "raster_render",
+                                    "reason": tr(
+                                        "Serwer odłożony do późniejszej próby."
+                                    ),
+                                    "raster": {"deferred": True},
+                                }
+                            )
+                            self.queue.remove((host, future, folder))
+                    if not self.queue:
+                        return
                 if self.adaptive and (
                     not self.memory_ok
                     or sum(self.active_hosts.values()) >= self.workers
@@ -788,21 +848,6 @@ class RasterWorkers:
                     None,
                 )
                 if self.adaptive:
-                    for host, future, folder in list(self.queue):
-                        if self.policies[host].blocked:
-                            future.set_result(
-                                {
-                                    "status": "failed",
-                                    "method": "raster_render",
-                                    "reason": tr(
-                                        "Serwer odłożony do późniejszej próby."
-                                    ),
-                                    "raster": {"deferred": True},
-                                }
-                            )
-                            self.queue.remove((host, future, folder))
-                    if not self.queue:
-                        return
                     # Prefer another server before a second task on a busy one.
                     # min preserves queue order when active counts are equal.
                     index = min(
@@ -1006,7 +1051,12 @@ class RasterWorkers:
             ) as merger:
                 merging = merger.submit(
                     merge_raster,
-                    folder / "raster.gpkg",
+                    (
+                        self.recovery_folder / folder.name
+                        if self.recovery_folder is not None
+                        else folder
+                    )
+                    / "raster.gpkg",
                     destination,
                     result["table"],
                     (lambda: False) if preserve_completed else self.stop.is_set,

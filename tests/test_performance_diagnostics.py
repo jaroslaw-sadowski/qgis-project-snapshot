@@ -232,10 +232,12 @@ class PerformanceDiagnosticsTests(unittest.TestCase):
         workers.futures = {}
         workers.launch_slots = 0
         workers.memory_available = 3 * 1024**3
+        workers.memory_budget_available = 2 * 1024**3
         workers.worker_memory = 400 * 1024**2
         workers.worker_peak_memory = 300 * 1024**2
         workers.reserved_growth = 900 * 1024**2
         workers.memory_ok = True
+        workers.memory_growth_ok = True
         workers._diagnose_scheduler(10.0)
         event = workers.diagnostic.emit.call_args
         self.assertEqual(event.args[0], "scheduler_sample")
@@ -244,6 +246,8 @@ class PerformanceDiagnosticsTests(unittest.TestCase):
             (row["processes"], row["budget"], row["active_tasks"]), (9, 9, 7)
         )
         self.assertEqual(row["cpu_ceiling"], 28)
+        self.assertEqual(row["memory_budget_available"], 2 * 1024**3)
+        self.assertTrue(row["memory_growth_ok"])
         self.assertEqual(sum(job["waiting"] for job in row["jobs"]), 2)
         self.assertTrue(all(job["telemetry_age_seconds"] == 1.0 for job in row["jobs"]))
         self.assertEqual(row["hosts"][0]["limit"], 7)
@@ -273,7 +277,9 @@ class ArchivePerformanceDiagnosticsTests(unittest.TestCase):
         )
         rows = [
             json.loads(line)
-            for line in (folder / "diagnostic.jsonl").read_text().splitlines()
+            for line in (folder / "diagnostyka" / "diagnostic.jsonl")
+            .read_text()
+            .splitlines()
         ]
         self.assertTrue(manifest["cancelled"])
         summaries = [row for row in rows if row["event"] == "layer_summary"]
@@ -289,7 +295,7 @@ class ArchivePerformanceDiagnosticsTests(unittest.TestCase):
         layer = self.add_map(name="Private-user-layer-79")
         self.project.setFileName(str(self.folder / "Private-project-63.qgz"))
         folder, manifest = self.capture([layer])
-        text = (folder / "diagnostic.jsonl").read_text()
+        text = (folder / "diagnostyka" / "diagnostic.jsonl").read_text()
         rows = [json.loads(line) for line in text.splitlines()]
         self.assertFalse(manifest["cancelled"])
         workers = [row["details"] for row in rows if row["event"] == "worker_event"]

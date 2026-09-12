@@ -16,6 +16,7 @@ import test_archive as fixtures
 import test_archive_progress as progress_fixtures
 
 from mbtiles_batch_exporter import i18n
+from mbtiles_batch_exporter.archive import read_resume_manifest, resume_manifest_path
 from mbtiles_batch_exporter.parallel_archive import RasterWorkers
 from mbtiles_batch_exporter.resources import (
     available_memory,
@@ -153,15 +154,29 @@ class OptionsTests(unittest.TestCase):
             dialog.retry_button.click()
             self.assertIsNotNone(dialog._result)
             self.assertNotEqual(original, dialog._result)
-            self.assertTrue((original / "manifest.json").exists())
+            self.assertTrue(resume_manifest_path(original).exists())
             self.assertEqual(dialog._selected_ids(), set())
         finally:
             dialog.close()
 
     def test_live_memory_budget_and_waiting_status_in_both_languages(self):
-        for language, waiting, downloading, unknown in (
-            ("pl", "Limit procesów komputera", "Pobieranie", "nieznany"),
-            ("en", "Computer process limit", "Downloading", "unknown"),
+        for language, waiting, downloading, unknown, commit, reprobe in (
+            (
+                "pl",
+                "Limit procesów komputera",
+                "Pobieranie",
+                "nieznany",
+                "Limit przydziału pamięci Windows",
+                "ponownie sprawdza wyższy limit",
+            ),
+            (
+                "en",
+                "Computer process limit",
+                "Downloading",
+                "unknown",
+                "Windows memory allocation limit",
+                "tries a higher limit again",
+            ),
         ):
             with self.subTest(language=language):
                 with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE=language):
@@ -188,12 +203,27 @@ class OptionsTests(unittest.TestCase):
                         self.assertIn("14", dialog.resource_hint.toolTip())
                         self.assertIn("1024 MiB", dialog.ram_hint.toolTip())
                         self.assertIn("768 MiB", dialog.ram_hint.text())
+                        self.assertIn(reprobe, dialog.servers.toolTip())
+                        row.update(
+                            state="commit", memory_budget_available=320 * 1024**2
+                        )
+                        dialog._server_activity([row])
+                        self.assertEqual(
+                            dialog._server_items[row["host"]].text(4), commit
+                        )
+                        self.assertIn("3.8 GiB", dialog.ram_hint.text())
+                        self.assertIn("0.3 GiB", dialog.ram_hint.toolTip())
+                        self.assertIn("Windows", dialog.ram_hint.toolTip())
+                        self.assertEqual(
+                            dialog.ram_hint.toolTip(), dialog.resource_hint.toolTip()
+                        )
                         row.update(
                             state="running",
                             active=1,
                             processes=1,
                             budget=3,
                             memory_available=5 * 1024**3,
+                            memory_budget_available=5 * 1024**3,
                             worker_memory=450 * 1024**2,
                             worker_memory_measured=True,
                         )
@@ -204,6 +234,10 @@ class OptionsTests(unittest.TestCase):
                         self.assertIn("1/3", dialog.resource_hint.text())
                         self.assertIn("5.0 GiB", dialog.ram_hint.text())
                         self.assertIn("450 MiB", dialog.ram_hint.toolTip())
+                        self.assertNotIn("Windows", dialog.ram_hint.toolTip())
+                        row.update(memory_budget_available=None)
+                        dialog._server_activity([row])
+                        self.assertNotIn("Windows", dialog.ram_hint.toolTip())
                         row.update(memory_available=None, budget=2)
                         dialog._server_activity([row])
                         self.assertIn(unknown, dialog.ram_hint.text())
@@ -211,20 +245,27 @@ class OptionsTests(unittest.TestCase):
                         dialog.close()
 
     def test_resume_from_new_dialog_uses_manifest_area_and_reuses_data(self):
+        from qgis.core import QgsSettings
+
         first = self.dialog()
         try:
             first.start()
             previous = first._result
             self.assertIsNotNone(previous)
+            self.assertEqual(
+                QgsSettings().value("mbtiles_batch_exporter/last_resume_folder"),
+                str(previous),
+            )
         finally:
             first.close()
         dialog = self.dialog()
         try:
             with (
                 patch(
-                    "mbtiles_batch_exporter.archive_dialog.QFileDialog.getExistingDirectory",
+                    "mbtiles_batch_exporter.archive_dialog."
+                    "QFileDialog.getExistingDirectory",
                     return_value=str(previous),
-                ),
+                ) as choose,
                 patch.object(
                     dialog, "_area", side_effect=AssertionError("New area used")
                 ),
@@ -234,10 +275,117 @@ class OptionsTests(unittest.TestCase):
                 ) as warning,
             ):
                 dialog.resume_button.click()
+            self.assertEqual(choose.call_args.args[2], str(previous))
             warning.assert_not_called()
             write.assert_not_called()
             self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
             self.assertNotEqual(dialog._result, previous)
+            self.assertEqual(
+                QgsSettings().value("mbtiles_batch_exporter/last_resume_folder"),
+                str(dialog._result),
+            )
+        finally:
+            dialog.close()
+
+    def test_checkpoint_survives_dialog_exception_and_prefills_resume(self):
+        checkpoint = self.folder / "archive.in-progress-fixture"
+        checkpoint.mkdir()
+        (checkpoint / "diagnostyka").mkdir()
+        (checkpoint / "diagnostyka" / "manifest.json").write_text("{}")
+        for locale, prompt in (("pl", "Wznów archiwum"), ("en", "Resume archive")):
+            with (
+                self.subTest(locale=locale),
+                patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE=locale),
+            ):
+                dialog = self.dialog()
+
+                def interrupted(*args, **kwargs):
+                    kwargs["checkpoint_created"](checkpoint)
+                    raise RuntimeError("Fixture failure")
+
+                try:
+                    with (
+                        patch(
+                            "mbtiles_batch_exporter.archive_dialog.create_archive",
+                            side_effect=interrupted,
+                        ),
+                        patch(
+                            "mbtiles_batch_exporter.archive_dialog.QMessageBox.warning"
+                        ),
+                    ):
+                        dialog.start()
+                    self.assertIsNone(dialog._result)
+                    self.assertIn(str(checkpoint), dialog.status.text())
+                    self.assertIn(prompt, dialog.status.text())
+                    self.assertTrue(dialog.resume_button.isEnabled())
+                    self.assertFalse(dialog._running)
+                finally:
+                    dialog.close()
+                reopened = self.dialog()
+                try:
+                    with (
+                        patch(
+                            "mbtiles_batch_exporter.archive_dialog."
+                            "QFileDialog.getExistingDirectory",
+                            return_value="",
+                        ) as choose,
+                        patch.object(reopened, "start") as start,
+                    ):
+                        reopened.resume_button.click()
+                    self.assertEqual(choose.call_args.args[2], str(checkpoint))
+                    start.assert_not_called()
+                finally:
+                    reopened.close()
+
+    def test_remembered_legacy_folder_and_missing_folder_defaults(self):
+        from qgis.core import QgsSettings
+
+        QgsSettings().setValue(
+            "mbtiles_batch_exporter/last_resume_folder", str(self.folder / "absent")
+        )
+        dialog = self.dialog()
+        try:
+            with patch(
+                "mbtiles_batch_exporter.archive_dialog."
+                "QFileDialog.getExistingDirectory",
+                return_value="",
+            ) as choose:
+                dialog.resume_button.click()
+            self.assertEqual(choose.call_args.args[2], dialog.output_edit.text())
+            legacy = self.folder / "legacy"
+            legacy.mkdir()
+            (legacy / "manifest.json").write_text("{}")
+            QgsSettings().setValue(
+                "mbtiles_batch_exporter/last_resume_folder", str(legacy)
+            )
+            with patch(
+                "mbtiles_batch_exporter.archive_dialog.QFileDialog.getExistingDirectory",
+                return_value="",
+            ) as choose:
+                dialog.resume_button.click()
+            self.assertEqual(choose.call_args.args[2], str(legacy))
+        finally:
+            dialog.close()
+
+    def test_empty_vector_output_name_and_diagnostic_folder_are_shown(self):
+        empty = self.add_points("Poza obszarem", [(3000, 3000)])
+        original_name = empty.name()
+        dialog = self.dialog()
+        try:
+            dialog.start()
+            self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
+            manifest = read_resume_manifest(dialog._result)
+            record = next(r for r in manifest["layers"] if r["id"] == empty.id())
+            expected = original_name + "_nie-bylo-obiketow-w-zasiegu"
+            self.assertEqual(record["output_name"], expected)
+            self.assertEqual(dialog._items[empty.id()].text(0), expected)
+            self.assertIn(expected, dialog.results.toPlainText())
+            self.assertIn("diagnostyka", dialog.results.toPlainText())
+            self.assertEqual(empty.name(), original_name)
+            self.assertEqual(
+                resume_manifest_path(dialog._result),
+                dialog._result / "diagnostyka" / "manifest.json",
+            )
         finally:
             dialog.close()
 

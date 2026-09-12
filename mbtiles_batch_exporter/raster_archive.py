@@ -8,6 +8,7 @@ import math
 import sqlite3
 import time
 from contextlib import closing
+from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -296,7 +297,17 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
 
 
 def _render_tile(
-    layer, project, bounds, resolution, size, cancelled, progress, counters, gate=None
+    layer,
+    project,
+    bounds,
+    resolution,
+    size,
+    cancelled,
+    progress,
+    counters,
+    gate=None,
+    *,
+    retry_managed=False,
 ):
     # A small gutter avoids cutting strokes at tile edges. Output remains 256px.
     gutter = 16
@@ -333,9 +344,13 @@ def _render_tile(
                 warnings = counters.setdefault("server_warnings", [])
                 if str(error) not in warnings:
                     warnings.append(str(error))
-                if gate or str(error).startswith("[HTTP 429]"):
+                if gate or retry_managed or str(error).startswith("[HTTP 429]"):
                     raise  # Do not amplify an explicit rate limit with tile retries.
-            if gate or getattr(error, "status", None) in (401, 403, 404, 407):
+            if (
+                gate
+                or retry_managed
+                or getattr(error, "status", None) in (401, 403, 404, 407)
+            ):
                 # Adaptive maps have one disk ledger governing all attempts.
                 # Nested immediate retries/subdivision would bypass its budget,
                 # especially when a recovery probe fails with a different error.
@@ -448,6 +463,10 @@ def write_rendered_raster(
     cancelled,
     progress,
     gate=None,
+    *,
+    resume=False,
+    ledger_path=None,
+    legacy_retries=False,
 ):
     """One sparse RGBA tile table; each zoom is rendered independently."""
     mask = QgsGeometry(area)
@@ -467,6 +486,33 @@ def write_rendered_raster(
             )
         )
     x0, y0 = bounds.xMinimum(), bounds.yMaximum()
+    ledger_path = (
+        Path(ledger_path)
+        if ledger_path is not None
+        else gate.folder / (table + ".tiles.sqlite")
+        if gate
+        else None
+    )
+    if resume and ledger_path is None:
+        raise ValueError(
+            tr("Nie można wznowić kafelków: brak poprawnego rejestru lub danych.")
+        )
+    existing = False
+    if resume and Path(database).is_file():
+        with closing(sqlite3.connect(database)) as connection:
+            if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                raise ValueError(
+                    tr(
+                        "Nie można wznowić kafelków: "
+                        "brak poprawnego rejestru lub danych."
+                    )
+                )
+            existing = bool(
+                connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    (table,),
+                ).fetchone()
+            )
     clone = layer.clone()
     if clone is None or not clone.isValid():
         raise RuntimeError(tr("Nie można przygotować warstwy do zapisu obrazu."))
@@ -517,54 +563,118 @@ def write_rendered_raster(
         "masked_out": 0,
         "timing_seconds": {"gate": 0.0, "render": 0.0, "mask": 0.0, "write": 0.0},
     }
+    initialization = None
+    destination_database = Path(database)
     try:
-        with gdal.ExceptionMgr():
-            dataset = gdal.GetDriverByName("GPKG").Create(
-                str(database),
-                width,
-                height,
-                4,
-                gdal.GDT_Byte,
-                options=[
-                    "RASTER_TABLE=" + table,
-                    "APPEND_SUBDATASET=YES",
-                    "BLOCKSIZE=256",
-                ]
-                + PNG_OPTIONS,
+        if ledger_path is not None and not destination_database.exists():
+            # A crash during GDAL's multi-step header creation must not publish
+            # a malformed checkpoint. No downloads begin until this file moves.
+            initialization = TemporaryDirectory(
+                prefix=".raster-init-", dir=destination_database.parent
             )
-            dataset.SetProjection(project.crs().toWkt(Qgis.CrsWktVariant.Wkt2_2019))
-            dataset.SetGeoTransform([x0, finest, 0, y0, 0, -finest])
-            dataset.FlushCache()
-            dataset = None
+            database = Path(initialization.name) / "raster.gpkg"
+        with (
+            gdal.ExceptionMgr(),
+            gdal.config_options(
+                {"OGR_SQLITE_SYNCHRONOUS": "FULL", "OGR_SQLITE_JOURNAL": "DELETE"}
+                if ledger_path is not None
+                else {}
+            ),
+        ):
+            if existing:
+                dataset = gdal.OpenEx(
+                    str(database),
+                    gdal.OF_RASTER,
+                    open_options=[
+                        f"TABLE={table}",
+                        f"ZOOM_LEVEL={levels[-1]['zoom']}",
+                        "BAND_COUNT=4",
+                    ],
+                )
+                if (
+                    dataset is None
+                    or dataset.RasterCount != 4
+                    or dataset.RasterXSize != width
+                    or dataset.RasterYSize != height
+                    or QgsCoordinateReferenceSystem(dataset.GetProjection())
+                    != project.crs()
+                    or any(
+                        not math.isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-9)
+                        for actual, expected in zip(
+                            dataset.GetGeoTransform(), [x0, finest, 0, y0, 0, -finest]
+                        )
+                    )
+                ):
+                    raise ValueError(
+                        tr(
+                            "Nie można wznowić kafelków: "
+                            "niezgodny obszar, CRS lub siatka."
+                        )
+                    )
+                dataset = None
+            else:
+                dataset = gdal.GetDriverByName("GPKG").Create(
+                    str(database),
+                    width,
+                    height,
+                    4,
+                    gdal.GDT_Byte,
+                    options=[
+                        "RASTER_TABLE=" + table,
+                        "APPEND_SUBDATASET=YES",
+                        "BLOCKSIZE=256",
+                    ]
+                    + PNG_OPTIONS,
+                )
+                dataset.SetProjection(project.crs().toWkt(Qgis.CrsWktVariant.Wkt2_2019))
+                dataset.SetGeoTransform([x0, finest, 0, y0, 0, -finest])
+                dataset.FlushCache()
+                dataset = None
             # GDAL creates standard empty tile matrices. Specify only requested zooms,
             # including coarse zooms for tiny AOIs, without scanning a
             # huge empty raster.
             with closing(sqlite3.connect(database)) as connection:
-                with connection:
-                    connection.execute(
-                        "DELETE FROM gpkg_tile_matrix WHERE table_name=?", (table,)
+                matrices = [
+                    (
+                        table,
+                        level["zoom"],
+                        math.ceil(width * finest / (TILE_SIZE * level["resolution"])),
+                        math.ceil(height * finest / (TILE_SIZE * level["resolution"])),
+                        TILE_SIZE,
+                        TILE_SIZE,
+                        level["resolution"],
+                        level["resolution"],
                     )
-                    connection.executemany(
-                        "INSERT INTO gpkg_tile_matrix VALUES (?,?,?,?,?,?,?,?)",
-                        [
-                            (
-                                table,
-                                level["zoom"],
-                                math.ceil(
-                                    width * finest / (TILE_SIZE * level["resolution"])
-                                ),
-                                math.ceil(
-                                    height * finest / (TILE_SIZE * level["resolution"])
-                                ),
-                                TILE_SIZE,
-                                TILE_SIZE,
-                                level["resolution"],
-                                level["resolution"],
+                    for level in levels
+                ]
+                if existing:
+                    actual = connection.execute(
+                        "SELECT * FROM gpkg_tile_matrix WHERE table_name=? "
+                        "ORDER BY zoom_level",
+                        (table,),
+                    ).fetchall()
+                    if actual != sorted(matrices, key=lambda value: value[1]):
+                        raise ValueError(
+                            tr(
+                                "Nie można wznowić kafelków: "
+                                "niezgodny obszar, CRS lub siatka."
                             )
-                            for level in levels
-                        ],
-                    )
-            if gate:
+                        )
+                with connection:
+                    if not existing:
+                        connection.execute(
+                            "DELETE FROM gpkg_tile_matrix WHERE table_name=?", (table,)
+                        )
+                        connection.executemany(
+                            "INSERT INTO gpkg_tile_matrix VALUES (?,?,?,?,?,?,?,?)",
+                            matrices,
+                        )
+            if initialization is not None:
+                Path(database).replace(destination_database)
+                database = destination_database
+                initialization.cleanup()
+                initialization = None
+            if ledger_path is not None:
                 _capture_adaptive(
                     clone,
                     project,
@@ -578,6 +688,9 @@ def write_rendered_raster(
                     progress,
                     stats,
                     gate,
+                    ledger_path,
+                    resume,
+                    legacy_retries,
                 )
             else:
                 failures_in_a_row = 0
@@ -716,6 +829,7 @@ def write_rendered_raster(
                 raise RuntimeError(
                     tr("Kontrola liczby zapisanych kafelków nie powiodła się.")
                 )
+            _empty_zoom_overviews(database, table, stats)
             for level in levels:
                 dataset = gdal.OpenEx(
                     str(database),
@@ -732,6 +846,8 @@ def write_rendered_raster(
     finally:
         dataset = None
         clone = None
+        if initialization is not None:
+            initialization.cleanup()
     failed = any(level["failed"] for level in stats["levels"]) or stats["stopped_early"]
     blank = any(level["nonempty"] == 0 for level in stats["levels"])
     status = (
@@ -795,19 +911,74 @@ def _capture_adaptive(
     progress,
     stats,
     gate,
+    ledger_path=None,
+    resume=False,
+    legacy_retries=False,
 ):
-    """Three bounded passes; never redraw durable successes or empty tiles."""
-    ledger_path = gate.folder / (table + ".tiles.sqlite")
+    """Persist whole tiles; legacy fixed mode owns its retries inside rendering."""
+    legacy_retries = legacy_retries and gate is None
+    attempt_limit = 1 if legacy_retries else 3
+    ledger_path = (
+        Path(ledger_path)
+        if ledger_path is not None
+        else gate.folder / (table + ".tiles.sqlite")
+    )
+    if ledger_path.exists() and not resume:
+        raise ValueError(
+            tr("Nie można wznowić kafelków: brak poprawnego rejestru lub danych.")
+        )
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = json.dumps(
+        {
+            "version": 1,
+            "table": table,
+            "mask": mask.asWkt(),
+            "crs": project.crs().toWkt(),
+            "levels": levels,
+            "origin": [x0, y0],
+        },
+        sort_keys=True,
+    )
+    quoted_table = '"' + table.replace('"', '""') + '"'
     deferred = False
     stop_http_status = None
-    with closing(sqlite3.connect(ledger_path)) as ledger:
+    stopped_early = False
+    failures_in_a_row = 0
+    with (
+        closing(sqlite3.connect(ledger_path)) as ledger,
+        closing(sqlite3.connect(database)) as stored,
+    ):
+        ledger.execute("PRAGMA journal_mode=DELETE")
+        ledger.execute("PRAGMA synchronous=FULL")
+        if ledger.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise ValueError(
+                tr("Nie można wznowić kafelków: brak poprawnego rejestru lub danych.")
+            )
+        ledger.execute("CREATE TABLE IF NOT EXISTS capture (settings TEXT NOT NULL)")
+        recorded = ledger.execute("SELECT settings FROM capture").fetchall()
+        if recorded:
+            if recorded != [(settings,)]:
+                raise ValueError(
+                    tr("Nie można wznowić kafelków: niezgodny obszar, CRS lub siatka.")
+                )
+        else:
+            if stored.execute(f"SELECT count(*) FROM {quoted_table}").fetchone()[0]:
+                raise ValueError(
+                    tr(
+                        "Nie można wznowić kafelków: "
+                        "brak poprawnego rejestru lub danych."
+                    )
+                )
+            ledger.execute("INSERT INTO capture VALUES (?)", (settings,))
         ledger.execute(
             (
-                "CREATE TABLE tiles (zoom INTEGER, col INTEGER, row "
+                "CREATE TABLE IF NOT EXISTS tiles (zoom INTEGER, col INTEGER, row "
                 "INTEGER, status TEXT, attempts INTEGER DEFAULT 0, "
-                'reason TEXT DEFAULT "", PRIMARY KEY(zoom,col,row))'
+                'reason TEXT DEFAULT "", total_attempts INTEGER DEFAULT 0, '
+                'png_sha256 TEXT DEFAULT "", PRIMARY KEY(zoom,col,row))'
             )
         )
+        ledger.commit()
         for level in reversed(levels):
             zoom, resolution = level["zoom"], level["resolution"]
             progress(tr("Przygotowanie rejestru kafelków: zoom {0}…").format(zoom))
@@ -824,7 +995,7 @@ def _capture_adaptive(
                 if cancelled():
                     raise InterruptedError()
                 ledger.execute(
-                    "INSERT INTO tiles(zoom,col,row,status) VALUES(?,?,?,?)",
+                    "INSERT OR IGNORE INTO tiles(zoom,col,row,status) VALUES(?,?,?,?)",
                     (zoom, column, row, "pending"),
                 )
                 if index % 500 == 0:
@@ -833,12 +1004,122 @@ def _capture_adaptive(
                         tr("Przygotowanie rejestru kafelków: zoom {0}…").format(zoom)
                     )
             ledger.commit()
-        stats.update(repair_attempts=0, repaired=0, deferred=False)
-        for round_number in range(3):
-            if deferred or stop_http_status:
+        stats.update(
+            repair_attempts=0,
+            repaired=0,
+            deferred=False,
+            resumed_tiles=0,
+            previous_attempts=ledger.execute(
+                "SELECT coalesce(sum(total_attempts),0) FROM tiles"
+            ).fetchone()[0],
+        )
+        if resume:
+            progress(tr("Sprawdzanie zachowanych kafelków…"))
+            updated = time.monotonic()
+            # SQLite recovers interrupted transactions when opening each file.
+            # Reconcile both durable stores before opening GDAL for any writes.
+            with stored:
+                for zoom, column, row, payload in stored.execute(
+                    "SELECT zoom_level,tile_column,tile_row,tile_data "
+                    f"FROM {quoted_table}"
+                ):
+                    if cancelled():
+                        raise InterruptedError()
+                    if time.monotonic() - updated > 0.1:
+                        progress(tr("Sprawdzanie zachowanych kafelków…"))
+                        updated = time.monotonic()
+                    old = ledger.execute(
+                        "SELECT status,png_sha256 FROM tiles "
+                        "WHERE zoom=? AND col=? AND row=?",
+                        (zoom, column, row),
+                    ).fetchone()
+                    checksum = sha256(payload).hexdigest()
+                    if old and old[0] == "saved" and old[1] == checksum:
+                        continue
+                    image = QImage.fromData(payload, "PNG")
+                    valid = not image.isNull() and image.size() == QSize(
+                        TILE_SIZE, TILE_SIZE
+                    )
+                    transparent = False
+                    if valid:
+                        rgba = image.convertToFormat(QImage.Format_RGBA8888)
+                        transparent = not any(
+                            rgba.constBits().asstring(rgba.sizeInBytes())[3::4]
+                        )
+                    if transparent and (old is None or old[0] == "empty"):
+                        # Empty-zoom overview markers are derived, not downloads.
+                        stored.execute(
+                            f"DELETE FROM {quoted_table} "
+                            "WHERE zoom_level=? AND tile_column=? AND tile_row=?",
+                            (zoom, column, row),
+                        )
+                    elif (
+                        old
+                        and old[0] not in ("saved", "empty")
+                        and valid
+                        and not transparent
+                    ):
+                        # A kill between PNG commit and ledger commit left a
+                        # complete native PNG; retain it instead of redrawing it.
+                        ledger.execute(
+                            'UPDATE tiles SET status="saved",png_sha256=?, '
+                            "attempts=attempts+1,total_attempts=total_attempts+1 "
+                            "WHERE zoom=? AND col=? AND row=?",
+                            (checksum, zoom, column, row),
+                        )
+                    elif old:
+                        stored.execute(
+                            f"DELETE FROM {quoted_table} "
+                            "WHERE zoom_level=? AND tile_column=? AND tile_row=?",
+                            (zoom, column, row),
+                        )
+                        ledger.execute(
+                            'UPDATE tiles SET status="pending",png_sha256="" '
+                            "WHERE zoom=? AND col=? AND row=?",
+                            (zoom, column, row),
+                        )
+                    else:
+                        raise ValueError(
+                            tr(
+                                "Nie można wznowić kafelków: "
+                                "niezgodny obszar, CRS lub siatka."
+                            )
+                        )
+            # A ledger success without its PNG must be requested again.
+            for zoom, column, row in ledger.execute(
+                'SELECT zoom,col,row FROM tiles WHERE status="saved"'
+            ):
+                if cancelled():
+                    raise InterruptedError()
+                if time.monotonic() - updated > 0.1:
+                    progress(tr("Sprawdzanie zachowanych kafelków…"))
+                    updated = time.monotonic()
+                if not stored.execute(
+                    f"SELECT 1 FROM {quoted_table} "
+                    "WHERE zoom_level=? AND tile_column=? AND tile_row=?",
+                    (zoom, column, row),
+                ).fetchone():
+                    ledger.execute(
+                        'UPDATE tiles SET status="pending",png_sha256="" '
+                        "WHERE zoom=? AND col=? AND row=?",
+                        (zoom, column, row),
+                    )
+            ledger.execute(
+                'UPDATE tiles SET status="pending",attempts=0,reason="" '
+                'WHERE status NOT IN ("saved","empty")'
+            )
+            ledger.commit()
+            stats["resumed_tiles"] = ledger.execute(
+                'SELECT count(*) FROM tiles WHERE status IN ("saved","empty")'
+            ).fetchone()[0]
+            stats["previous_attempts"] = ledger.execute(
+                "SELECT coalesce(sum(total_attempts),0) FROM tiles"
+            ).fetchone()[0]
+        for round_number in range(attempt_limit):
+            if deferred or stop_http_status or stopped_early:
                 break
             for level in reversed(levels):
-                if deferred or stop_http_status:
+                if deferred or stop_http_status or stopped_early:
                     break
                 zoom, resolution = level["zoom"], level["resolution"]
                 total, pending = ledger.execute(
@@ -869,10 +1150,10 @@ def _capture_adaptive(
                 cursor = ledger.execute(
                     (
                         "SELECT col,row,attempts FROM tiles WHERE zoom=? AND "
-                        'status IN ("pending","retry") AND attempts < 3 ORDER BY '
+                        'status IN ("pending","retry") AND attempts < ? ORDER BY '
                         "col,row"
                     ),
-                    (zoom,),
+                    (zoom, attempt_limit),
                 )
                 try:
                     for column, row, attempts in cursor:
@@ -881,8 +1162,9 @@ def _capture_adaptive(
                         # An overload probe retries this
                         # missing tile before requesting a new
                         # one.
-                        while attempts < 3:
-                            gate.retrying = attempts > 0
+                        while attempts < attempt_limit:
+                            if gate:
+                                gate.retrying = attempts > 0
                             progress(
                                 tr(
                                     "{0} — zoom {1}, fragment {2}/{3}, próba {4}"
@@ -915,6 +1197,7 @@ def _capture_adaptive(
                                     progress,
                                     stats,
                                     gate,
+                                    retry_managed=not legacy_retries,
                                 )
                                 image = _mask_image(
                                     image, mask, bounds, resolution, stats
@@ -942,16 +1225,34 @@ def _capture_adaptive(
                                         buf_band_space=1,
                                     )
                                 dataset.FlushCache()
+                                checksum = ""
+                                if not empty:
+                                    written = stored.execute(
+                                        f"SELECT tile_data FROM {quoted_table} "
+                                        "WHERE zoom_level=? AND tile_column=? "
+                                        "AND tile_row=?",
+                                        (zoom, column, row),
+                                    ).fetchone()
+                                    if written is None:
+                                        raise RuntimeError(
+                                            tr(
+                                                "Kontrola liczby zapisanych "
+                                                "kafelków nie powiodła się."
+                                            )
+                                        )
+                                    checksum = sha256(written[0]).hexdigest()
                                 attempts += 1
                                 if attempts > 1:
                                     stats["repair_attempts"] += 1
                                     stats["repaired"] += 1
                                 ledger.execute(
-                                    'UPDATE tiles SET status=?,attempts=?,reason="" '
+                                    'UPDATE tiles SET status=?,attempts=?,reason="",'
+                                    "total_attempts=total_attempts+1,png_sha256=? "
                                     "WHERE zoom=? AND col=? AND row=?",
                                     (
                                         "empty" if empty else "saved",
                                         attempts,
+                                        checksum,
                                         zoom,
                                         column,
                                         row,
@@ -961,7 +1262,9 @@ def _capture_adaptive(
                                 stats["timing_seconds"]["write"] += (
                                     time.monotonic() - started
                                 )
-                                gate.outcome()
+                                if gate:
+                                    gate.outcome()
+                                failures_in_a_row = 0
                                 break
                             except HostDeferred:
                                 deferred = True
@@ -978,9 +1281,10 @@ def _capture_adaptive(
                                     404,
                                     407,
                                 )
-                                retryable = not permanent and attempts < 3
+                                retryable = not permanent and attempts < attempt_limit
                                 ledger.execute(
-                                    "UPDATE tiles SET status=?,attempts=?,reason=? "
+                                    "UPDATE tiles SET status=?,attempts=?,reason=?,"
+                                    "total_attempts=total_attempts+1 "
                                     "WHERE zoom=? AND col=? AND row=?",
                                     (
                                         "retry" if retryable else "failed",
@@ -992,11 +1296,21 @@ def _capture_adaptive(
                                     ),
                                 )
                                 ledger.commit()
-                                gate.outcome(error, recoverable=retryable)
+                                if gate:
+                                    gate.outcome(error, recoverable=retryable)
                                 if getattr(error, "status", None) == 407:
                                     # Repeating the same rejected proxy credentials
                                     # cannot retrieve another tile of this map.
                                     stop_http_status = 407
+                                    break
+                                if legacy_retries:
+                                    failures_in_a_row += 1
+                                    if (
+                                        str(error).startswith("[HTTP 429]")
+                                        or getattr(error, "status", None) == 429
+                                    ):
+                                        stop_http_status = 429
+                                    stopped_early = failures_in_a_row >= 5
                                     break
                                 if layer.dataProvider() is not None:
                                     layer.dataProvider().reloadData()
@@ -1007,7 +1321,7 @@ def _capture_adaptive(
                                 if not overload or not retryable:
                                     break
                         completed += 1
-                        if deferred or stop_http_status:
+                        if deferred or stop_http_status or stopped_early:
                             break
                 finally:
                     cursor.close()
@@ -1037,7 +1351,9 @@ def _capture_adaptive(
                     )
                 )
         stats["deferred"] = deferred
-        stats["stopped_early"] = deferred or stop_http_status is not None
+        stats["stopped_early"] = (
+            deferred or stop_http_status is not None or stopped_early
+        )
         if stop_http_status is not None:
             stats["stop_http_status"] = stop_http_status
         for level in reversed(levels):
@@ -1049,7 +1365,8 @@ def _capture_adaptive(
                 )
             )
             attempted = ledger.execute(
-                "SELECT coalesce(sum(attempts),0) FROM tiles WHERE zoom=?", (zoom,)
+                "SELECT coalesce(sum(total_attempts),0) FROM tiles WHERE zoom=?",
+                (zoom,),
             ).fetchone()[0]
             stats["levels"].append(
                 {
@@ -1237,11 +1554,45 @@ def write_raster_data(
                         converted.FlushCache()
                         converted = None
                 output = None
-            output = gdal.Open(str(target))
+            output = gdal.Open(str(target), gdal.GA_Update)
             if output.RasterXSize != right - left or output.RasterYSize != bottom - top:
                 raise RuntimeError(
                     tr("Kontrola wymiarów lokalnego rastra nie powiodła się.")
                 )
+            overview_factors = []
+            factor = 2
+            while (
+                math.ceil(max(output.RasterXSize, output.RasterYSize) / factor)
+                >= TILE_SIZE
+            ):
+                overview_factors.append(factor)
+                factor *= 2
+
+            def overview_progress(fraction, message, data):
+                progress(
+                    tr("{0}: budowanie piramid rastra {1:.0%}").format(
+                        layer.name(), fraction
+                    )
+                )
+                return not cancelled()
+
+            if overview_factors:
+                try:
+                    with gdal.config_options(
+                        {"COMPRESS_OVERVIEW": "DEFLATE", "ZLEVEL_OVERVIEW": "9"}
+                    ):
+                        result = output.BuildOverviews(
+                            "NEAREST", overview_factors, callback=overview_progress
+                        )
+                except RuntimeError:
+                    if cancelled():
+                        raise InterruptedError(tr("Przerwano zapis rastra.")) from None
+                    raise
+                if cancelled():
+                    raise InterruptedError(tr("Przerwano zapis rastra."))
+                if result != 0:
+                    raise RuntimeError(tr("Nie udało się zbudować piramid rastra."))
+                output.FlushCache()
             return {
                 "status": "saved",
                 "method": "raster_data",
@@ -1249,6 +1600,7 @@ def write_raster_data(
                 "local_source": f"./zasoby/{target.name}",
                 "local_provider": "gdal",
                 "alpha_band": band_count,
+                "overview_factors": overview_factors,
                 "reason": tr(
                     "Zapisano oryginalne wartości rastra i maskę w bezstratnym GeoTIFF."
                 ),
@@ -1260,3 +1612,65 @@ def write_raster_data(
         raise
     finally:
         source = output = None
+
+
+def _empty_zoom_overviews(database, table, stats):
+    """Expose successfully empty zooms to GDAL without resampling another zoom."""
+    previous = set(stats.get("empty_zoom_placeholders", []))
+    placeholders = []
+    empty_zooms = [
+        level["zoom"]
+        for level in stats["levels"]
+        if level["nonempty"] == 0
+        and level["empty"] > 0
+        and level["failed"] == 0
+        and not level.get("pending", 0)
+        and level.get("total", level["empty"]) == level["empty"]
+    ]
+    if empty_zooms:
+        with closing(sqlite3.connect(database)) as connection:
+            missing = []
+            for zoom in empty_zooms:
+                exists = connection.execute(
+                    f'SELECT 1 FROM "{table}" WHERE zoom_level=? LIMIT 1', (zoom,)
+                ).fetchone()
+                if not exists:
+                    missing.append(zoom)
+                elif zoom in previous:
+                    placeholders.append(zoom)
+            if missing:
+                # MEM -> PNG uses native GDAL encoding and keeps exact RGBA/DEFLATE9.
+                with TemporaryDirectory(
+                    prefix=".empty-zoom-", dir=Path(database).parent
+                ) as temporary:
+                    path = Path(temporary) / "empty.png"
+                    image = gdal.GetDriverByName("MEM").Create(
+                        "", TILE_SIZE, TILE_SIZE, 4, gdal.GDT_Byte
+                    )
+                    for band, interpretation in enumerate(
+                        (
+                            gdal.GCI_RedBand,
+                            gdal.GCI_GreenBand,
+                            gdal.GCI_BlueBand,
+                            gdal.GCI_AlphaBand,
+                        ),
+                        1,
+                    ):
+                        image.GetRasterBand(band).SetColorInterpretation(interpretation)
+                    png = gdal.GetDriverByName("PNG").CreateCopy(
+                        str(path), image, options=["ZLEVEL=9"]
+                    )
+                    png.FlushCache()
+                    png = image = None
+                    payload = path.read_bytes()
+                with connection:
+                    for zoom in missing:
+                        connection.execute(
+                            f'INSERT INTO "{table}" '
+                            "(zoom_level,tile_column,tile_row,tile_data) "
+                            "VALUES (?,0,0,?)",
+                            (zoom, payload),
+                        )
+                placeholders.extend(missing)
+    stats["empty_zoom_placeholders"] = sorted(placeholders)
+    return stats["empty_zoom_placeholders"]

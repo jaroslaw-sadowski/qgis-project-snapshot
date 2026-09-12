@@ -49,7 +49,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.2.0.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.4.1.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -122,7 +122,31 @@ Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
 Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
 procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
 przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md).
-Bieżące wydanie: [1.2.0](validation-1.2.0.md).
+Bieżące wydanie: [1.4.1](validation-1.4.1.md).
+
+## Kontrole adaptacji i budżetu Windows (1.3.0)
+
+Testy polityki muszą obejmować ponowną próbę wzrostu po 60 s zdrowych pełnych okien,
+brak wzrostu po samym upływie czasu przy niedostatecznym obciążeniu, porównanie
+z aktualną szybkością i cofnięcie dwóch słabych okien. Sprawdź wydłużanie kolejnych
+stabilizacji do 120/240/300 s, zerowanie zdrowego okresu po błędach oraz redukcję
+utrwalonego spadku ponad 25% również bez wcześniejszej próby zwiększenia limitu.
+HTTP 429/503, trzy kolejne timeouty lub 502/504 oraz Retry-After zachowują przerwy.
+Testy bramki odróżniają zwykłe błędy WMS od zdarzeń nadal wymagających ACK.
+
+Przypadki pamięci Windows powinny sprawdzać niski dostępny commit przy wolnym RAM,
+zachowanie działających map i ograniczenie nowych startów, powrót budżetu po
+zwolnieniu pamięci oraz brak odczytu commit. Etykieta RAM nadal pokazuje fizyczną
+pamięć. Należy zachować rezerwę 768 MiB, szacunek z RSS, izolację QGIS i jednego
+zapisującego końcowy GeoPackage. Kod nie wymaga nowej zależności.
+
+Przy próbie ręcznej porównaj mały dozwolony eksport z 1.2.0 i 1.3.0 na tym samym
+obszarze, z tymi samymi warstwami i zoomami. Zachowaj oba końcowe logi i manifesty;
+sprawdź wyniki PNG i kompletność, a następnie czasy oraz powody zmian limitów.
+Wyniki różnych obszarów lub zoomów nie są porównaniem samej wersji algorytmu.
+Nie uznawaj poprawnych testów jednostkowych za pomiar przyspieszenia usług
+produkcyjnych ani pełny odbiór Windows. Wyniki wydania zapisuje
+[raport 1.3.0](validation-1.3.0.md).
 
 ## Kontrole diagnostyki wydajności (1.2.0)
 
@@ -165,6 +189,55 @@ poczekaj na wynik, a następnie zamknij QGIS. Otwórz oryginalny projekt, wybier
 sumy plików starego archiwum. `continuation` oraz `reused` w manifeście i zdarzenia
 `layer_reused` w diagnostyce pozwalają odróżnić skopiowane warstwy od nowego pobrania.
 Próba nie potwierdza odzyskiwania danych po awarii programu lub utracie zasilania.
+
+## Kontrole postępu kafelków i piramid (1.4.0)
+
+`tests/test_tile_resume.py` sprawdza zachowanie PNG i poprawnie pustych kafelków,
+uzgodnienie rejestru z GPKG, ponowienia braków z nowym budżetem oraz odrzucanie
+niezgodnego obszaru lub siatki. Natywne lokalne WMS mają zliczać faktyczne żądania:
+ukończone kafelki nie mogą być pobierane ponownie. Sumy PNG, liczniki logiczne
+i `PRAGMA integrity_check` potwierdzają zachowanie danych.
+
+`tests/test_overviews.py` porównuje pełną rozdzielczość UInt16 przed budową piramid
+i po niej, maskę oraz RGBA, anulowanie zapisu, niezależne kolory zoomów i natywny
+odczyt GDAL/QGIS przed scaleniem i po nim. Sprawdza też całkowicie pusty poziom
+oraz brak zastępowania brakujących kafelków obrazem z innego zoomu.
+`tests/test_snapshot_options.py` weryfikuje zapamiętanie widocznego folderu postępu,
+końcowej nazwy i wybór wznowienia po wyjątku, w obu językach.
+
+Test w nowym procesie musi też potwierdzić stabilność odcisku tego samego stylu
+po ponownym zapisie XML przez Qt. Odcisk v2 z 1.4.0 używa `ElementTree.canonicalize`;
+zmieniony styl lub źródło nadal mają blokować wznowienie. Dla archiwów 1.1–1.3
+pozostaje dawne porównanie surowego XML, które może odmówić po restarcie wskutek
+innej kolejności atrybutów. Test nie powinien omijać tej weryfikacji ani zastępować
+oryginału przebudowanym projektem offline.
+
+`tests/test_vector_archive.py` porównuje lokalny WFS z danymi, poprawnie pustą
+odpowiedzią oraz błędem OGC. Sprawdza odświeżenie cache i zachowanie edycji,
+pola pustego wyniku, geometrię obszaru i dodatkową kontrolę zerowego MSSQL.
+Atrapa połączenia MSSQL nie zastępuje rzeczywistej próby w sieci firmowej.
+Kontynuacja musi ponownie sprawdzić stare zerowe WFS/MSSQL bez
+`vector_read_version=2` oraz nowe zerowe MSSQL z `empty_read_verified=null`.
+Potwierdzony pusty odczyt nadal ma być zachowany bez ponowienia.
+
+W odrębnej próbie z małymi lokalnymi danymi przerwij proces QGIS po zapisaniu
+części mapy, następnie wznowienie uruchom w nowym procesie z oryginalnego projektu.
+Sprawdź folder `.in-progress-`, kopię wyników, liczbę żądań tylko dla braków,
+całe PNG i końcową integralność. Nie używaj do testu niezapisanej pracy użytkownika.
+Zakończenie procesu nie symuluje wszystkich skutków awarii dysku lub zasilania;
+nie jest podstawą deklaracji odporności na fizyczne uszkodzenie danych.
+Wyniki tego etapu zapisuje [raport 1.4.0](validation-1.4.0.md).
+
+## Kontrole nazw i układu folderu (1.4.1)
+
+Sprawdź sufiks `_nie-bylo-obiketow-w-zasiegu` tylko dla potwierdzonego pustego
+wektora, zachowanie pól i stylu oraz niezmienioną nazwę oryginału. Błąd, raster
+pusty i niepotwierdzone MSSQL nie mogą otrzymać tego oznaczenia.
+Testy okna mają odczytać nowy manifest przez `read_resume_manifest`, wyświetlić
+`output_name` i pamiętać cały folder archiwum. Kontynuacja musi przyjmować
+również starszy manifest z folderu głównego. Sprawdź nowy zapis w `diagnostyka/`
+i brak pustego `download-state/`, bez usuwania postępu potrzebnego do wznowienia.
+Wyniki i paczkę opisuje [raport 1.4.1](validation-1.4.1.md).
 
 ## Tłumaczenia
 

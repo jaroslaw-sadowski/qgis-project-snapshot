@@ -142,14 +142,16 @@ def benchmark(output):
                         for who in (resource.RUSAGE_SELF, resource.RUSAGE_CHILDREN)
                         for field in ("ru_utime", "ru_stime")
                     )
-                    manifest = json.loads((result / "manifest.json").read_text())
+                    manifest = json.loads(
+                        (result / "diagnostyka" / "manifest.json").read_text()
+                    )
                     records = [r for r in manifest["layers"] if r["id"] in selected]
                     if any(r["status"] != "saved" for r in records):
                         raise RuntimeError(
                             "Niekompletny wynik pomiaru: " + json.dumps(records)
                         )
                     digest = sha256()
-                    with closing(sqlite3.connect(result / "dane.gpkg")) as db:
+                    with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as db:
                         for record in sorted(records, key=lambda r: r["id"]):
                             for (png,) in db.execute(
                                 f'SELECT tile_data FROM "{record["table"]}" '

@@ -1004,8 +1004,8 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
       <translation>Pause</translation>
     </message>
     <message>
-      <source>Automat zaczyna od 1 zadania na serwer. Po udanych pobraniach stopniowo sprawdza wyższe limity, dopóki rośnie szybkość i komputer ma wolne zasoby. Pierwszeństwo mają serwery z mniejszą liczbą aktywnych procesów. Błędy lub brak przyspieszenia zmniejszają obciążenie. Łączny limit wynosi maks. 32 procesy i nie więcej niż dwukrotność liczby dostępnych CPU. Dalszy wzrost ogranicza wolny RAM. Limity dotyczą map, nie dokładnej liczby żądań HTTP.</source>
-      <translation>Starts with 1 task per server. Successful downloads lead to gradual trials of higher limits while speed improves and the computer has spare resources. Servers with fewer active processes get priority. Errors or no speed gain reduce the load. The total is capped at 32 processes, twice the available CPU count and available RAM. Limits apply to map tasks, not exact HTTP request counts.</translation>
+      <source>Automat zaczyna od 1 zadania na serwer. Po udanych pobraniach stopniowo sprawdza wyższe limity, dopóki rośnie szybkość i komputer ma wolne zasoby. Pierwszeństwo mają serwery z mniejszą liczbą aktywnych procesów. Błędy lub brak przyspieszenia zmniejszają obciążenie. Po okresie poprawnej pracy automat ponownie sprawdza wyższy limit. Łączny limit wynosi maks. 32 procesy i nie więcej niż dwukrotność liczby dostępnych CPU. Dalszy wzrost ogranicza wolny RAM. Limity dotyczą map, nie dokładnej liczby żądań HTTP.</source>
+      <translation>Starts with 1 task per server. Successful downloads lead to gradual trials of higher limits while speed improves and the computer has spare resources. Servers with fewer active processes get priority. Errors or no speed gain reduce the load. After a period of healthy responses, the automatic control tries a higher limit again. The total is capped at 32 processes, twice the available CPU count and available RAM. Limits apply to map tasks, not exact HTTP request counts.</translation>
     </message>
     <message>
       <source>Rozpoczynanie</source>
@@ -1026,6 +1026,14 @@ Only layers needing a retry are selected. Retrying creates a separate folder; ke
     <message>
       <source>Ograniczenie pamięci</source>
       <translation>Memory constraint</translation>
+    </message>
+    <message>
+      <source>Limit przydziału pamięci Windows</source>
+      <translation>Windows memory allocation limit</translation>
+    </message>
+    <message>
+      <source>Windows może jeszcze przydzielić {0:.1f} GiB pamięci. Ten limit może być niższy niż dostępny RAM.</source>
+      <translation>Windows can still allocate {0:.1f} GiB of memory. This limit may be lower than available RAM.</translation>
     </message>
     <message>
       <source>Uzupełnianie braków</source>
@@ -1220,6 +1228,92 @@ Continuation will copy completed layers and retry missing or partial layers in a
     <message>
       <source>&lt;p&gt;Kontynuacja: zachowano wcześniejsze dane {0} warstw. Pozostałe wyniki pochodzą z bieżącego pobierania.&lt;/p&gt;</source>
       <translation>&lt;p&gt;Continuation: retained earlier data for {0} layers. The remaining results come from the current download.&lt;/p&gt;</translation>
+    </message>
+    <message>
+      <source>To archiwum jest używane przez inny proces QGIS. Spróbuj później.</source>
+      <translation>This archive is in use by another QGIS process. Try again later.</translation>
+    </message>
+    <message>
+      <source>Stan pobierania do wznowienia: {0}</source>
+      <translation>Download progress for resuming: {0}</translation>
+    </message>
+    <message>
+      <source>Nie można wznowić kafelków: brak poprawnego rejestru lub danych.</source>
+      <translation>Cannot resume tiles: the tile record or data is missing or invalid.</translation>
+    </message>
+    <message>
+      <source>Nie można wznowić kafelków: niezgodny obszar, CRS lub siatka.</source>
+      <translation>Cannot resume tiles: the area, CRS or grid does not match.</translation>
+    </message>
+    <message>
+      <source>Sprawdzanie zachowanych kafelków…</source>
+      <translation>Checking retained tiles…</translation>
+    </message>
+    <message>
+      <source>{0}: budowanie piramid rastra {1:.0%}</source>
+      <translation>{0}: building raster overviews {1:.0%}</translation>
+    </message>
+    <message>
+      <source>Nie udało się zbudować piramid rastra.</source>
+      <translation>Could not build raster overviews.</translation>
+    </message>
+    <message>
+      <source>Zachowaj ukończone warstwy oraz poprawnie zapisane i puste kafelki map. Ponów tylko brakujące kafelki w nowym folderze, do trzech prób na kafelek. Nieukończony wektor zaczyna swoją warstwę od początku. Poprzedni folder pozostaje dostępny.</source>
+      <translation>Retain completed layers and successfully saved or empty map tiles. Retry only missing tiles in a new folder, with up to three attempts per tile. An unfinished vector layer starts that layer again. The previous folder remains available.</translation>
+    </message>
+    <message>
+      <source>W oryginalnym projekcie wskaż folder poprzedniego archiwum. Możesz też wskazać folder postępu po nieoczekiwanym zamknięciu QGIS. Obszar i zoomy zostaną odczytane z manifestu.</source>
+      <translation>In the original project, select the previous archive folder. You can also select the progress folder after an unexpected QGIS exit. The area and zoom levels will be read from the manifest.</translation>
+    </message>
+    <message>
+      <source>
+Kontynuacja zachowa ukończone warstwy i poprawne kafelki w nowym folderze. Brakujące kafelki otrzymają do trzech nowych prób pobrania. Poprawnie puste kafelki nie są pobierane ponownie.</source>
+      <translation>
+Continuation retains completed layers and successful tiles in a new folder. Missing tiles receive up to three new download attempts. Successfully empty tiles are not downloaded again.</translation>
+    </message>
+    <message>
+      <source>Zapisany postęp pozostaje w folderze:
+{0}
+Wybierz „Wznów archiwum…”, aby kontynuować.</source>
+      <translation>Saved progress remains in this folder:
+{0}
+Choose “Resume archive…” to continue.</translation>
+    </message>
+    <message>
+      <source>Obszar eksportu nie ma poprawnej geometrii lub układu współrzędnych.</source>
+      <translation>The export area has invalid geometry or an invalid coordinate reference system.</translation>
+    </message>
+    <message>
+      <source>Nie udało się potwierdzić pustego odczytu MSSQL.</source>
+      <translation>Could not confirm the empty MSSQL read.</translation>
+    </message>
+    <message>
+      <source>Przerywanie… Ukończone warstwy i zapisane kafelki map zostaną zachowane do wznowienia.</source>
+      <translation>Cancelling… Completed layers and saved map tiles will be retained for resuming.</translation>
+    </message>
+    <message>
+      <source>Przerwano zapis warstwy. Zapisane kafelki map pozostają dostępne do wznowienia.</source>
+      <translation>Layer export cancelled. Saved map tiles remain available for resuming.</translation>
+    </message>
+    <message>
+      <source>Zapisano pustą tabelę. MSSQL odpowiada, ale brak obiektów w obszarze wymaga sprawdzenia w oryginalnym projekcie.</source>
+      <translation>Saved an empty table. MSSQL responds, but the absence of features in the area needs checking in the original project.</translation>
+    </message>
+    <message>
+      <source>Nie udało się zapisać nazwy pustej warstwy.</source>
+      <translation>Could not save the empty layer name.</translation>
+    </message>
+    <message>
+      <source>Otwórz projekt .qgz w QGIS lub raport.html w przeglądarce. manifest.json i diagnostic.jsonl są w podfolderze diagnostyka. Do przenoszenia i wznowienia zachowaj cały folder archiwum.</source>
+      <translation>Open the .qgz project in QGIS or raport.html in a browser. manifest.json and diagnostic.jsonl are in the diagnostyka subfolder. Keep the entire archive folder for moving or resuming.</translation>
+    </message>
+    <message>
+      <source>&lt;/table&gt;&lt;details&gt;&lt;summary&gt;Szczegóły diagnostyczne&lt;/summary&gt;&lt;pre&gt;</source>
+      <translation>&lt;/table&gt;&lt;details&gt;&lt;summary&gt;Diagnostic details&lt;/summary&gt;&lt;pre&gt;</translation>
+    </message>
+    <message>
+      <source>&lt;p&gt;Otwórz &lt;a href="{0}"&gt;projekt .qgz&lt;/a&gt; w QGIS. Folder &lt;b&gt;dane&lt;/b&gt; zawiera GeoPackage i pliki przyspieszające wyświetlanie. Folder &lt;b&gt;zasoby&lt;/b&gt; zawiera dodatkowe pliki projektu, jeśli były potrzebne. Folder &lt;b&gt;diagnostyka&lt;/b&gt; przechowuje szczegółowy raport techniczny, log i postęp do wznowienia. Zachowaj i przenoś cały folder archiwum.&lt;/p&gt;</source>
+      <translation>&lt;p&gt;Open the &lt;a href="{0}"&gt;.qgz project&lt;/a&gt; in QGIS. The &lt;b&gt;dane&lt;/b&gt; folder contains the GeoPackage and files that help display it faster. The &lt;b&gt;zasoby&lt;/b&gt; folder contains additional project files, if needed. The &lt;b&gt;diagnostyka&lt;/b&gt; folder stores the detailed technical report, log and progress for resuming. Keep and move the entire archive folder.&lt;/p&gt;</translation>
     </message>
   </context>
 </TS>

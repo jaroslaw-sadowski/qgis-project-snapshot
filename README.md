@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-Polski · [English](README.en.md) · Wersja **1.2.0**
+Polski · [English](README.en.md) · Wersja **1.4.1**
 
 ## Co to jest i co robi
 
@@ -27,7 +27,7 @@ i uwierzytelnianie, wymagają sprawdzenia na własnym stanowisku.
 
 ## Jak zainstalować
 
-1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.2.0.zip`**.
+1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.4.1.zip`**.
    Użyj instalacyjnego ZIP-a wtyczki, nie ZIP-a całego repozytorium.
 2. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
 3. Wskaż paczkę i zainstaluj wtyczkę. Przy aktualizacji uruchom ponownie QGIS.
@@ -51,30 +51,60 @@ Nie wszystkie fonty, formularze i wyrażenia da się przenieść automatycznie.
 Data archiwum oznacza czas pobierania, nie jednoczesny stan wszystkich źródeł.
 Archiwum i raport mogą zawierać dane poufne — sprawdź je przed udostępnieniem.
 
+Do pracy otwieraj **projekt `.qgz`**, a do sprawdzenia wyniku **`raport.html`**.
+`dane/` zawiera GeoPackage i pliki przyspieszające jego odczyt,
+`zasoby/` potrzebne zasoby, a `diagnostyka/` manifest,
+log i ewentualny postęp do wznowienia. Tych plików nie trzeba otwierać ręcznie.
+Przenoś cały folder razem; nie usuwaj jego zawartości przed wznowieniem.
+
+Potwierdzone puste warstwy wektorowe w kopii projektu otrzymują końcówkę
+**`_nie-bylo-obiketow-w-zasiegu`**. Nadal zawierają pola i styl, ale zero obiektów.
+Oryginalne nazwy pozostają bez zmian; błąd lub niepotwierdzony pusty odczyt MSSQL
+nie otrzymuje tej końcówki.
+
 ## Jak kontynuować archiwum
 
 Po zakończeniu lub anulowaniu pobierania wybierz **Kontynuuj to archiwum**.
 Po ponownym uruchomieniu QGIS otwórz oryginalny projekt, wybierz
 **Wznów archiwum…** i wskaż cały folder poprzedniego wyniku.
 
-Wtyczka sprawdzi zapisane pliki i utworzy nowy folder: skopiuje ukończone warstwy
-oraz zasoby i ponowi brakujące lub częściowe warstwy. Puste zoomy nadal wymagają
-sprawdzenia, ale nie są automatycznie pobierane ponownie. Nieukończona warstwa
-zaczyna od początku; jeśli ponowienie nie zakończy się poprawnie, wcześniejszy
-obraz częściowy pozostaje w wyniku. Poprzedni folder pozostaje bez zmian.
+Wtyczka sprawdzi zapisane pliki i utworzy nowy folder. Zachowa ukończone warstwy,
+zasoby oraz poprawnie zapisane i puste kafelki map. Pobierze tylko brakujące kafelki,
+z nowym limitem do trzech prób na kafelek. Nieukończony wektor zacznie swoją warstwę
+od początku. Poprzedni folder pozostaje dostępny.
+Starsze zerowe wyniki WFS/MSSQL oraz niepotwierdzone puste odczyty MSSQL są
+sprawdzane ponownie; poprawnie pusty wynik nadal jest prawidłowy.
+
+Od 1.4.0 postęp map jest zapisywany na bieżąco. Po nieoczekiwanym zamknięciu QGIS
+użyj **Wznów archiwum…** i wskaż folder z nazwą zawierającą `.in-progress-`.
+Okno podpowiada ostatni zachowany folder; wybór nadal należy do użytkownika.
+Puste zoomy wymagają porównania ze źródłem, ale poprawnie puste kafelki nie są
+pobierane ponownie.
 
 Potrzebny jest cały folder archiwum i miejsce na jego kopię; sam raport lub JSON
 nie wystarczy. Kontynuacja używa poprzedniego obszaru i zoomów. Zmienione źródła,
-style lub niezapisane edycje wymagają nowego archiwum. Dla archiwów 1.0.0 wtyczka
-nie potwierdzi zgodności źródeł i stylów — użyj tego samego oryginalnego projektu.
-Wznawianie wymaga zapisanego wyniku; nie odzyskuje eksportu po awarii lub utracie zasilania.
+style lub niezapisane edycje wymagają nowego archiwum. Archiwa sprzed 1.4.0 zachowują ukończone warstwy,
+ale nieukończone mapy bez rejestru kafelków pobierają od początku warstwy.
+Dla archiwów 1.0.0 wtyczka nie potwierdzi zgodności źródeł i stylów — użyj tego
+samego oryginalnego projektu.
+Przed planowanym zamknięciem użyj **Przerwij** i poczekaj na zapis. Odzyskiwanie
+korzysta z zachowanych danych; nie naprawi plików uszkodzonych przez dysk lub awarię zasilania.
+
+## Szybszy odczyt rastrów
+
+Archiwalne GeoTIFF-y otrzymują piramidy ułatwiające wyświetlanie przy oddaleniu.
+Mapy zachowują osobno pobrane poziomy szczegółowości i ich style, także prawidłowo
+puste poziomy. Piramidy nie uzupełniają braków obrazem z innej skali.
 
 ## Automatyczne pobieranie równoległe
 
 Wtyczka pobiera mapy w osobnych procesach QGIS. Zaczyna od jednego zadania
 na serwer i stopniowo zwiększa ich liczbę, uwzględniając wolny RAM, procesor,
 szybkość pobierania i odpowiedzi serwera. Przy błędach ogranicza obciążenie
-lub robi przerwę. Nie trzeba ręcznie ustawiać liczby procesów.
+lub robi przerwę. Po okresie poprawnej pracy ponownie sprawdza, czy więcej zadań
+przyspieszy pobieranie; utrwalony spadek szybkości może obniżyć limit. W Windows
+uwzględnia też dostępny limit przydzielania pamięci. Nie trzeba ręcznie ustawiać
+liczby procesów.
 
 Okno pokazuje aktywne zadania i limity. **Warstwy w kolejce** to warstwy czekające
 na pobranie z serwera w tym samym wierszu. Automat pomaga przyspieszyć eksport,
@@ -86,7 +116,8 @@ aktywnego QGIS. Kontynuacja nie zmienia zasad automatycznego obciążania serwer
 Od wersji 1.2.0 wtyczka automatycznie zapisuje w `diagnostic.jsonl` pomiary CPU,
 pamięci, operacji odczytu i zapisu oraz pracy kolejek i serwerów. Pomiary komputera
 powstają co około 5 sekund, również podczas oczekiwania na pobranie. Log pozostaje
-lokalnie w folderze archiwum; wtyczka nie wysyła go automatycznie.
+lokalnie; od 1.4.1 jest w podfolderze **`diagnostyka/`**, razem z `manifest.json`.
+Wtyczka nie wysyła tych plików automatycznie.
 
 Do typowej analizy wydajności zwykle wystarczy **`diagnostic.jsonl`**. Dołącz
 `manifest.json`, gdy trzeba wskazać warstwy po nazwie lub sprawdzić szczegóły braków.

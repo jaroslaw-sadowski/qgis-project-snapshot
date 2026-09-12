@@ -39,7 +39,7 @@ class PolicyTests(unittest.TestCase):
         p.evaluate(45, False)
         self.assertEqual(p.limit, 3)
 
-    def test_two_bad_windows_revert_and_freeze(self):
+    def test_two_bad_windows_revert_and_wait_for_stabilization(self):
         p = HostPolicy("test")
         p.success(20, 15, 0)
         p.evaluate(15, True)
@@ -120,7 +120,7 @@ class PolicyTests(unittest.TestCase):
         other.failure(403, None, 1, other.generation, probe=True)
         self.assertEqual(other.limit, 3)
 
-    def test_successful_probe_unblocks_but_never_restarts_growth(self):
+    def test_successful_probe_requires_healthy_windows_before_growth_resumes(self):
         p = HostPolicy("a", limit=3)
         p.failure(503, 1, 0, 0)
         p.success(1, 1, p.generation, probe=True)
@@ -128,8 +128,92 @@ class PolicyTests(unittest.TestCase):
         p.success(100, 16, p.generation)
         p.evaluate(16, True)
         self.assertEqual(p.limit, 2)
-        p.failure(429, 0, 17, p.generation)
+        for now in (31, 46, 61):
+            p.success(100, now, p.generation)
+            p.evaluate(now, True, active=p.limit)
+        self.assertEqual(p.limit, 3)
+        self.assertEqual(p.history[-1]["reason"], "reprobe")
+        p.failure(429, 0, 62, p.generation)
+        self.assertEqual(p.limit, 2)
+
+    def test_reprobe_uses_current_rate_and_backs_off_repeated_failed_trials(self):
+        p = HostPolicy("test")
+        now = 0
+
+        def window(count=20, backlog=True):
+            nonlocal now
+            now += 15
+            p.success(count, now, p.generation)
+            p.evaluate(now, backlog, active=p.limit)
+
+        window()
+        self.assertEqual(p.limit, 2)
+        for delay in (60, 120, 240, 300):
+            window()
+            window()
+            self.assertEqual(p.limit, 1)
+            self.assertTrue(p.frozen)
+            self.assertEqual(p.retry_seconds, delay)
+            for _ in range(int(delay / 15) - 1):
+                window()
+                self.assertEqual(p.limit, 1)
+            window()
+            self.assertEqual(p.limit, 2)
+            self.assertEqual(p.history[-1]["reason"], "reprobe")
+        # A recovered service really benefits from the new slot. An old peak
+        # from a different map must not prevent subsequent growth.
+        window(60)
+        self.assertEqual(p.limit, 3)
+        self.assertEqual(p.retry_seconds, 30)
+
+    def test_stable_limit_is_reduced_after_sustained_throughput_drop(self):
+        p = HostPolicy("test", limit=4, ceiling=4)
+        for now, count in ((15, 150), (30, 140), (45, 50), (60, 50)):
+            p.success(count, now, p.generation)
+            p.evaluate(now, False, active=p.limit)
+        self.assertEqual(p.limit, 3)
+        self.assertEqual(p.history[-1]["reason"], "throughput_drop")
+        self.assertTrue(p.frozen)
+
+    def test_single_slow_window_and_low_rate_at_one_do_not_lock_growth(self):
+        p = HostPolicy("test", limit=1, frozen=True, retry_seconds=60)
+        for now, count in ((15, 150), (30, 20), (45, 20), (60, 20)):
+            p.success(count, now, p.generation)
+            p.evaluate(now, True, active=1)
+        self.assertEqual(p.limit, 2)
+        q = HostPolicy("test", limit=4, ceiling=4)
+        for now, count in ((15, 150), (30, 20), (45, 150)):
+            q.success(count, now, q.generation)
+            q.evaluate(now, False, active=4)
+        self.assertEqual(q.limit, 4)
+        self.assertFalse(q.frozen)
+
+    def test_idle_time_errors_and_memory_pressure_cannot_unlock_reprobe(self):
+        p = HostPolicy("test", frozen=True, retry_seconds=60)
+        p.evaluate(600, True, active=0)
         self.assertEqual(p.limit, 1)
+        for now in (615, 630, 645):
+            p.success(100, now, p.generation)
+            p.evaluate(now, True, active=1)
+        p.failure("timeout", None, 650, p.generation)
+        p.success(100, 665, p.generation)
+        p.evaluate(665, True, active=1)
+        self.assertEqual(p.limit, 1)
+        for now in (680, 695, 710):
+            p.success(100, now, p.generation)
+            p.evaluate(now, True, active=1, memory_ok=False)
+        self.assertEqual(p.limit, 1)
+        p.success(100, 725, p.generation)
+        p.evaluate(725, True, active=1)
+        self.assertEqual(p.limit, 2)
+
+    def test_repeated_gateway_errors_reduce_and_pause_a_host(self):
+        p = HostPolicy("test", limit=4)
+        for index, code in enumerate((502, 504, 502)):
+            p.failure(code, None, index, p.generation)
+        self.assertEqual(p.limit, 3)
+        self.assertTrue(p.recovering)
+        self.assertEqual(p.until, 32)
 
     def test_timeouts_and_permanent_errors(self):
         p = HostPolicy("a", limit=4)
@@ -150,6 +234,24 @@ class PolicyTests(unittest.TestCase):
         p.failure(429, 301, 0, 0)
         self.assertTrue(p.blocked)
         self.assertEqual(p.until, 301)
+
+    def test_late_retry_after_restarts_pause_without_counting_an_old_probe(self):
+        p = HostPolicy("test", limit=4)
+        p.failure(503, 0, 0, 0)
+        p.success(1, 1, p.generation, probe=True)
+        previous_generation = p.generation
+        self.assertFalse(p.recovering)
+        p.failure(429, 120, 2, 0)
+        self.assertEqual(p.limit, 3)
+        self.assertTrue(p.recovering)
+        self.assertEqual(p.until, 122)
+        self.assertEqual(p.probe_failures, 0)
+        p.success(1, 3, previous_generation, probe=True)
+        self.assertTrue(p.recovering)
+        p.failure(503, 120, 4, previous_generation)
+        self.assertEqual(p.until, 124)
+        self.assertEqual(p.limit, 3)
+        self.assertEqual(p.probe_failures, 0)
 
     def test_memory_pressure_prevents_growth(self):
         p = HostPolicy("a")
@@ -242,6 +344,7 @@ class PolicyTests(unittest.TestCase):
         coordinator.worker_peak_memory = 0
         coordinator.reserved_growth = 0
         coordinator.coordinator_failed = False
+        coordinator.memory_growth_ok = True
         coordinator.cpu = 2
         coordinator.diagnostic = None
         with (
@@ -251,11 +354,11 @@ class PolicyTests(unittest.TestCase):
             ),
             patch(
                 "mbtiles_batch_exporter.parallel_archive.available_memory",
-                side_effect=[512 * 1024**2, 3 * 1024**3],
+                side_effect=[512 * 1024**2] * 2 + [3 * 1024**3] * 2,
             ) as memory,
         ):
             coordinator._coordinate()
-        self.assertEqual(memory.call_count, 2)
+        self.assertEqual(memory.call_count, 4)
         self.assertEqual(
             [r["memory_ok"] for r in coordinator.memory_history], [False, True]
         )
@@ -525,7 +628,9 @@ class AdaptiveWmsTests(unittest.TestCase):
                 adaptive=True,
                 **kwargs,
             )
-        return result, json.loads((result / "manifest.json").read_text())
+        return result, json.loads(
+            (result / "diagnostyka" / "manifest.json").read_text()
+        )
 
     def test_windows_control_lock_recovers_and_map_is_saved(self):
         from test_ipc import windows_lock
@@ -547,13 +652,14 @@ class AdaptiveWmsTests(unittest.TestCase):
         self.assertFalse(manifest["adaptive"]["coordinator_failed"])
         record = next(r for r in manifest["layers"] if r["id"] == layer.id())
         self.assertEqual(record["status"], "saved")
-        with closing(sqlite3.connect(folder / "dane.gpkg")) as db:
+        with closing(sqlite3.connect(folder / "dane" / "dane.gpkg")) as db:
             count = db.execute(f'SELECT COUNT(*) FROM "{record["table"]}"').fetchone()[
                 0
             ]
         self.assertGreater(count, 0)
         self.assertIn(
-            '"ipc_replace_recovered"', (folder / "diagnostic.jsonl").read_text()
+            '"ipc_replace_recovered"',
+            (folder / "diagnostyka" / "diagnostic.jsonl").read_text(),
         )
 
     def test_persistent_control_lock_reports_coordinator_for_queued_maps(self):
@@ -578,7 +684,10 @@ class AdaptiveWmsTests(unittest.TestCase):
             all(r["worker_error"]["stage"] == "coordinator" for r in selected)
         )
         self.assertFalse((folder / ".workers").exists())
-        self.assertIn('"ipc_replace_failed"', (folder / "diagnostic.jsonl").read_text())
+        self.assertIn(
+            '"ipc_replace_failed"',
+            (folder / "diagnostyka" / "diagnostic.jsonl").read_text(),
+        )
 
     def test_rate_limit_repairs_same_map_and_records_recovery(self):
         layer = self.add_map()

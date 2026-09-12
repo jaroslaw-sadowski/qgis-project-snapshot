@@ -81,11 +81,84 @@ class PerformanceResourceTests(unittest.TestCase):
         ):
             memory = performance_counters()["system_memory"]
             self.assertEqual(available_memory(), 1234 * 1024)
+            self.assertEqual(available_memory(include_commit=True), 1234 * 1024)
         self.assertEqual(memory["total_bytes"], 16 * 1024**3)
         self.assertEqual(memory["swap_total_bytes"], 0)
         self.assertEqual(memory["swap_free_bytes"], 0)
         self.assertIsNone(memory["commit_limit_bytes"])
         self.assertIsNone(memory["committed_as_bytes"])
+
+    def test_windows_low_commit_limits_budget_without_changing_reported_ram(self):
+        commit = [325 * 1024**2]
+        ram = 4 * 1024**3
+
+        def memory_status(output):
+            native = output._obj
+            self.assertEqual(native.length, 64)
+            native.available = ram
+            native.page_available = commit[0]
+            return 1
+
+        with (
+            patch("mbtiles_batch_exporter.resources.sys.platform", "win32"),
+            patch("mbtiles_batch_exporter.resources.ctypes.windll", create=True) as dll,
+        ):
+            dll.kernel32.GlobalMemoryStatusEx.side_effect = memory_status
+            for value, expected in (
+                (325 * 1024**2, 325 * 1024**2),
+                (0, 0),
+                (8 * 1024**3, ram),
+            ):
+                with self.subTest(commit=value):
+                    commit[0] = value
+                    self.assertEqual(available_memory(), ram)
+                    self.assertEqual(available_memory(include_commit=True), expected)
+
+    def test_unavailable_or_invalid_commit_keeps_physical_memory_budget(self):
+        memory = {"available_bytes": 4 * 1024**3}
+        with patch(
+            "mbtiles_batch_exporter.resources._system_memory", return_value=memory
+        ):
+            self.assertEqual(
+                available_memory(include_commit=True), memory["available_bytes"]
+            )
+            for value in (None, -1, True, "325", 3.5, float("nan"), float("inf")):
+                with self.subTest(commit=value):
+                    memory["process_commit_available_bytes"] = value
+                    self.assertEqual(
+                        available_memory(include_commit=True), memory["available_bytes"]
+                    )
+
+    def test_missing_physical_memory_does_not_use_commit_as_a_replacement(self):
+        for sample in (
+            None,
+            {},
+            {"process_commit_available_bytes": 8 * 1024**3},
+            {"available_bytes": None, "process_commit_available_bytes": 0},
+        ):
+            with (
+                self.subTest(sample=sample),
+                patch(
+                    "mbtiles_batch_exporter.resources._system_memory",
+                    return_value=sample,
+                ),
+            ):
+                self.assertIsNone(available_memory())
+                self.assertIsNone(available_memory(include_commit=True))
+
+    def test_linux_swap_and_overcommit_are_not_windows_commit_headroom(self):
+        with (
+            patch("mbtiles_batch_exporter.resources.sys.platform", "linux"),
+            patch(
+                "mbtiles_batch_exporter.resources.Path.read_text",
+                return_value=(
+                    "MemTotal: 16777216 kB\nMemAvailable: 4194304 kB\n"
+                    "SwapTotal: 0 kB\nSwapFree: 0 kB\nCommitLimit: 1048576 kB\n"
+                    "Committed_AS: 8388608 kB\n"
+                ),
+            ),
+        ):
+            self.assertEqual(available_memory(include_commit=True), 4 * 1024**3)
 
     def test_linux_io_preserves_large_counters_and_storage_semantics(self):
         with (

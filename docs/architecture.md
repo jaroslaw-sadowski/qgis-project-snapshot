@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (1.2.0)
+# Działanie i ograniczenia archiwizacji (1.4.1)
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
@@ -7,7 +7,7 @@ instalacji; dawny eksporter, jego okno i pomocniczy moduł zostały usunięte.
 
 ## Dane i odtworzenie projektu
 
-- Wektory: geometrie i atrybuty w osobnych tabelach jednego `dane.gpkg`,
+- Wektory: geometrie i atrybuty w osobnych tabelach jednego `dane/dane.gpkg`,
   z filtrami i niezapisanymi edycjami. Zachowujemy całe obiekty przecinające obszar.
 - Obrazy map WMS/WMTS/XYZ/ArcGIS: osobne tabele rastra tego samego GeoPackage,
   w CRS projektu, m.in. EPSG:2180. PNG RGBA, ZLEVEL=9, bez redukcji alfa i kolorów.
@@ -26,6 +26,45 @@ lub zależności są pakowane. Relacje mogą wskazywać obiekty spoza obszaru. P
 lokalne ścieżki nie dowodzą pełnej samodzielności; wymagany jest odbiór bez sieci.
 Data oznacza czas pobierania, nie jednoczesny stan wszystkich zewnętrznych źródeł.
 
+Od 1.4.0 `_write_vector` sprawdza poprawność geometrii obszaru i CRS przed
+odczytem. Dla WFS odświeża natywny cache tylko poza trybem edycji, aby zachować
+identyfikatory niezapisanych zmian. Po iteracji dostarcza oczekujące błędy Qt
+wyłącznie aktywnemu dostawcy, zanim uzna pusty wynik za poprawny. Odpowiedź OGC
+z błędem nie może zostać zakwalifikowana jako `Saved` z zerem obiektów.
+
+Przy zerowym odczycie MSSQL natywne połączenie dostawcy wykonuje `SELECT TOP(1)`
+dla tej samej tabeli i istniejącego filtra, aby sprawdzić dostęp do źródła.
+Błąd uniemożliwia potwierdzenie pustego wyniku. Znalezienie obiektu poza obszarem
+nie oznacza błędu: poprawny przestrzenny odczyt nadal może dać zero obiektów.
+Próba nie weryfikuje całego zapytania przestrzennego i nie zastępuje odbioru
+firmowej bazy. Diagnostyka podaje CRS, odświeżenie cache i stan próby
+`empty_source_probe`, bez URI, SQL, treści obiektów ani wyjątków z poświadczeniami.
+
+Nowe odczyty wektorów oznacza `vector_read_version=2`. Przy pustym MSSQL sama
+dostępność tabeli z obiektami nie potwierdza braku treści w wybranym obszarze:
+`empty_read_verified=null` zachowuje uwagę do porównania w oryginalnym projekcie.
+Kontynuacja ponawia takie zerowe odczyty oraz stare zerowe WFS/MSSQL bez v2,
+zamiast bezwarunkowo kopiować wcześniejszy `saved`. Potwierdzone puste odczyty
+pozostają prawidłowym wynikiem i nie wymagają ponownego pobrania.
+
+## Nazwy pustych wektorów i układ folderu (1.4.1)
+
+W kopii projektu `output_name` otrzymuje końcówkę `_nie-bylo-obiketow-w-zasiegu`
+wyłącznie dla `saved`, metody `vector`, `feature_count=0` i
+`empty_read_verified=true`. `name` nadal opisuje oryginalną warstwę; jej nazwa,
+ID i źródło nie są zmieniane w projekcie użytkownika. Sufiks nie obejmuje pustych
+obrazów, błędów ani niepotwierdzonego zerowego MSSQL. Raport i okno wyników pokazują
+nazwę kopii, zachowując informację o oryginale w manifeście.
+
+Pliki techniczne trafiają do `diagnostyka/`: `manifest.json`, `diagnostic.jsonl`
+oraz `download-state/`, jeśli jest potrzebny do kontynuacji. Pusty katalog postępu
+jest usuwany. Projekt `.qgz`, `raport.html`, `dane/` i potrzebne `zasoby/` pozostają
+w folderze głównym. `dane/dane.gpkg` przechowuje wektory i mapy; pliki AUX QGIS/GDAL
+pozostają obok niego, zachowując statystyki potrzebne do szybkiego odczytu.
+`resume_manifest_path(folder)` wybiera manifest z nowego
+podfolderu lub dawnej lokalizacji; okno nadal przyjmuje cały folder archiwum.
+Nie trzeba ręcznie przenosić plików starszego wyniku przed wznowieniem.
+
 ## Procesy i automat
 
 API `create_archive(..., adaptive=False)` zachowuje zgodny tryb stały. Okno używa
@@ -34,23 +73,50 @@ nie przekazujemy obiektów QGIS. Końcowy GeoPackage ma jednego zapisującego.
 Wektory, MSSQL, rastry źródłowe i usługi z authcfg pozostają w głównym QGIS.
 Mapy z głównej ścieżki korzystają ze wspólnej bramki hosta.
 
+Opis limitu trzech prób w instrukcji dotyczy standardowego trybu okna.
+Techniczne API `adaptive=False` zachowuje wcześniejszą naprawę: po trzech
+nieudanych próbach całego kafelka 256 px dzieli go na cztery fragmenty 128 px,
+z najwyżej trzema próbami każdego. Ostateczny błąd fragmentu kończy ten kafelek;
+rejestr nie powtarza dodatkowo całego cyklu. Dopiero złożony i utrwalony PNG
+rodzica jest sukcesem do wznowienia. HTTP 429 lub pięć kolejnych ostatecznych
+błędów kończy pobieranie mapy w tym trybie. Opcja nie jest dostępna w GUI.
+
 Start: jedno zadanie mapowe na host, niezależnie od ścieżek usług. Wzrost o jeden
 wymaga 15 s, 10 poprawnych kafelków, kolejki i wolnego budżetu. Dwa kolejne okna
-bez 10% poprawy przepustowości cofają limit i blokują wzrost. Pomiar wymaga
+bez 10% poprawy przepustowości cofają limit i czasowo wstrzymują wzrost. Pomiar wymaga
 15 s pomiaru z docelową liczbą gotowych map. Przerwy na rozruch kolejnej mapy
 są wyłączane z czasu i liczby sukcesów, lecz nie kasują wcześniejszych próbek.
 Gotowy proces między publikacją wyniku kafelka a zgodą na następny pozostaje
 gotowy do pomiaru. Rozruch i kończąca się kolejka nie świadczą o suficie serwera. Sufit hosta to min(32, 2 × CPU), dodatkowo
 ograniczany wspólnym budżetem RAM i liczbą map.
-HTTP 429/503 i trzy kolejne timeouty zmniejszają obciążenie oraz blokują wzrost.
+HTTP 429/503 natychmiast zmniejszają obciążenie i uruchamiają przerwę;
+timeouty oraz HTTP 502/504 robią to po trzech kolejnych niepowodzeniach.
 503 oznacza możliwe przeciążenie lub niedostępność, nie dowód jednej przyczyny.
+
+Od 1.3.0 `frozen` oznacza okres stabilizacji, a nie blokadę do końca eksportu.
+Po 60 s zdrowych pomiarów przy pełnym bieżącym obciążeniu automat może wykonać
+jedną próbę `limit + 1`. Zlicza wyłącznie ukończone okna po co najmniej 15 s
+i 10 sukcesów; sam upływ minuty, brak kolejki lub niepełne obsadzenie limitu nie
+uprawniają do wzrostu. Błędy zerują zdrowy okres. Nowa próba jest porównywana
+z ostatnim pomiarem przy niższym limicie, a nie z szybkością początku eksportu.
+Wymaga co najmniej 10% zysku; dwa kolejne słabe pełne okna cofają zwiększenie.
+Nieudane ponowne próby wydłużają stabilizację do 120, 240 i najwyżej 300 s.
+Po udanej próbie kolejny okres stabilizacji znów może zaczynać się od 60 s.
+
+Automat obserwuje też ustabilizowany limit. Spadek szybkości o ponad 25% względem
+szybkości odniesienia przez dwa pełne okna zmniejsza limit o jeden, co najmniej
+do jednego. Niepełne okna rozruchu nie są dowodem pogorszenia. Dzięki temu
+ograniczanie obciążenia nie wymaga wcześniejszej próby zwiększenia limitu.
 
 Przerwy: Retry-After w sekundach lub dacie HTTP, inaczej 30/60/120 s. Po przerwie
 jedna próba rzeczywiście brakującego kafelka; jej sukces odblokowuje host.
-Trzy nieudane próby powrotu, brak kafelków dopuszczonych do ponowienia albo
-wymagane oczekiwanie ponad pięć minut odkładają pozostałe dane. Inne hosty pracują.
+Trzy nieudane próby powrotu albo wymagane oczekiwanie ponad pięć minut odkładają
+pozostałe dane. Następna mapa może dostarczyć kafelek do próby powrotu, gdy obecna
+wyczerpała własne ponowienia. Spóźnione Retry-After obowiązuje również po udanej
+próbie: nowa generacja ponownie wstrzymuje host bez wielokrotnego obniżania limitu
+za tę samą falę błędów. Inne hosty pracują.
 
-Limit globalny: min(32, 2 × CPU, budżet RAM), co najmniej jeden; nieznany dostępny
+Limit globalny: min(32, 2 × CPU, budżet pamięci), co najmniej jeden; nieznany dostępny
 RAM ogranicza do dwóch. Po renderowaniu każdy proces publikuje bieżący i szczytowy
 RSS z natywnego systemu, co 5 s i przy zamknięciu. Koszt następnego procesu E to
 max(384 MiB, 1,5 × największy szczyt z tego eksportu), początkowo 1 GiB. Główny
@@ -62,9 +128,24 @@ co najmniej E. Pozostała pamięć daje miejsca dla nowych procesów po E bajtó
 Zachowujemy największy peak również po końcu procesu. Zwolniony RSS może być
 ponownie potrzebny; samo jego obniżenie nie usuwa rezerwy na wzrost.
 
+Od 1.3.0 `available_memory(include_commit=True)` dodatkowo ogranicza dostępne
+bajty do mniejszej z wartości fizycznego RAM i dostępnego commit na Windows.
+Ta wartość ogranicza starty; domyślne `available_memory()` oraz wyświetlany RAM
+nadal oznaczają pamięć fizyczną. Brak odczytu commit pozostawia wcześniejszą
+regułę RAM. Zachowano 768 MiB rezerwy i dotychczasowy szacunek procesu z RSS.
+To dodatkowy hamulec, nie ścisły model commit każdego procesu: RSS i commit
+mają różną semantykę, a inne aplikacje mogą zużyć dostępny zapas między próbkami.
+Niskie zasoby ograniczają nowe starty bez usuwania ukończonych danych czy zabijania
+działających map. Natywna diagnostyka pokazuje oddzielnie RAM i commit.
+
 Telemetria poprzedza próbkę RAM. `launch_slots` wyznacza skończony przydział startów
 na podstawie próbki co 5 s. Zakończenie mapy nie odnawia przydziału. Spadek poniżej
 rezerwy blokuje nowe procesy i wzrost, nie przerywa działających map. Przerwy
+na danym hoście mogą pozostawić uruchomione, lecz oczekujące procesy. Wzrost może
+ponownie dopuścić taki proces bez startu nowego, nawet bez kolejki nowych warstw;
+wymaga jednak pokrycia rezerwy 768 MiB oraz zapasu wzrostu wszystkich procesów
+(`memory_growth_ok`). Odłożone hosty kończą swoje oczekujące wyniki bez potrzeby
+wolnego slotu lub odzyskania pamięci. Przerwy
 serwerów także liczą się do aktywnych procesów. GUI pokazuje estymatę i rezerwę;
 historia pamięci oraz manifest zapisują też szczyt i zapas wzrostu. To heurystyka; nagły wzrost zużycia pamięci
 może przekroczyć zapas. Nie jest to gwarancja maksimum przepustowości ani RAM.
@@ -73,6 +154,10 @@ Koordynator co 0,5 s czyta atomowe statystyki i zapisuje polecenia protokołu 1:
 generacja, pozwolenie, przerwa/próba powrotu, potwierdzenie zdarzeń i ważność 2 s.
 Bramka sprawdza zgodę przed operacją renderowania i ponowieniem; oczekiwanie
 obsługuje anulowanie. Brak łączności z koordynatorem odkłada mapę.
+Od 1.3.0 zwykły błąd odpowiedzi WMS nie wymaga oczekiwania na osobne potwierdzenie
+każdego zdarzenia przed dalszą pracą. Zdarzenia nadal trafiają do koordynatora;
+obowiązkowy ACK pozostaje dla przeciążenia, timeoutu i próby powrotu hosta.
+Nie zmienia to ważności pozwolenia, przerw serwera ani limitu prób kafelka.
 
 Dyskowy rejestr SQLite zapisuje wynik i liczbę prób każdego kafelka, także poprawnie
 przezroczystego. Najwyżej trzy podejścia (początkowe + dwie rundy uzupełniania),
@@ -80,15 +165,16 @@ bez ponownego pobierania sukcesów i odtwarzania tabeli. Przy przeciążeniu lub
 pomijane są natychmiastowe ponowienia i podziały. HTTP 401/403/404/407 nie są ponawiane.
 Mapę scala się po zakończeniu pobierania/naprawy; gotowe PNG są kopiowane bez rekompresji.
 
-Anulowanie zachowuje ukończone, scalone warstwy, a nieukończone katalogi usuwa.
+Anulowanie zachowuje ukończone, scalone warstwy oraz trwały postęp map.
 Nieodpowiadające procesy są kończone po pięciu sekundach od anulowania.
-Zapisany wynik można kontynuować po ponownym otwarciu oryginalnego projektu;
-nie odzyskujemy katalogów roboczych po awarii i nie uczymy limitów między eksportami.
+Nieukończone wektory i nietrwałe pliki wykonawcze są usuwane. Wynik oraz zachowany
+folder postępu można kontynuować po ponownym otwarciu oryginalnego projektu.
+Limitów serwerów nie przenosimy między eksportami.
 
-## Kontynuacja ukończonych warstw (1.1.0)
+## Kontynuacja warstw i kafelków (1.4.0)
 
-`create_archive(..., resume_from=folder)` kontynuuje zapisany wynik, również
-po świadomym anulowaniu i ponownym uruchomieniu QGIS. `read_resume_manifest`
+`create_archive(..., resume_from=folder)` kontynuuje zapisany wynik lub folder
+postępu po anulowaniu albo nieoczekiwanym zakończeniu QGIS. `read_resume_manifest`
 odczytuje manifest 4 bez otwierania zarchiwizowanego projektu ani źródeł sieciowych.
 Okno bierze z manifestu obszar, zoomy i zestaw warstw. Potrzebny jest cały folder
 archiwum oraz oryginalny projekt; sam manifest nie zawiera danych do skopiowania.
@@ -101,22 +187,35 @@ surowego źródła ani poświadczeń. Zmiana odcisku blokuje kontynuację; hash 
 wybranych do kontynuacji również ją blokują. Zwykły nowy eksport nadal zachowuje
 bufor edycji bez zatwierdzania go w źródle.
 
+Od 1.4.0 rekord podaje `source_fingerprint_version=2`. Przed obliczeniem odcisku
+XML stylu przechodzi przez natywne `ElementTree.canonicalize`, dzięki czemu
+kolejność atrybutów zmieniana przez Qt między procesami nie blokuje wznowienia
+niezmienionego projektu po restarcie. Archiwa 1.1–1.3 są nadal sprawdzane dawną
+metodą: mogą odmówić kontynuacji po restarcie wskutek tej niestabilnej kolejności.
+Nie pomijamy weryfikacji takiego wyniku. Zarchiwizowany `.qgz` nie zastępuje
+oryginalnej definicji źródła i stylu, ponieważ zapis kopii zmienia ich odwołania.
+
 Archiwa 1.0.0 bez odcisku pozostają obsługiwane. Sprawdzamy ich ID, dostawców,
 obszar, CRS i zoomy, lecz nie deklarujemy zgodności źródeł i stylów. Ograniczenie
 jest zgłaszane w oknie i jako `continuation.source_settings_verified=false`.
 
-`_copy_resume` kopiuje `dane.gpkg` i pliki `zasoby/` do nowego prywatnego katalogu,
-sprawdzając SHA-256 podczas kopiowania. Odrzuca ścieżki poza archiwum oraz niezgodne
-odwołania lokalnych warstw. Poprzedni folder nie jest modyfikowany. Projekt wynikowy
-powstaje ze źródłowego projektu QGIS, z zachowaniem obecnych zasad zasobów i relacji.
-Nowy folder wymaga miejsca na kopię istniejących danych i nowe wyniki.
+`_copy_resume` kopiuje `dane/dane.gpkg`, pliki `zasoby/` i zachowany
+`diagnostyka/download-state/`
+do nowego folderu. Zakończone archiwum weryfikuje przez SHA-256. Dla checkpointu
+SQLite backup kopiuje spójny zatwierdzony stan baz, następnie sprawdza ich
+integralność. Odrzucane są ścieżki poza archiwum i niezgodne odwołania lokalne.
+Poprzedni wynik pozostaje dostępny. Projekt wynikowy powstaje ze źródłowego
+projektu QGIS, z zachowaniem obecnych zasad zasobów i relacji. Nowy folder wymaga
+miejsca na kopię istniejących danych i nowe wyniki.
 
 `saved` i `empty` z `local_source` są kopiowane z oznaczeniem `reused=true`,
 bez powtórnego odczytu dostawcy lub renderowania. Status `empty` nadal oznacza
-konieczność sprawdzenia przezroczystych zoomów. `failed`, `cancelled` i `partial`
-są ponawiane od początku warstwy. Jeżeli próba nie zakończy się jako `saved` lub
-`empty`, zachowujemy wcześniejszy zapisany obraz częściowy; rekord zawiera
-`reused=true` i `continuation_attempt` z wynikiem tej próby.
+konieczność sprawdzenia przezroczystych zoomów. Mapy `failed`, `cancelled` i `partial`
+z rejestrem 1.4.0 zachowują ukończone kafelki, również prawidłowo puste.
+Nieukończony wektor jest pobierany od początku tylko swojej warstwy.
+Starsze mapy bez rejestru powtarzają całą warstwę; jeżeli próba nie zakończy się
+jako `saved` lub `empty`, zachowujemy wcześniejszy obraz częściowy, z `reused=true`
+i `continuation_attempt` opisującym wynik tej próby.
 
 Sekcja `continuation` manifestu podaje czas rozpoczęcia poprzedniego archiwum,
 SHA-256 poprzedniego manifestu, liczbę użytych ponownie warstw i stan weryfikacji
@@ -124,10 +223,55 @@ ustawień źródeł. Zdarzenie diagnostyczne `layer_reused` opisuje skopiowaną 
 warstwę. `completed_in_workers` pomija rekordy użyte ponownie. Daty skopiowanych
 warstw pozostają datami ich wcześniejszego pobrania.
 
-To kontynuacja na poziomie warstw, bez zachowania rejestru niedokończonych kafelków
-między eksportami. Nie obsługuje awarii QGIS ani utraty zasilania przed zapisaniem
-archiwum. Algorytmy obciążenia, timeouty, jakość PNG i jeden zapisujący końcowy
-GeoPackage pozostają bez zmian.
+Eksport od początku używa widocznego katalogu `nazwa.in-progress-losowy`.
+Atomowy trwały `diagnostyka/manifest.json` z `checkpoint=true` jest zapisywany przed
+pobieraniem i po ukończeniu warstw. `checkpoint_created` przekazuje jego folder
+oknu, które zapisuje go w `QgsSettings` i podpowiada przy następnym wyborze
+wznowienia. Po poprawnym zakończeniu folder otrzymuje końcową nazwę, a ustawienie
+jest aktualizowane. Natywny `QLockFile` blokuje równoczesne wznowienie danych
+używanych przez działający proces. Pliki wykonawcze procesu i migawka źródła nie
+są wymagane do wznowienia; odtwarza je oryginalny projekt.
+
+Każda mapa ma prywatny `diagnostyka/download-state/layer_<hash>/raster.gpkg`
+i `tiles.sqlite`.
+Rejestr sprawdza obszar, CRS, siatkę i poziomy. Po wznowieniu uzgadnia zatwierdzone
+PNG z zapisanymi wynikami oraz ich SHA-256; rozróżnia poprawnie puste kafelki od
+brakujących. Udane zapisy oraz puste wyniki nie są ponawiane. Pozostałe kafelki
+otrzymują nowy budżet do trzech prób, przy zachowaniu historii liczby podejść.
+Rejestr i PNG korzystają z zatwierdzonych transakcji SQLite; obraz jest utrwalany
+przed potwierdzeniem sukcesu w rejestrze. Nie wymaga to własnego formatu obrazów
+ani nowej zależności. Cache ukończonej mapy jest usuwany dopiero po utrwaleniu
+scalonej warstwy i manifestu. Awaria pomiędzy tymi etapami może wymagać ponownego
+lokalnego scalenia, bez pobrania ukończonych kafelków.
+
+Odzyskiwanie wymaga zachowanych czytelnych plików; nie gwarantuje naprawy danych
+po uszkodzeniu nośnika lub awarii zasilania. Algorytmy obciążenia, timeouty,
+PNG RGBA `ZLEVEL=9` i jeden zapisujący końcowy GeoPackage pozostają bez zmian.
+
+## Piramidy rastrów (1.4.0)
+
+`write_raster_data` buduje natywne wewnętrzne piramidy GeoTIFF przez
+`BuildOverviews("NEAREST", factors)`, z kompresją DEFLATE poziom 9. Czynniki 2, 4,
+8 itd. kończą się, gdy większy wymiar poziomu spadłby poniżej 256 pikseli.
+Pełna rozdzielczość zachowuje wartości danych, kanał alfa lub maskę; piramidy nie
+zastępują danych źródłowych. Callback GDAL obsługuje postęp i anulowanie.
+
+Mapy GPKG nadal renderują każdy wybrany zoom niezależnie. GDAL pomija w odczycie
+zoom bez ani jednego fizycznego PNG, nawet gdy istnieje wpis `gpkg_tile_matrix`.
+Po pełnym poprawnie pustym odczycie zoomu `_empty_zoom_overviews` zapisuje jeden
+przezroczysty PNG RGBA w jego macierzy. Lista `empty_zoom_placeholders` odróżnia
+te znaczniki od treści; logiczny `tile_count` nadal liczy wyłącznie niepuste
+kafelki. Zoom z błędami lub oczekiwaniem nie dostaje znacznika. Przy wznowieniu
+znaczniki są usuwane przed uzgodnieniem rejestru i odtwarzane po zakończeniu.
+Dzięki temu poprawnie puste poziomy są widoczne w natywnych piramidach GDAL/QGIS,
+także po scaleniu. Nie wywołujemy `BuildOverviews` na mapach: zmieniłoby to style
+zależne od skali. Brakujące kafelki nie są wypełniane obrazem z innego zoomu.
+
+Lokalne testy QGIS 3.40/GDAL 3.12 potwierdzają natywny odczyt poziomów przed
+scaleniem i po nim, odrębne kolory stylów oraz zachowanie pełnej przezroczystości
+pustego poziomu. Dwa całkowicie puste zoomy oznaczają dwa fizyczne znaczniki PNG,
+lecz nadal `status=empty` i `tile_count=0`. To dostępność piramid do odczytu,
+nie dowód kompletności źródłowej usługi ani pomiar przyspieszenia dużego projektu.
 
 ## Proxy i diagnostyka
 
@@ -316,9 +460,10 @@ nierozpoznane; nie analizujemy treści zapytania. To diagnostyka, nie walidator
 kompletności WFS. Nie traktuj kontekstu warstwy w GUI jako dowodu pochodzenia
 każdego żądania, jeśli inne zadania QGIS pracują równocześnie.
 
-_write_vector otrzymuje opcjonalną diagnostykę. Liczniki pochodzą z istniejącej
-iteracji, bez dodatkowego odczytu źródła. Stan iteratora logujemy przed jego
-zamknięciem; read_complete opisuje odczyt, a stage/writer_error osobno zapis.
+_write_vector otrzymuje opcjonalną diagnostykę. Liczniki obiektów pochodzą
+z istniejącej iteracji; dodatkowa kontrola pustego MSSQL od 1.4.0 została opisana
+wyżej. Stan iteratora logujemy przed jego zamknięciem; read_complete opisuje odczyt,
+a stage/writer_error osobno zapis.
 
 ## Kolejka, pamięć i timeouty (0.9.4)
 

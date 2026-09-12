@@ -36,8 +36,16 @@ Ponytail jest zaleceniem, nie bezwzględnym wymogiem; poprawność i dane mają 
   Każdy zoom renderuj osobno, według rzeczywistego kształtu obszaru.
 - Wektory zapisuj jako dane z atrybutami i niezapisanymi edycjami, dopiero przy błędzie
   stosuj obraz zastępczy i wyraźnie odnotuj utratę danych w raporcie.
+- Potwierdzony pusty wektor oznaczaj w nazwie wynikowej dokładnie dopiskiem
+  `_nie-bylo-obiketow-w-zasiegu`. Błąd, niepotwierdzone zero i obraz zastępczy
+  nie spełniają tego warunku. Nie zmieniaj nazwy w oryginalnym projekcie.
 - Pustego obrazu ani częściowego pobrania nie uznawaj bezwarunkowo za sukces.
-  Anulowanie ma zachowywać ukończone wyniki i usuwać niepełne prywatne pliki.
+  Anulowanie i awaria mają zachowywać ukończone wyniki oraz trwały rejestr i dane
+  kafelków w `download-state`, także z niedokończonych warstw. Usuwaj wyłącznie
+  niepełny zapis końcowej warstwy i pliki robocze procesów, nie dane do wznowienia.
+- Projekt i raport pozostawiaj w głównym folderze archiwum, GeoPackage razem
+  z pomocniczymi AUX w `dane/`, manifest, log i stan kafelków w `diagnostyka/`.
+  Zachowuj odczyt starszego układu przy wznowieniu. Nie usuwaj potrzebnej diagnostyki.
 - Nie deklaruj pełnej samodzielności projektu na podstawie samych lokalnych ścieżek.
   Kod formularzy, wyrażenia, zasoby i relacje mogą wymagać ręcznego odbioru.
 - Proxy pobieraj z aktywnego QGIS. Poświadczenia procesów przekazuj w pamięci,

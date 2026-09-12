@@ -167,7 +167,7 @@ class FourHostWmsTests(unittest.TestCase):
                 zoom_min=17,
                 zoom_max=17,
             )
-        manifest = json.loads((result / "manifest.json").read_text())
+        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
         records = [r for r in manifest["layers"] if r["id"] in selected]
         self.assertEqual(len(records), 8)
         self.assertTrue(all(r["status"] == "saved" for r in records))

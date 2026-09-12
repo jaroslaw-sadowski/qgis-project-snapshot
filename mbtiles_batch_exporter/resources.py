@@ -107,10 +107,15 @@ def _system_memory():
     return None
 
 
-def available_memory():
-    """Currently available bytes, or None when the platform cannot report them."""
+def available_memory(*, include_commit=False):
+    """Available RAM, optionally bounded by Windows process commit headroom."""
     memory = _system_memory()
-    return memory.get("available_bytes") if memory is not None else None
+    available = memory.get("available_bytes") if memory is not None else None
+    if include_commit and available is not None:
+        commit = memory.get("process_commit_available_bytes")
+        if isinstance(commit, int) and not isinstance(commit, bool) and commit >= 0:
+            return min(available, commit)
+    return available
 
 
 def process_memory():

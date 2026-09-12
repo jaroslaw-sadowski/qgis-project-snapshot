@@ -128,10 +128,12 @@ class ProxyTests(unittest.TestCase):
                 adaptive=True,
                 server_activity=rows.extend,
             )
-        manifest = json.loads((folder / "manifest.json").read_text())
+        manifest = json.loads((folder / "diagnostyka" / "manifest.json").read_text())
         self.diagnostic_events = [
             json.loads(line)
-            for line in (folder / "diagnostic.jsonl").read_text().splitlines()
+            for line in (folder / "diagnostyka" / "diagnostic.jsonl")
+            .read_text()
+            .splitlines()
         ]
         self.assertFalse((folder / ".workers").exists())
         for path in folder.rglob("*"):

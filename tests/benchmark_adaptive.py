@@ -49,9 +49,11 @@ def benchmark(output):
                     adaptive=adaptive,
                     server_activity=lambda values: activity.extend(values),
                 )
-            manifest = json.loads((result / "manifest.json").read_text())
+            manifest = json.loads(
+                (result / "diagnostyka" / "manifest.json").read_text()
+            )
             images = {}
-            with closing(sqlite3.connect(result / "dane.gpkg")) as db:
+            with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as db:
                 for record in manifest["layers"]:
                     if record["status"] == "excluded":
                         continue

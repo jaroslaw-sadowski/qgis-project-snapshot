@@ -94,7 +94,9 @@ class ArchiveTests(unittest.TestCase):
         )
 
     def manifest(self, result):
-        return json.loads((result / "manifest.json").read_text(encoding="utf-8"))
+        return json.loads(
+            (result / "diagnostyka" / "manifest.json").read_text(encoding="utf-8")
+        )
 
     def test_vectors_keep_attributes_edits_styles_tree_and_source_state(self):
         second = self.add_points("Ta sama nazwa", [(6, 6)])
@@ -122,7 +124,9 @@ class ArchiveTests(unittest.TestCase):
         manifest = self.manifest(result)
         events = [
             json.loads(line)
-            for line in (result / "diagnostic.jsonl").read_text().splitlines()
+            for line in (result / "diagnostyka" / "diagnostic.jsonl")
+            .read_text()
+            .splitlines()
         ]
         self.assertEqual(events[-1]["event"], "archive_end")
         self.assertTrue(any(e["event"] == "vector_read" for e in events))
@@ -205,7 +209,7 @@ class ArchiveTests(unittest.TestCase):
         result = self.archive([line.id()])
         row = next(r for r in self.manifest(result)["layers"] if r["id"] == line.id())
         local = QgsVectorLayer(
-            f"{result}/dane.gpkg|layername={row['table']}", "local", "ogr"
+            f"{result}/dane/dane.gpkg|layername={row['table']}", "local", "ogr"
         )
         self.assertEqual(
             next(local.getFeatures()).geometry().asWkt(), feature.geometry().asWkt()
@@ -266,7 +270,7 @@ class ArchiveTests(unittest.TestCase):
         statuses = {r["id"]: r["status"] for r in manifest["layers"]}
         self.assertEqual(statuses[self.layer.id()], "saved")
         self.assertEqual(statuses[second.id()], "cancelled")
-        with closing(sqlite3.connect(result / "dane.gpkg")) as database:
+        with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as database:
             self.assertEqual(
                 database.execute(
                     "SELECT count(*) FROM gpkg_contents WHERE data_type='features'"
@@ -284,12 +288,12 @@ class ArchiveTests(unittest.TestCase):
 
         result = self.archive(cancelled=cancelled)
         self.assertEqual(self.manifest(result)["layers"][0]["status"], "cancelled")
-        with closing(sqlite3.connect(result / "dane.gpkg")) as database:
+        with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as database:
             self.assertEqual(
                 database.execute("SELECT count(*) FROM gpkg_contents").fetchone()[0], 0
             )
 
-    def test_snapshot_failure_restores_state_and_removes_staging(self):
+    def test_snapshot_failure_restores_project_and_keeps_recovery_manifest(self):
         self.project.setDirty(True)
         with patch.object(QgsProject, "write", return_value=False):
             with self.assertRaisesRegex(RuntimeError, "kopii projektu"):
@@ -298,17 +302,25 @@ class ArchiveTests(unittest.TestCase):
         self.assertTrue(self.project.isDirty())
         self.assertEqual(self.original.read_bytes(), self.original_bytes)
         self.assertFalse(list(self.folder.glob(".archive-*")))
-        logs = list(self.folder.glob("*_archive_*.diagnostic.jsonl"))
+        checkpoints = list(self.folder.glob("*_archive_*.in-progress-*"))
+        self.assertEqual(len(checkpoints), 1)
+        logs = list((checkpoints[0] / "diagnostyka").glob("diagnostic.jsonl"))
         self.assertEqual(len(logs), 1)
         self.assertIn('"archive_exception"', logs[0].read_text())
-        self.assertFalse([p for p in self.folder.glob("*_archive_*") if p.is_dir()])
+        self.assertFalse((checkpoints[0] / "_source.qgz").exists())
+        self.assertFalse((checkpoints[0] / ".workers").exists())
+        manifest = self.manifest(checkpoints[0])
+        self.assertTrue(manifest["checkpoint"])
+        self.assertEqual(manifest["layers"][0]["status"], "pending")
 
     def test_repeated_archive_never_overwrites_previous(self):
         first = self.archive()
-        contents = (first / "manifest.json").read_bytes()
+        contents = (first / "diagnostyka" / "manifest.json").read_bytes()
         second = self.archive()
         self.assertNotEqual(first, second)
-        self.assertEqual((first / "manifest.json").read_bytes(), contents)
+        self.assertEqual(
+            (first / "diagnostyka" / "manifest.json").read_bytes(), contents
+        )
 
     def test_failed_vector_write_falls_back_to_image_and_continues(self):
         second = self.add_points("Druga", [(3, 3)])
@@ -332,7 +344,7 @@ class ArchiveTests(unittest.TestCase):
         )
         self.assertEqual(first["method"], "raster_render")
         self.assertIn("nie zachowuje obiektów", first["reason"])
-        with closing(sqlite3.connect(result / "dane.gpkg")) as database:
+        with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as database:
             self.assertEqual(
                 database.execute("SELECT count(*) FROM gpkg_contents").fetchone()[0], 2
             )

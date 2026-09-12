@@ -50,7 +50,7 @@ class DynamicWorkerTests(unittest.TestCase):
             ),
             patch(
                 "mbtiles_batch_exporter.parallel_archive.available_memory",
-                side_effect=lambda: memory[0],
+                side_effect=lambda **kwargs: memory[0],
             ),
         ):
             workers = RasterWorkers(
@@ -139,7 +139,7 @@ class DynamicWorkerTests(unittest.TestCase):
             ),
             patch(
                 "mbtiles_batch_exporter.parallel_archive.available_memory",
-                side_effect=lambda: memory[0],
+                side_effect=lambda **kwargs: memory[0],
             ),
         ):
             workers = RasterWorkers(

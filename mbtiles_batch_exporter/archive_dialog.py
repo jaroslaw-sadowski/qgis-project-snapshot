@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 # -*- coding: utf-8 -*-
-import json
 import math
 import time
 from html import escape
@@ -13,6 +12,7 @@ from qgis.core import (
     QgsGeometry,
     QgsLayerTreeGroup,
     QgsProject,
+    QgsSettings,
     QgsUnitTypes,
     QgsVectorLayer,
     QgsWkbTypes,
@@ -39,7 +39,12 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from .archive import create_archive, polygon_area, read_resume_manifest
+from .archive import (
+    create_archive,
+    polygon_area,
+    read_resume_manifest,
+    resume_manifest_path,
+)
 from .i18n import tr
 from .raster_archive import TILE_SIZE, zoom_levels
 
@@ -52,6 +57,7 @@ class ArchiveDialog(QDialog):
         self._running = False
         self._cancelled = False
         self._result = None
+        self._checkpoint = None
         self._started_at = None
         self._finished_at = None
         self._last_message = None
@@ -159,7 +165,9 @@ class ArchiveDialog(QDialog):
                     "pobraniach stopniowo sprawdza wyższe limity, dopóki rośnie "
                     "szybkość i komputer ma wolne zasoby. Pierwszeństwo mają "
                     "serwery z mniejszą liczbą aktywnych procesów. Błędy lub "
-                    "brak przyspieszenia zmniejszają obciążenie. Łączny limit "
+                    "brak przyspieszenia zmniejszają obciążenie. Po okresie "
+                    "poprawnej pracy automat ponownie sprawdza wyższy limit. "
+                    "Łączny limit "
                     "wynosi maks. 32 procesy i nie więcej niż dwukrotność "
                     "liczby dostępnych CPU. Dalszy wzrost ogranicza wolny RAM. "
                     "Limity dotyczą map, nie dokładnej liczby żądań HTTP."
@@ -283,9 +291,11 @@ class ArchiveDialog(QDialog):
         self.retry_button.setToolTip(
             tr(
                 (
-                    "Skopiuj ukończone warstwy do nowego folderu i ponów brakujące "
-                    "lub częściowe. Przerwane warstwy są pobierane od początku. "
-                    "Poprzednie archiwum pozostaje dostępne."
+                    "Zachowaj ukończone warstwy oraz poprawnie zapisane i puste "
+                    "kafelki map. Ponów tylko brakujące kafelki w nowym folderze, "
+                    "do trzech prób na kafelek. "
+                    "Nieukończony wektor zaczyna swoją warstwę od początku. "
+                    "Poprzedni folder pozostaje dostępny."
                 )
             )
         )
@@ -311,6 +321,7 @@ class ArchiveDialog(QDialog):
         self.resume_button.setToolTip(
             tr(
                 "W oryginalnym projekcie wskaż folder poprzedniego archiwum. "
+                "Możesz też wskazać folder postępu po nieoczekiwanym zamknięciu QGIS. "
                 "Obszar i zoomy zostaną odczytane z manifestu."
             )
         )
@@ -497,6 +508,7 @@ class ArchiveDialog(QDialog):
             "stable": tr("Ustalony limit"),
             "cooldown": tr("Przerwa serwera"),
             "memory": tr("Ograniczenie pamięci"),
+            "commit": tr("Limit przydziału pamięci Windows"),
             "repairing": tr("Uzupełnianie braków"),
             "deferred": tr("Odłożono do późniejszej próby"),
         }
@@ -555,6 +567,16 @@ class ArchiveDialog(QDialog):
                 if rows[0].get("worker_memory_measured")
                 else tr("szacunek początkowy"),
             )
+            budget_memory = rows[0].get("memory_budget_available")
+            if (
+                isinstance(memory, (int, float))
+                and isinstance(budget_memory, (int, float))
+                and 0 <= budget_memory < memory
+            ):
+                explanation += " " + tr(
+                    "Windows może jeszcze przydzielić {0:.1f} GiB pamięci. "
+                    "Ten limit może być niższy niż dostępny RAM."
+                ).format(budget_memory / 1024**3)
             self.resource_hint.setToolTip(explanation)
             self.ram_hint.setToolTip(explanation)
 
@@ -703,11 +725,27 @@ class ArchiveDialog(QDialog):
         return ids
 
     def _resume_archive(self):
+        previous = QgsSettings().value(
+            "mbtiles_batch_exporter/last_resume_folder", "", type=str
+        )
+        initial = (
+            previous
+            if previous and resume_manifest_path(previous).is_file()
+            else self.output_edit.text()
+        )
         folder = QFileDialog.getExistingDirectory(
-            self, tr("Wybierz folder archiwum do wznowienia"), self.output_edit.text()
+            self, tr("Wybierz folder archiwum do wznowienia"), initial
         )
         if folder:
             self.start(resume_from=Path(folder))
+
+    def _remember_checkpoint(self, folder):
+        self._checkpoint = Path(folder)
+        settings = QgsSettings()
+        settings.setValue(
+            "mbtiles_batch_exporter/last_resume_folder", str(self._checkpoint)
+        )
+        settings.sync()
 
     def start(self, *, resume_from=None):
         if self._running:
@@ -737,6 +775,7 @@ class ArchiveDialog(QDialog):
         self._running = True
         self._cancelled = False
         self._result = None
+        self._checkpoint = None
         self._started_at = time.monotonic()
         self._finished_at = None
         self._last_message = None
@@ -819,12 +858,12 @@ class ArchiveDialog(QDialog):
                 layer_status=self._layer_status,
                 worker_activity=self._worker_activity,
                 resume_from=resume_from,
+                checkpoint_created=self._remember_checkpoint,
             )
+            self._remember_checkpoint(self._result)
             self._finished_at = time.monotonic()
             self.timer.stop()
-            manifest = json.loads(
-                (self._result / "manifest.json").read_text(encoding="utf-8")
-            )
+            manifest = read_resume_manifest(self._result)
             saved = sum(record["status"] == "saved" for record in manifest["layers"])
             missing = sum(
                 record["status"] in ("failed", "cancelled")
@@ -881,6 +920,17 @@ class ArchiveDialog(QDialog):
             self.progress.setFormat(tr("Błąd — nie utworzono archiwum"))
             QMessageBox.warning(self, tr("Archiwizacja"), self.status.text())
         finally:
+            if (
+                self._result is None
+                and self._checkpoint is not None
+                and resume_manifest_path(self._checkpoint).is_file()
+            ):
+                message = tr(
+                    "Zapisany postęp pozostaje w folderze:\n{0}\n"
+                    "Wybierz „Wznów archiwum…”, aby kontynuować."
+                ).format(self._checkpoint)
+                self.status.setText(self.status.text() + "\n" + message)
+                self._append_log(message)
             self._running = False
             self.timer.stop()
             self._update_elapsed()
@@ -899,10 +949,12 @@ class ArchiveDialog(QDialog):
         }
         lines = [self.status.text(), ""]
         for record in manifest["layers"]:
-            if record["id"] in retry:
-                lines.append(
-                    f"{record['name']} — {record.get('reason') or record['status']}"
-                )
+            name = record.get("output_name", record["name"])
+            item = self._items.get(record["id"])
+            if item is not None:
+                item.setText(0, name)
+            if record["id"] in retry or name != record["name"]:
+                lines.append(f"{name} — {record.get('reason') or record['status']}")
         if not retry:
             lines.append(
                 tr(
@@ -916,17 +968,19 @@ class ArchiveDialog(QDialog):
             lines.append(
                 tr(
                     (
-                        "\nKontynuacja skopiuje ukończone warstwy i ponowi brakujące "
-                        "lub częściowe w nowym folderze. Przezroczyste zoomy nadal "
-                        "wymagają sprawdzenia; nie są automatycznie pobierane ponownie."
+                        "\nKontynuacja zachowa ukończone warstwy i poprawne kafelki "
+                        "w nowym folderze. Brakujące kafelki otrzymają do trzech "
+                        "nowych prób pobrania. Poprawnie puste kafelki nie są "
+                        "pobierane ponownie."
                     )
                 )
             )
         lines.append(
             tr(
                 (
-                    "Pełne wyniki i diagnostyka: raport.html oraz "
-                    "manifest.json w folderze archiwum."
+                    "Otwórz projekt .qgz w QGIS lub raport.html w przeglądarce. "
+                    "manifest.json i diagnostic.jsonl są w podfolderze diagnostyka. "
+                    "Do przenoszenia i wznowienia zachowaj cały folder archiwum."
                 )
             )
         )
@@ -991,6 +1045,7 @@ class ArchiveDialog(QDialog):
             "cancelled": tr("Przerwano"),
         }
         if item is not None:
+            item.setText(0, record.get("output_name", record.get("name", item.text(0))))
             item.setText(2, labels.get(record["status"], record["status"]))
             reason = record.get("reason") or tr(
                 "Przygotowanie warstwy do archiwizacji."
@@ -1042,8 +1097,8 @@ class ArchiveDialog(QDialog):
         self.status.setText(
             tr(
                 (
-                    "Przerywanie… Ukończone warstwy zostaną zachowane w "
-                    "archiwum częściowym."
+                    "Przerywanie… Ukończone warstwy i zapisane kafelki map "
+                    "zostaną zachowane do wznowienia."
                 )
             )
         )

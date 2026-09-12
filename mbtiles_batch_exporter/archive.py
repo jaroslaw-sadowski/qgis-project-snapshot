@@ -4,24 +4,27 @@
 """Project archives with local vector data and raster snapshots."""
 
 import json
+import os
 import re
 import shutil
 import sqlite3
 import time
 import xml.etree.ElementTree as ET
 from configparser import ConfigParser
-from contextlib import ExitStack, closing
+from contextlib import ExitStack, closing, contextmanager
 from datetime import datetime
 from hashlib import sha256
 from html import escape
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
+from urllib.parse import quote
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from osgeo import gdal, ogr
 from qgis.core import (
     Qgis,
     QgsCoordinateTransform,
+    QgsDataSourceUri,
     QgsFeatureRequest,
     QgsFeatureSink,
     QgsGeometry,
@@ -29,14 +32,16 @@ from qgis.core import (
     QgsMultiBandColorRenderer,
     QgsPathResolver,
     QgsProject,
+    QgsProviderRegistry,
     QgsRasterLayer,
     QgsReadWriteContext,
     QgsVectorFileWriter,
     QgsVectorLayer,
 )
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import QCoreApplication, QEvent, QLockFile
 from qgis.PyQt.QtXml import QDomDocument
 
+from .adaptive import write_state
 from .archive_resources import ProjectResources, audit_local_layers
 from .diagnostics import (
     Diagnostics,
@@ -91,9 +96,29 @@ def polygon_area(layer):
 
 
 def _write_vector(
-    layer, area, area_crs, project, path, table, cancelled, progress, diagnostic=None
+    layer,
+    area,
+    area_crs,
+    project,
+    path,
+    table,
+    cancelled,
+    progress,
+    diagnostic=None,
+    read_details=None,
 ):
     """Stream live features (including the edit buffer) into a single GPKG table."""
+    provider = layer.dataProvider()
+    if not layer.isValid() or provider is None or not provider.isValid():
+        raise RuntimeError(tr("Nie udało się rozpocząć odczytu obiektów."))
+    # WFS delivers downloader errors through queued calls to the provider.
+    # Drain earlier calls before the baseline, without processing UI events.
+    QCoreApplication.sendPostedEvents(provider, QEvent.MetaCall)
+    refreshed = layer.providerType() == "WFS" and not layer.isEditable()
+    if refreshed:
+        # Keep the live layer/edit buffer. Reloading during editing can change
+        # transient feature IDs, so that case uses QGIS's existing cached reader.
+        provider.reloadData()
     if diagnostic:
         diagnostic.emit(
             "vector_setup",
@@ -103,12 +128,36 @@ def _write_vector(
             spatial=layer.isSpatial(),
             subset_filter=bool(layer.subsetString()),
             editing=layer.isEditable(),
+            provider_crs=provider.crs().authid(),
+            provider_crs_matches_layer=provider.crs() == layer.crs(),
+            area_crs_valid=area_crs.isValid(),
+            wfs_cache_refreshed=refreshed,
         )
     mask = QgsGeometry(area)
-    if layer.isSpatial() and layer.crs() != area_crs:
+    if layer.isSpatial():
         if not layer.crs().isValid():
             raise ValueError(tr("Warstwa nie ma poprawnego układu współrzędnych."))
-        mask.transform(QgsCoordinateTransform(area_crs, layer.crs(), project))
+        if (
+            not area_crs.isValid()
+            or mask.isNull()
+            or mask.isEmpty()
+            or not mask.isGeosValid()
+        ):
+            raise ValueError(
+                tr(
+                    "Obszar eksportu nie ma poprawnej geometrii "
+                    "lub układu współrzędnych."
+                )
+            )
+    if layer.isSpatial() and layer.crs() != area_crs:
+        result = mask.transform(QgsCoordinateTransform(area_crs, layer.crs(), project))
+        if result != Qgis.GeometryOperationResult.Success:
+            raise ValueError(
+                tr(
+                    "Obszar eksportu nie ma poprawnej geometrii "
+                    "lub układu współrzędnych."
+                )
+            )
     request = QgsFeatureRequest()
     if layer.isSpatial():
         request.setFilterRect(mask.boundingBox())
@@ -133,11 +182,12 @@ def _write_vector(
     writer = None
     iterator = None
     errors = []
-    provider = layer.dataProvider()
     old_errors = list(provider.errors())
     counters = dict(received=0, written=0, empty_geometry=0, outside_mask=0)
     stage = "writer_create"
     read_complete = False
+    empty_probe = None
+    empty_verified = None
     started_read = time.monotonic()
     layer.raiseError.connect(errors.append)
     try:
@@ -190,6 +240,9 @@ def _write_vector(
                 tr("Przerwano zapis warstwy; niepełną tabelę usunięto.")
             )
         stage = "provider_check"
+        # WFS can close its iterator before the GUI thread delivers its error.
+        # A closed iterator alone does not prove success.
+        QCoreApplication.sendPostedEvents(provider, QEvent.MetaCall)
         if errors or list(provider.errors()) != old_errors:
             # Provider messages may contain credentials or a full database URI.
             raise RuntimeError(
@@ -197,6 +250,41 @@ def _write_vector(
             )
         if not iterator.isClosed():
             raise RuntimeError(tr("Odczyt warstwy nie zakończył się poprawnie."))
+        if counters["received"] == 0 and layer.providerType() == "mssql":
+            stage = "empty_source_probe"
+            empty_probe = "unconfirmed"
+            try:
+                # QGIS 3.40's MSSQL iterator can silently close on SQL errors.
+                # This bounded native query checks connectivity, table access and
+                # the existing subset, with exceptions instead of silent EOF.
+                uri = QgsDataSourceUri(provider.dataSourceUri())
+                connection = (
+                    QgsProviderRegistry.instance()
+                    .providerMetadata("mssql")
+                    .createConnection(uri.uri(), {})
+                )
+                if connection is None or not uri.table():
+                    raise RuntimeError("MSSQL probe unavailable")
+                source = ".".join(
+                    "[" + part.replace("]", "]]") + "]"
+                    for part in (uri.schema() or "dbo", uri.table())
+                )
+                sql = "SELECT TOP (1) 1 FROM " + source
+                if layer.subsetString():
+                    sql += " WHERE (" + layer.subsetString() + ")"
+                result = connection.executeSql(sql)
+                empty_probe = "source_has_rows" if result else "source_empty"
+            except Exception:
+                # SQL/provider exceptions can embed credentials or the URI.
+                raise RuntimeError(
+                    tr("Nie udało się potwierdzić pustego odczytu MSSQL.")
+                ) from None
+        if count == 0 and (
+            layer.providerType() != "mssql"
+            or counters["received"] > 0
+            or empty_probe == "source_empty"
+        ):
+            empty_verified = True
         read_complete = True
         stage = "writer_flush"
         if not writer.flushBuffer() or writer.hasError() != QgsVectorFileWriter.NoError:
@@ -208,6 +296,9 @@ def _write_vector(
                 job=table,
                 stage=stage,
                 read_complete=read_complete,
+                vector_read_version=2,
+                empty_read_verified=empty_verified,
+                empty_source_probe=empty_probe,
                 seconds=time.monotonic() - started_read,
                 raised_errors=len(errors),
                 old_provider_errors=len(old_errors),
@@ -230,6 +321,11 @@ def _write_vector(
         )
     if any(saved.fields().indexFromName(field.name()) < 0 for field in fields):
         raise RuntimeError(tr("Kontrola zapisanej tabeli wykazała brak atrybutów."))
+    if read_details is not None:
+        read_details.update(
+            vector_read_version=2,
+            empty_read_verified=empty_verified,
+        )
     return count
 
 
@@ -290,6 +386,55 @@ def _local_project(snapshot, destination, records, resources=None):
         qgs = next(name for name in archive.namelist() if name.endswith(".qgs"))
         root = ET.fromstring(archive.read(qgs))
     saved = {record["id"]: record for record in records if record.get("local_source")}
+    empty_vectors = []
+    for record in records:
+        record.pop("output_name", None)
+        if (
+            record.get("status") == "saved"
+            and record.get("method") == "vector"
+            and record.get("feature_count") == 0
+            and record.get("empty_read_verified") is True
+            and record["id"] in saved
+        ):
+            record["output_name"] = record["name"] + "_nie-bylo-obiketow-w-zasiegu"
+            empty_vectors.append(record)
+    if empty_vectors:
+        database = None
+        with gdal.ExceptionMgr():
+            try:
+                database = gdal.OpenEx(
+                    str(
+                        destination.parent
+                        / empty_vectors[0]["local_source"][2:].split("|", 1)[0]
+                    ),
+                    gdal.OF_VECTOR | gdal.OF_UPDATE,
+                )
+                identifiers = {
+                    database.GetLayer(index).GetMetadataItem(
+                        "IDENTIFIER"
+                    ): database.GetLayer(index).GetName()
+                    for index in range(database.GetLayerCount())
+                }
+                for record in empty_vectors:
+                    identifier = record["output_name"]
+                    counter = 1
+                    while (
+                        identifiers.get(identifier, record["table"]) != record["table"]
+                    ):
+                        tail = record["table"][6:14]
+                        if counter > 1:
+                            tail += f"-{counter}"
+                        identifier = f"{record['output_name']} [{tail}]"
+                        counter += 1
+                    local = database.GetLayerByName(record["table"])
+                    if local is None or local.SetMetadataItem("IDENTIFIER", identifier):
+                        raise RuntimeError(
+                            tr("Nie udało się zapisać nazwy pustej warstwy.")
+                        )
+                    identifiers[identifier] = record["table"]
+                database.FlushCache()
+            finally:
+                local = database = None
     project_layers = root.find("projectlayers")
     if project_layers is not None:
         for element in list(project_layers):
@@ -336,6 +481,8 @@ def _local_project(snapshot, destination, records, resources=None):
                 raster = None
             element.find("datasource").text = record["local_source"]
             element.find("provider").text = record["local_provider"]
+            if record.get("output_name"):
+                element.find("layername").text = record["output_name"]
             if record["method"] == "raster_data":
                 renderer = element.find("./pipe/rasterrenderer")
                 if renderer is not None:
@@ -360,12 +507,19 @@ def _local_project(snapshot, destination, records, resources=None):
                 else:
                     child.set("source", record["local_source"])
                     child.set("providerKey", record["local_provider"])
+                    if record.get("output_name"):
+                        child.set("name", record["output_name"])
             elif child.tag == "legendlayer":
                 if any(
                     node.get("layerid") not in saved
                     for node in child.iter("legendlayerfile")
                 ):
                     parent.remove(child)
+                else:
+                    for node in child.iter("legendlayerfile"):
+                        record = saved.get(node.get("layerid"), {})
+                        if record.get("output_name"):
+                            child.set("name", record["output_name"])
             elif parent.tag in ("custom-order", "layerorder"):
                 layer_id = child.get("id") or child.text
                 if layer_id not in saved:
@@ -450,14 +604,23 @@ def _ready_records(records, parallel, cancelled, progress):
             time.sleep(0.05)
 
 
+def resume_manifest_path(folder):
+    """Find current manifests while retaining archives written before 1.4.1."""
+    folder = Path(folder)
+    current = folder / "diagnostyka" / "manifest.json"
+    return current if current.is_file() else folder / "manifest.json"
+
+
 def read_resume_manifest(folder):
     """Read archive settings without opening its project or remote sources."""
     try:
-        manifest = json.loads((Path(folder) / "manifest.json").read_text("utf-8"))
+        manifest = json.loads(resume_manifest_path(folder).read_text("utf-8"))
         if (
             manifest["schema_version"] != 4
             or not isinstance(manifest["layers"], list)
             or not isinstance(manifest["sha256"], dict)
+            or manifest.get("data_file", "dane.gpkg")
+            not in ("dane.gpkg", "dane/dane.gpkg")
             or not manifest["area"]["wkt"]
             or not manifest["area"]["crs"]
             or not 0 <= manifest["zoom_min"] <= manifest["zoom_max"] <= 24
@@ -473,7 +636,42 @@ def read_resume_manifest(folder):
         ) from error
 
 
-def _source_fingerprint(layer):
+@contextmanager
+def _archive_lock(folder):
+    """Native process lock, including stale-lock recovery after a process dies."""
+    if folder is None:
+        yield None
+        return
+    lock = QLockFile(str(Path(folder) / ".archive.lock"))
+    lock.setStaleLockTime(0)
+    if not lock.tryLock(0):
+        raise ValueError(
+            tr("To archiwum jest używane przez inny proces QGIS. Spróbuj później.")
+        )
+    try:
+        yield lock
+    finally:
+        lock.unlock()
+
+
+@contextmanager
+def _archive_workspace(destination):
+    """Keep recovery data on exceptions; dispose only runtime source snapshots."""
+    staging = Path(
+        mkdtemp(prefix=destination.name + ".in-progress-", dir=destination.parent)
+    )
+    (staging / "diagnostyka").mkdir(mode=0o700)
+    (staging / "dane").mkdir(mode=0o700)
+    with _archive_lock(staging) as lock:
+        try:
+            yield staging, lock
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging / ".workers", ignore_errors=True)
+                (staging / "_source.qgz").unlink(missing_ok=True)
+
+
+def _source_fingerprint(layer, *, canonical=True):
     """Keep a digest of source and rendering settings, never source credentials."""
     style = QgsMapLayerStyle()
     style.readFromLayer(layer)
@@ -482,7 +680,7 @@ def _source_fingerprint(layer):
         layer.providerType(),
         layer.crs().toWkt(),
         layer.subsetString() if isinstance(layer, QgsVectorLayer) else "",
-        style.xmlData(),
+        ET.canonicalize(style.xmlData()) if canonical else style.xmlData(),
     ]
     return sha256(json.dumps(settings, ensure_ascii=False).encode()).hexdigest()
 
@@ -490,7 +688,24 @@ def _source_fingerprint(layer):
 def _copy_resume(folder, manifest, staging, progress, cancelled):
     """Verify and copy only archive data; never use paths outside its folder."""
     folder = Path(folder).resolve()
-    for relative, expected in manifest["sha256"].items():
+    checkpoint = manifest.get("checkpoint") is True
+    data_file = manifest.get("data_file", "dane.gpkg")
+    files = dict(manifest["sha256"])
+    if checkpoint:
+        # An interrupted writer cannot hash a changing database. SQLite backup
+        # recovers its journal and copies a consistent committed snapshot.
+        files = {
+            path.relative_to(folder).as_posix(): None
+            for path in [folder / data_file, *(folder / "zasoby").rglob("*")]
+            if path.is_file()
+        }
+        for record in manifest["layers"]:
+            table = "layer_" + sha256(record["id"].encode()).hexdigest()[:24]
+            cache = resume_manifest_path(folder).parent / "download-state" / table
+            for name in ("raster.gpkg", "tiles.sqlite"):
+                if (cache / name).is_file():
+                    files[(cache / name).relative_to(folder).as_posix()] = None
+    for relative, expected in files.items():
         path = Path(relative)
         if (
             path.is_absolute()
@@ -500,39 +715,102 @@ def _copy_resume(folder, manifest, staging, progress, cancelled):
             or not (folder / path).resolve().is_relative_to(folder)
         ):
             raise ValueError(tr("Manifest zawiera ścieżkę poza folderem archiwum."))
-        if relative != "dane.gpkg" and path.parts[:1] != ("zasoby",):
+        cache_path = (
+            path.relative_to("diagnostyka")
+            if path.parts[:2] == ("diagnostyka", "download-state")
+            else path
+        )
+        is_cache = cache_path.parts[:1] == ("download-state",)
+        if relative != data_file and path.parts[:1] != ("zasoby",) and not is_cache:
             continue
-        target = staging / path
+        if is_cache and (
+            len(cache_path.parts) != 3
+            or not re.fullmatch(r"layer_[0-9a-f]{24}", cache_path.parts[1])
+            or cache_path.name
+            not in {
+                name + suffix
+                for name in ("raster.gpkg", "tiles.sqlite")
+                for suffix in ("", "-journal", "-wal", "-shm")
+            }
+        ):
+            raise ValueError(tr("Nieprawidłowy manifest archiwum do wznowienia."))
+        target = staging / "diagnostyka" / cache_path if is_cache else staging / path
+        if relative == data_file:
+            target = staging / "dane" / "dane.gpkg"
         target.parent.mkdir(parents=True, exist_ok=True)
         digest = sha256()
         progress(tr("Sprawdzanie i kopiowanie danych poprzedniego archiwum…"))
         updated = time.monotonic()
-        with (folder / path).open("rb") as source, target.open("wb") as output:
-            for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                if cancelled():
-                    raise InterruptedError()
-                digest.update(chunk)
-                output.write(chunk)
-                if time.monotonic() - updated >= 0.1:
+        with _archive_lock((folder / path).parent if is_cache else None):
+            if checkpoint and path.suffix in (".gpkg", ".sqlite"):
+
+                def copying(status, remaining, total):
+                    if cancelled():
+                        raise InterruptedError()
                     progress(
                         tr("Sprawdzanie i kopiowanie danych poprzedniego archiwum…")
                     )
-                    updated = time.monotonic()
-        if digest.hexdigest() != expected:
+
+                with (
+                    closing(
+                        sqlite3.connect((folder / path).as_uri() + "?mode=rw", uri=True)
+                    ) as source_db,
+                    closing(sqlite3.connect(target)) as target_db,
+                ):
+                    source_db.backup(target_db, pages=256, progress=copying)
+                    if (
+                        target_db.execute("PRAGMA integrity_check").fetchone()[0]
+                        != "ok"
+                    ):
+                        raise ValueError(
+                            tr(
+                                "Dane poprzedniego archiwum zmieniły się "
+                                "lub są uszkodzone."
+                            )
+                        )
+                with (folder / path).open("rb") as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        if cancelled():
+                            raise InterruptedError()
+                        digest.update(chunk)
+                with target.open("r+b") as output:
+                    os.fsync(output.fileno())
+            else:
+                with (folder / path).open("rb") as source, target.open("wb") as output:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        if cancelled():
+                            raise InterruptedError()
+                        digest.update(chunk)
+                        output.write(chunk)
+                        if time.monotonic() - updated >= 0.1:
+                            progress(
+                                tr(
+                                    "Sprawdzanie i kopiowanie danych "
+                                    "poprzedniego archiwum…"
+                                )
+                            )
+                            updated = time.monotonic()
+                    output.flush()
+                    os.fsync(output.fileno())
+        if expected is not None and digest.hexdigest() != expected:
             raise ValueError(
                 tr("Dane poprzedniego archiwum zmieniły się lub są uszkodzone.")
             )
+        if checkpoint:
+            manifest["sha256"][relative] = digest.hexdigest()
     for record in manifest["layers"]:
         if not record.get("local_source"):
             continue
         table = "layer_" + sha256(record["id"].encode()).hexdigest()[:24]
         method = record.get("method")
         if method == "vector":
-            source = "./dane.gpkg|layername=" + table
+            source = "./" + data_file + "|layername=" + table
             provider = "ogr"
         elif method == "raster_render":
             source = (
-                "./dane.gpkg|option:TABLE="
+                "./"
+                + data_file
+                + "|option:TABLE="
                 + table
                 + "|option:ZOOM_LEVEL="
                 + str(manifest["zoom_max"])
@@ -549,7 +827,11 @@ def _copy_resume(folder, manifest, staging, progress, cancelled):
             or record["local_source"] != source
             or record.get("local_provider") != provider
             or filename not in manifest["sha256"]
-            or not (staging / filename).is_file()
+            or not (
+                staging / "dane" / "dane.gpkg"
+                if filename == data_file
+                else staging / filename
+            ).is_file()
         ):
             raise ValueError(tr("Brak poprawnych danych warstwy do wznowienia."))
 
@@ -571,6 +853,7 @@ def create_archive(
     adaptive=False,
     server_activity=lambda rows: None,
     resume_from=None,
+    checkpoint_created=lambda folder: None,
 ):
     """Create a partial archive; return its published directory.
 
@@ -675,6 +958,7 @@ def create_archive(
             record["source_fingerprint"] = _source_fingerprint(
                 project.mapLayer(record["id"])
             )
+            record["source_fingerprint_version"] = 2
     if resume_from is not None:
         resume_manifest = read_resume_manifest(resume_from)
         previous = {
@@ -707,14 +991,37 @@ def create_archive(
                 )
             if old["provider"] != record["provider"] or (
                 old.get("source_fingerprint")
-                and old["source_fingerprint"] != record["source_fingerprint"]
+                and old["source_fingerprint"]
+                != (
+                    record["source_fingerprint"]
+                    if old.get("source_fingerprint_version") == 2
+                    else _source_fingerprint(layer, canonical=False)
+                )
             ):
                 raise ValueError(
                     tr("Źródło lub styl warstwy zmieniły się. Utwórz nowe archiwum.")
                 )
-            if old["status"] in ("saved", "empty") and old.get("local_source"):
+            recheck_empty = (
+                old["provider"] in ("WFS", "mssql")
+                and old.get("method") == "vector"
+                and old.get("feature_count") == 0
+                and (
+                    old.get("vector_read_version") != 2
+                    or old.get("empty_read_verified") is not True
+                )
+            )
+            if (
+                old["status"] in ("saved", "empty")
+                and old.get("local_source")
+                and not recheck_empty
+            ):
                 record.update(
-                    old, reused=True, source_fingerprint=old.get("source_fingerprint")
+                    old,
+                    reused=True,
+                    source_fingerprint=record["source_fingerprint"]
+                    if old.get("source_fingerprint")
+                    else None,
+                    source_fingerprint_version=2,
                 )
         if any(not record.get("source_fingerprint") for record in previous.values()):
             progress(
@@ -743,15 +1050,59 @@ def create_archive(
                 server_activity(parallel.server_activity())
 
     with (
-        Diagnostics(output_folder / (name + ".diagnostic.jsonl")) as diagnostic,
-        TemporaryDirectory(prefix=".archive-", dir=output_folder) as temporary,
+        _archive_lock(resume_from),
+        _archive_workspace(destination) as (staging, workspace_lock),
+        Diagnostics(staging / "diagnostyka" / "diagnostic.jsonl") as diagnostic,
         PerformanceDiagnostics(diagnostic, "main", output_folder) as performance,
         ExitStack() as processes,
     ):
-        staging = Path(temporary)
         if resume_manifest is not None:
             performance.set_phase("copy_previous")
             _copy_resume(resume_from, resume_manifest, staging, progress, cancelled)
+        recovery_folder = staging / "diagnostyka" / "download-state"
+        recovery_folder.mkdir(exist_ok=True, mode=0o700)
+        checkpoint = {
+            "schema_version": 4,
+            "checkpoint": True,
+            "data_file": "dane/dane.gpkg",
+            "started_at": started.isoformat(),
+            "project_crs": project.crs().authid(),
+            "area": {"crs": area_crs.authid(), "wkt": area.asWkt()},
+            "zoom_min": zoom_min,
+            "zoom_max": zoom_max,
+            "layers": records,
+            "sha256": {},
+        }
+
+        def save_checkpoint(record=None):
+            for entry in records:
+                if entry.get("local_source", "").startswith("./dane.gpkg|"):
+                    entry["local_source"] = entry["local_source"].replace(
+                        "./dane.gpkg|", "./dane/dane.gpkg|", 1
+                    )
+            # Workers write private cache databases. The final GPKG has one
+            # writer, and it has closed its current operation at this boundary.
+            if (staging / "dane" / "dane.gpkg").exists():
+                with (staging / "dane" / "dane.gpkg").open("r+b") as stream:
+                    os.fsync(stream.fileno())
+            if (
+                record
+                and record.get("method") == "raster_data"
+                and record.get("local_source")
+            ):
+                with (staging / record["local_source"][2:]).open("r+b") as stream:
+                    os.fsync(stream.fileno())
+            checkpoint["updated_at"] = datetime.now().astimezone().isoformat()
+            write_state(
+                staging / "diagnostyka" / "manifest.json",
+                checkpoint,
+                durable=True,
+                diagnostic=diagnostic,
+            )
+
+        save_checkpoint()
+        checkpoint_created(staging)
+        progress(tr("Stan pobierania do wznowienia: {0}").format(staging))
         metadata = ConfigParser()
         metadata.read(Path(__file__).with_name("metadata.txt"), encoding="utf-8")
         diagnostic.emit(
@@ -804,7 +1155,7 @@ def create_archive(
         )
         performance.set_phase("snapshot")
         _snapshot_project(project, snapshot)
-        database = staging / "dane.gpkg"
+        database = staging / "dane" / "dane.gpkg"
         levels = None
         parallel = None
         if (adaptive or workers > 1) and any(
@@ -831,6 +1182,7 @@ def create_archive(
                     cpu=resources["cpu"] if resources else None,
                     cancelled=cancelled,
                     progress=progress,
+                    recovery_folder=recovery_folder,
                 )
             )
         indices = {
@@ -880,6 +1232,7 @@ def create_archive(
                     )
                 completed += 1
                 layer_status(dict(record), completed, total)
+                save_checkpoint()
                 continue
             layer = project.mapLayer(record["id"])
             record["started_at"] = datetime.now().astimezone().isoformat()
@@ -905,6 +1258,29 @@ def create_archive(
                                     )
                                 ).format(layer.name())
                             )
+                            if not database.exists():
+                                initial = staging / ".vector-init.gpkg"
+                                try:
+                                    with gdal.config_option(
+                                        "OGR_SQLITE_SYNCHRONOUS", "FULL"
+                                    ):
+                                        blank = ogr.GetDriverByName(
+                                            "GPKG"
+                                        ).CreateDataSource(str(initial))
+                                        if blank is None:
+                                            raise RuntimeError(
+                                                tr(
+                                                    "Nie można utworzyć "
+                                                    "tabeli GeoPackage."
+                                                )
+                                            )
+                                        blank = None
+                                    with initial.open("r+b") as stream:
+                                        os.fsync(stream.fileno())
+                                    initial.replace(database)
+                                finally:
+                                    initial.unlink(missing_ok=True)
+                            read_details = {}
                             count = _write_vector(
                                 layer,
                                 area,
@@ -919,6 +1295,7 @@ def create_archive(
                                     )
                                 ),
                                 diagnostic=diagnostic,
+                                read_details=read_details,
                             )
                             diagnostic.emit(
                                 "vector_read",
@@ -934,12 +1311,23 @@ def create_archive(
                                 feature_count=count,
                                 method="vector",
                                 crs=layer.crs().authid(),
-                                local_source="./dane.gpkg|layername=" + table,
+                                local_source="./dane/dane.gpkg|layername=" + table,
                                 local_provider="ogr",
                                 reason=tr("Zapisano dane i styl.")
                                 if count
                                 else tr("Poprawny odczyt: brak obiektów w obszarze."),
+                                **read_details,
                             )
+                            if (
+                                count == 0
+                                and layer.providerType() == "mssql"
+                                and read_details.get("empty_read_verified") is not True
+                            ):
+                                record["reason"] = tr(
+                                    "Zapisano pustą tabelę. MSSQL odpowiada, "
+                                    "ale brak obiektów w obszarze wymaga "
+                                    "sprawdzenia w oryginalnym projekcie."
+                                )
                         except InterruptedError:
                             raise
                         except Exception as error:
@@ -1082,22 +1470,35 @@ def create_archive(
                                 and not isinstance(layer, QgsVectorLayer)
                             ):
                                 gate = parallel.local_gate(layer, cancelled)
-                            record.update(
-                                result
-                                if result is not None
-                                else write_rendered_raster(
-                                    layer,
-                                    project,
-                                    area,
-                                    area_crs,
-                                    database,
-                                    table,
-                                    levels,
-                                    cancelled,
-                                    progress,
-                                    gate=gate,
-                                )
-                            )
+                            if result is None:
+                                cache = recovery_folder / table
+                                cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+                                with _archive_lock(cache):
+                                    result = write_rendered_raster(
+                                        layer,
+                                        project,
+                                        area,
+                                        area_crs,
+                                        cache / "raster.gpkg",
+                                        table,
+                                        levels,
+                                        cancelled,
+                                        progress,
+                                        gate=gate,
+                                        resume=(cache / "raster.gpkg").exists()
+                                        or (cache / "tiles.sqlite").exists(),
+                                        ledger_path=cache / "tiles.sqlite",
+                                        legacy_retries=not adaptive,
+                                    )
+                                if result.get("local_source"):
+                                    performance.set_phase("merge", job)
+                                    merge_raster(
+                                        cache / "raster.gpkg",
+                                        database,
+                                        table,
+                                        cancelled,
+                                    )
+                            record.update(result)
                         finally:
                             if gate:
                                 parallel.finish_local(
@@ -1118,8 +1519,8 @@ def create_archive(
                         status="cancelled",
                         reason=tr(
                             (
-                                "Przerwano zapis warstwy; niepełne dane tej warstwy "
-                                "usunięto."
+                                "Przerwano zapis warstwy. Zapisane kafelki map "
+                                "pozostają dostępne do wznowienia."
                             )
                         ),
                     )
@@ -1143,11 +1544,16 @@ def create_archive(
                         ),
                     )
             old = previous.get(record["id"], {})
-            if old.get("local_source") and record["status"] not in ("saved", "empty"):
+            if (
+                old.get("method") == "raster_render"
+                and old.get("local_source")
+                and record["status"] not in ("saved", "empty")
+            ):
                 # A failed continuation must not replace a useful partial image.
                 attempt = record["status"]
                 digest = sha256()
-                with (Path(resume_from) / "dane.gpkg").open("rb") as source:
+                previous_data = resume_manifest.get("data_file", "dane.gpkg")
+                with (Path(resume_from) / previous_data).open("rb") as source:
                     updated = time.monotonic()
                     for chunk in iter(lambda: source.read(1024 * 1024), b""):
                         digest.update(chunk)
@@ -1156,12 +1562,12 @@ def create_archive(
                                 tr("Sprawdzanie wcześniejszego obrazu częściowego…")
                             )
                             updated = time.monotonic()
-                if digest.hexdigest() != resume_manifest["sha256"]["dane.gpkg"]:
+                if digest.hexdigest() != resume_manifest["sha256"][previous_data]:
                     raise ValueError(
                         tr("Dane poprzedniego archiwum zmieniły się lub są uszkodzone.")
                     )
                 _remove_table(database, old["table"])
-                merge_raster(Path(resume_from) / "dane.gpkg", database, old["table"])
+                merge_raster(Path(resume_from) / previous_data, database, old["table"])
                 record.clear()
                 record.update(old, reused=True, continuation_attempt=attempt)
                 record["reason"] += " " + tr(
@@ -1178,6 +1584,11 @@ def create_archive(
             if not record.get("reused"):
                 record["finished_at"] = datetime.now().astimezone().isoformat()
             completed += 1
+            save_checkpoint(record)
+            if record["status"] in ("saved", "empty") and record.get("local_source"):
+                # Keep the cache until the merged result and its checkpoint
+                # are durable. A crash in between can only repeat a local merge.
+                shutil.rmtree(recovery_folder / job, ignore_errors=True)
             layer_status(dict(record), completed, total)
             progress(f"{record['name']}: {record['reason']}")
             performance.set_phase("waiting")
@@ -1194,6 +1605,9 @@ def create_archive(
         processes.close()
         parallel = None
         network_monitor = None
+        if not any(recovery_folder.iterdir()):
+            recovery_folder.rmdir()
+        save_checkpoint()
         worker_activity([])
         progress(
             tr("Zapisywanie projektu, lokalnych symboli, formularzy i załączników…")
@@ -1222,6 +1636,7 @@ def create_archive(
         manifest = {
             "schema_version": 4,
             "implementation_step": 3,
+            "data_file": "dane/dane.gpkg",
             "status": "partial",
             "cancelled": cancelled(),
             "started_at": started.isoformat(),
@@ -1259,7 +1674,7 @@ def create_archive(
             manifest["continuation"] = {
                 "previous_started_at": resume_manifest["started_at"],
                 "previous_manifest_sha256": sha256(
-                    (Path(resume_from) / "manifest.json").read_bytes()
+                    resume_manifest_path(resume_from).read_bytes()
                 ).hexdigest(),
                 "reused_layers": sum(bool(r.get("reused")) for r in records),
                 "source_settings_verified": all(
@@ -1268,7 +1683,22 @@ def create_archive(
             }
         performance.set_phase("checksums")
         for path in sorted(staging.rglob("*")):
-            if path.is_file():
+            relative = path.relative_to(staging)
+            if relative.parts[:2] == ("diagnostyka", "download-state") and (
+                len(relative.parts) != 4
+                or path.name
+                not in {
+                    name + suffix
+                    for name in ("raster.gpkg", "tiles.sqlite")
+                    for suffix in ("", "-journal", "-wal", "-shm")
+                }
+            ):
+                continue
+            if path.is_file() and path.name not in (
+                "manifest.json",
+                "diagnostic.jsonl",
+                ".archive.lock",
+            ):
                 progress(
                     tr("Kontrola pliku: {0} ({1:.1f} MiB)…").format(
                         path.relative_to(staging).as_posix(),
@@ -1290,8 +1720,11 @@ def create_archive(
         manifest["finished_at"] = datetime.now().astimezone().isoformat()
         progress(tr("Zapisywanie manifestu i raportu z wynikami…"))
         performance.set_phase("report")
-        (staging / "manifest.json").write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        write_state(
+            staging / "diagnostyka" / "manifest.json",
+            manifest,
+            durable=True,
+            diagnostic=diagnostic,
         )
         labels = {
             "saved": tr("Zapisano"),
@@ -1307,7 +1740,7 @@ def create_archive(
                 f"<td>{escape(str(value))}</td>"
                 for value in (
                     " / ".join(record["groups"]),
-                    record["name"],
+                    record.get("output_name", record["name"]),
                     labels[record["status"]],
                     record.get("feature_count", record.get("tile_count", "—")),
                     record["reason"],
@@ -1328,6 +1761,14 @@ def create_archive(
                     "dostępu do sieci.</p>"
                 )
             )
+            + tr(
+                '<p>Otwórz <a href="{0}">projekt .qgz</a> w QGIS. '
+                "Folder <b>dane</b> zawiera GeoPackage i pliki przyspieszające "
+                "wyświetlanie. Folder <b>zasoby</b> zawiera dodatkowe pliki "
+                "projektu, jeśli były potrzebne. Folder <b>diagnostyka</b> "
+                "przechowuje szczegółowy raport techniczny, log i postęp "
+                "do wznowienia. Zachowaj i przenoś cały folder archiwum.</p>"
+            ).format(quote(name + ".qgz"))
             + "".join(f"<p>{escape(tr(text))}</p>" for text in ARCHIVE_LIMITATIONS)
             + (
                 tr(
@@ -1370,9 +1811,9 @@ def create_archive(
                 )
             ).format(escape(manifest["started_at"]), escape(manifest["finished_at"]))
             + rows
-            + "</table><h2>Diagnostyka / Diagnostics</h2><pre>"
+            + tr("</table><details><summary>Szczegóły diagnostyczne</summary><pre>")
             + escape(json.dumps(manifest, ensure_ascii=False, indent=2))
-            + "</pre></html>",
+            + "</pre></details></html>",
             encoding="utf-8",
         )
         if destination.exists():
@@ -1414,8 +1855,8 @@ def create_archive(
         diagnostic.emit(
             "archive_result", status=manifest["status"], cancelled=manifest["cancelled"]
         )
-        staging.rename(destination)
         with diagnostic.lock:
-            diagnostic.path.rename(destination / "diagnostic.jsonl")
-            diagnostic.path = destination / "diagnostic.jsonl"
+            workspace_lock.unlock()
+            staging.rename(destination)
+            diagnostic.path = destination / "diagnostyka" / "diagnostic.jsonl"
     return destination

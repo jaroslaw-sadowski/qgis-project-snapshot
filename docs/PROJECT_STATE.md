@@ -1,6 +1,134 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 12 września 2026. Wersja **1.2.0**, diagnostyka wydajności.
+Aktualizacja: 12 września 2026. Wersja **1.4.1**: puste warstwy i porządek w archiwum.
+
+## Zmiany i odbiór 1.4.1
+
+Potwierdzone puste wektory otrzymują dokładnie dopisek
+`_nie-bylo-obiketow-w-zasiegu` w wynikowym projekcie, drzewie, raporcie
+i identyfikatorze GPKG. Warunki: saved/vector/feature_count=0 oraz
+empty_read_verified=true. Niepotwierdzone zero, błędy i obraz zastępczy nie
+otrzymują dopisku. Oryginalny projekt, nazwy źródeł, ID i techniczne tabele
+pozostają; output_name w manifeście opisuje wynik. Wznowienie nie powiela dopisku.
+
+Nowe archiwum: QGZ i raport.html w głównym katalogu, dane/dane.gpkg razem z AUX,
+diagnostyka/manifest.json, diagnostic.jsonl i download-state dla nieukończonych
+kafelków. Opcjonalne zasoby pozostają w zasoby/. Raport PL/EN opisuje foldery
+i składa pełny JSON pod szczegółami diagnostycznymi. Schemat manifestu nadal 4,
+data_file wskazuje dane/dane.gpkg. UI i kopiowanie kontynuacji rozpoznają dawny
+manifest, GPKG i cache w katalogu głównym. Zachować cały folder do wznowienia.
+Natywne próby GDAL/QGIS potwierdzają przenośność GPKG razem z AUX bez regeneracji
+statystyk przy otwieraniu. Nowy eksport z kontynuacji nadal odtwarza statystyki,
+ponieważ może zastępować tabele częściowych map.
+
+Pierwszy ZIP przeszedł 225/225 testów bez pominięć. Przegląd ujawnił dodatkowo
+błędne odzyskiwanie dawnego vector0 jako rastra po nieudanym ponowieniu obu metod.
+Test odtworzył przerwanie całego wznowienia. Warunek method=raster_render usuwa
+przyczynę; pięć testów nazw i tej regresji przeszło.
+Końcowy ZIP: **226/226 testów, 158,736 s, bez pominięć**, w izolowanym profilu;
+lokalne WMS, WFS i proxy wykonane. Ruff/format, Flake8/pycodestyle, AST 42 plików,
+325 tłumaczeń, lokalne odnośniki i diff — OK. Skan sekretów źródeł i osobno
+rozpakowanego ZIP-a bez trafień; Bandit nadal 20 przejrzanych ostrzeżeń,
+15 medium i 5 low, zero high. Paczka 144 567 bajtów, 22 pliki, powtarzalna:
+9b43991a8e4a3c532e46417caef9dbef86c3012f032e7f3b0413b96a24099921.
+Wyniki i ograniczenia:
+[validation-1.4.1.md](validation-1.4.1.md). Brak publikacji lub instalacji
+w profilu użytkownika.
+
+## Zmiany i odbiór 1.4.0
+
+Użytkownik zlecił diagnozę zerowych WFS/MSSQL, poprawę odczytu rastrów i wznowienie
+po awarii QGIS/reboocie. Lokalne testy rzeczywistego dostawcy WFS odtworzyły dwa
+błędy: opóźniony sygnał Qt po OWS Exception dawał fałszywe Saved 0, a cache mógł
+zachować wcześniejszy pusty wynik. Dostarczamy oczekujące błędy przed oceną odczytu
+i odświeżamy cache poza trybem edycji. Prawidłowe puste zasięgi nadal są poprawne.
+MSSQL może zamknąć iterator bez błędu dostępnego Pythonowi. Natywne ograniczone
+TOP (1) weryfikuje dostęp/tabelę/subset, bez logowania SQL lub poświadczeń.
+Nie potwierdza przestrzennego SQL, jeśli tabela ma obiekty: wynik 0 otrzymuje uwagę
+i `empty_read_verified=null`. Takie wyniki i starsze remote vector0 są odczytywane
+ponownie przy kontynuacji; `vector_read_version=2` rozróżnia nową kontrolę.
+Sieć firmowa nadal niedostępna; nie deklarujemy pełnego naprawienia jej MSSQL.
+
+GeoTIFF otrzymuje wewnętrzne piramidy GDAL NEAREST/DEFLATE9 z zachowaniem pełnych
+wartości i masek. Mapy GPKG zachowują niezależne zoomy; w pełni poprawny przezroczysty
+zoom otrzymuje minimalny pusty PNG, aby GDAL nie pomijał go przy odczycie.
+
+Trwały folder `.in-progress-…` i atomowy manifest istnieją od początku pobierania.
+`download-state` zachowuje prywatny GPKG i rejestr kafelków SQLite FULL. Zachowane
+PNG są sprawdzane, puste kafelki ponownie używane, braki otrzymują nowy budżet prób.
+Backup SQLite odtwarza spójny stan po przerwaniu, a QLockFile chroni aktywne dane.
+Cache znika dopiero po scaleniu i trwałym checkpoint. Pierwszy merge i pierwsze
+utworzenie GPKG wektorów są atomowe. Wektory restartują wyłącznie niedokończoną
+warstwę. GUI zapamiętuje folder; wznowienie wymaga oryginalnego projektu.
+
+Test nowego procesu QGIS wykrył dodatkowo niestabilną kolejność atrybutów XML
+w dawnym odcisku stylu. Wersja odcisku 2 używa ElementTree.canonicalize. Stare
+odciski 1.1–1.3 pozostają sprawdzane dawną metodą i mogą odmówić wznowienia po
+restarcie; nie obchodzimy walidacji. Starsze archiwa nie mają rejestru 1.4 do
+wznowienia pojedynczych kafelków. Nowy mechanizm nie odzyskuje już usuniętych danych.
+
+Natywny test zabicia QGIS i wznowienia w innym procesie przeszedł: pierwsza mapa
+bez ponownego pobierania, dwa kafelki niedokończonej mapy zachowane identycznie.
+Przeszły również dedykowane testy WFS, piramid, blokad i anulowanego workera.
+Końcowy ZIP: **219/219 testów w 156,211 s**, bez pominięć, w izolowanym QGIS;
+WMS, WFS i proxy wykonane. Pierwszy zestaw wykrył dawne założenia trzech testów
+o ścieżkach/markerach oraz regresję retry trybu stałego; poprawiono przyczyny,
+sprawdzono dedykowane przypadki i ponownie pełny ZIP. Automatyczny tryb zachowuje
+3 próby; techniczne adaptive=False odzyskało dawny podział z zachowaniem postępu.
+Ruff/format, Flake8/pycodestyle, AST 41 plików, odnośniki i diff — OK.
+Skan sekretów bez trafień; 20 przejrzanych ostrzeżeń Bandit (15 medium, 5 low).
+Paczka 141 090 bajtów, 22 pliki; powtarzalna SHA-256:
+38200abf7b13714b04d46533c925b7af47225e0cb4172675bed33579891c22c9.
+Wyniki i ograniczenia: [validation-1.4.0.md](validation-1.4.0.md).
+Nie publikowano ani nie instalowano paczki w profilu użytkownika. Aktualizować
+po zakończeniu eksportu i ponownie uruchomić QGIS. Wznowienie pojedynczych kafelków
+dotyczy postępu zapisanego w 1.4.0; nie odzyskuje kafelków usuniętych przez starsze wersje.
+
+## Optymalizacje 1.3.0 na podstawie rzeczywistej diagnostyki
+
+Użytkownik przekazał nowy przebieg 1.2.0 i autoryzował wdrożenie optymalizacji.
+Windows 11, Core Ultra 5 135U, 16 GB RAM: 43 min 6 s, zoomy 16–18,
+211 warstw (96 saved, 109 empty, 6 failed), bez anulowania/partial.
+Maksimum 13 procesów i 11 aktywnych zadań; CPU całego systemu średnio 29,39%.
+W minutach 20–40 działały 3 procesy przy budżecie około 10 i 5,08 GiB wolnego RAM.
+Geoportal pozostał zamrożony przy 2 zadaniach po 431 s, mimo dalszej kolejki.
+Najmniejszy Windows commit wyniósł 325 MiB przy 4,52 GiB wolnego RAM; zwiększanie
+obciążenia wymagało również poprawy ochrony przydziału pamięci.
+
+Zmiany 1.3: frozen jest okresem stabilizacji, po 60 s zdrowych pełnych okien można
+ponowić pojedynczy wzrost; dwa okna bez 10% zysku cofają, kolejne nieudane próby
+wydłużają stabilizację 60/120/240/300 s. Dwa pełne okna spadku szybkości >25%
+zmniejszają ustalony limit. Zachowano natychmiastową reakcję 429/503, dodano
+seryjne 502/504 obok timeoutów. Spóźnione Retry-After obowiązuje także po udanym
+probe. Zwykłe błędy WMS nie czekają na każde ACK, lecz pozostają raportowane;
+przeciążenie/timeout/probe nadal wymagają potwierdzenia i ważnego pozwolenia.
+
+Starty korzystają z min(RAM, dostępny commit Windows), bez zmiany rezerwy 768 MiB,
+estymaty RSS i sufitu 32 / 2 × CPU. Pierwszy przydział następuje po świeżym pomiarze.
+Wzrost pozwoleń istniejących procesów wymaga też pokrycia reserved_growth;
+odłożone hosty rozliczają wyniki mimo braku RAM lub slotów. GUI odróżnia brak
+przydziału Windows od fizycznego RAM. PNG, pojedynczy zapisujący GPKG, anulowanie i kontynuacja pozostają; bez nowych zależności.
+
+Sześć błędnych map zwracało głównie HTTP 200 XML zamiast obrazu; dobra mapa tego samego
+hosta działała. Nie pomijamy ich obszarów ani nie uznajemy błędów za puste mapy.
+W izolowanym lokalnym benchmarku ACK czas dwóch map 14,704 → 2,633 s, przy identycznych
+36 GetMap i bajtach PNG. To nie prognoza przyspieszenia całego projektu.
+36 wektorów zwróciło 0 bez zarejestrowanych błędów; badanie 1.4 wykazało, że same
+te liczniki nie potwierdzają poprawnego odczytu. 9 warstw empty ma obrazy na części zoomów.
+Bez GPKG/QGZ nie wykonano niezależnego odbioru danych użytkownika.
+
+Szczegóły, ograniczenia liczników sieci i wynik odbioru:
+[validation-1.3.0.md](validation-1.3.0.md). Gotowy ZIP: 185/185 testów w 132,037 s,
+bez pominięć, lokalny WMS i instalacja w QGIS poprawne. Ruff/format,
+Flake8/pycodestyle, AST 37 plików, metadane/odnośniki/diff — OK;
+zero sekretów, 11 dotychczasowych przejrzanych ostrzeżeń Bandit.
+Pierwszy zestaw źródeł przerwano na nieaktualnej atrapie slotów startowych;
+po poprawie 5 testów odzyskiwania i pełny zestaw ZIP-a przeszły.
+Paczka 129 962 bajty, 22 pliki, powtarzalna SHA-256:
+759a9c42a5ca2d7c6785ecc4007541e50daeefb5a01fd78b73c3e2e76a218a6c.
+Wydanie przygotowane lokalnie;
+bez publikacji, push, commitu lub zmiany widoczności repozytorium.
+Instalować po zakończeniu eksportu i ponownie uruchomić QGIS.
 
 ## Pomiary 1.2.0
 
@@ -150,7 +278,8 @@ Sam ZIP i pozytywne testy nie oznaczają zatwierdzenia przez moderatorów.
 
 ## Działanie i granice potwierdzonych wyników
 
-Automat 0.9.7 pozostaje bez zmian: od jednego zadania na host, wzrost po poprawnych
+Automat zachowuje budżet 0.9.7, z poprawkami reakcji i ponawiania wzrostu z 1.3.0:
+od jednego zadania na host, wzrost po poprawnych
 pobraniach i pomiarze przepustowości; min(32, 2 × CPU), ograniczany dostępnym RAM.
 Zużycie procesu pochodzi z natywnego RSS/peak, z zapasem 50% i minimum 384 MiB;
 768 MiB pozostaje rezerwą. Przed pomiarem estymata 1 GiB. To heurystyka, nie dowód

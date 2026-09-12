@@ -1,4 +1,4 @@
-QGIS Project Snapshot 1.2.0
+QGIS Project Snapshot 1.4.1
 Autor / Author: Jarosław Sadowski
 
 POLSKI
@@ -13,7 +13,7 @@ QGIS 3.40 lub nowszy z serii 3.x, Qt5/PyQt5 i GDAL >= 3.7 dostarczane z QGIS.
 Bez dodatkowych pakietów. Potrzebny dostęp do źródeł, wolne miejsce na dysku
 i prawo do pobierania danych. Sprawdzono QGIS 3.40 na Ubuntu.
 W QGIS wybierz Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP i wskaż
-qgis-project-snapshot-1.2.0.zip. Przy aktualizacji uruchom ponownie QGIS.
+qgis-project-snapshot-1.4.1.zip. Przy aktualizacji uruchom ponownie QGIS.
 Instalacja z katalogu plugins.qgis.org będzie możliwa po zatwierdzeniu publikacji.
 
 Użycie i automatyka
@@ -21,19 +21,34 @@ Wybierz Wtyczki → QGIS Project Snapshot → Archiwizuj projekt….
 Wskaż folder, obszar, warstwy i szczegółowość, następnie Utwórz archiwum.
 Mapy pobierają osobne procesy QGIS. Ich liczba rośnie automatycznie według
 zasobów komputera, szybkości i odpowiedzi serwerów; błędy ograniczają obciążenie.
+Po okresie poprawnej pracy automat ponownie próbuje zwiększyć liczbę zadań;
+utrwalony spadek szybkości może obniżyć limit. Windows dodatkowo sprawdza,
+ile pamięci może jeszcze przydzielić nowym procesom.
 Nie trzeba ustawiać liczby procesów. Automat nie gwarantuje maksymalnej szybkości.
 „Warstwy w kolejce” dotyczą serwera w tym samym wierszu.
 Przeczytaj raport, sprawdź kopię bez sieci i przenoś cały folder archiwum.
 Nie wszystkie zależności projektu są przenoszone automatycznie.
 Po przerwaniu wybierz „Kontynuuj to archiwum”. Po ponownym otwarciu oryginalnego
 projektu użyj „Wznów archiwum…” i wskaż cały poprzedni folder. Powstanie nowy
-folder z zachowanymi ukończonymi warstwami i ponowieniem brakujących lub częściowych.
-Przerwane warstwy są pobierane od początku. Potrzebne jest miejsce na kopię danych;
-poprzedni folder pozostaje bez zmian. To nie jest odzyskiwanie po awarii programu.
+folder z ukończonymi warstwami i poprawnie zapisanymi lub pustymi kafelkami map.
+Tylko brakujące kafelki otrzymają do trzech nowych prób. Nieukończony wektor zacznie
+swoją warstwę od początku. Potrzebne jest miejsce na kopię danych i cały folder.
+Po nieoczekiwanym zamknięciu QGIS wskaż folder z nazwą zawierającą .in-progress-.
+Okno podpowiada ostatni zachowany folder. Poprzednie wyniki pozostają dostępne.
+Przed planowanym zamknięciem użyj Przerwij i poczekaj na zapis; uszkodzony dysk
+lub pliki mogą uniemożliwić odzyskanie postępu.
+GeoTIFF-y mają piramidy do szybszego odczytu. Mapy zachowują niezależnie pobrane
+zoomy i style, także poprawnie puste poziomy; braki nie są wypełniane inną skalą.
+Do pracy otwieraj projekt .qgz, do sprawdzenia wyniku raport.html. Dane są w dane/,
+zasoby w zasoby/. Zachowaj je razem z projektem. Manifest, log i postęp są w diagnostyka/;
+nie trzeba otwierać ich ręcznie. Przenoś cały folder archiwum.
+Potwierdzone puste wektory w kopii mają końcówkę _nie-bylo-obiketow-w-zasiegu.
+Pola i styl pozostają. Błędy oraz niepotwierdzone puste MSSQL nie dostają końcówki;
+oryginalne nazwy są niezmienione.
 Instrukcja szczegółowa: INSTRUKCJA.md.
 
 Diagnostyka
-Automatyczny lokalny diagnostic.jsonl zawiera pomiary CPU, pamięci, odczytu i zapisu,
+Automatyczny lokalny diagnostyka/diagnostic.jsonl zawiera pomiary CPU, pamięci, odczytu i zapisu,
 kolejek oraz odpowiedzi serwerów. Pomiary komputera powstają co około 5 sekund,
 również podczas oczekiwania. Log nie jest wysyłany automatycznie.
 Od 1.2.0 zwykle wystarczy on do analizy wydajności. Dołącz manifest.json, gdy
@@ -64,7 +79,7 @@ QGIS 3.40 or a later 3.x release, with Qt5/PyQt5 and GDAL >= 3.7 supplied by QGI
 No additional packages. Requires source access, disk space and permission to
 download the data. Tested with QGIS 3.40 on Ubuntu.
 Choose Plugins → Manage and Install Plugins → Install from ZIP, then select
-qgis-project-snapshot-1.2.0.zip. Restart QGIS when upgrading.
+qgis-project-snapshot-1.4.1.zip. Restart QGIS when upgrading.
 Installation from plugins.qgis.org will be available once publication is approved.
 
 Use and automatic downloads
@@ -72,19 +87,34 @@ Choose Plugins → QGIS Project Snapshot → Archive project….
 Select a folder, area, layers and detail, then Create archive.
 Separate QGIS processes download maps. Concurrency grows automatically using
 computer resources, download speed and server responses; errors reduce the load.
+After healthy periods, it retests higher concurrency and reduces the limit when
+slowdowns persist. Windows also checks how much more memory it can allocate.
 No manual process count is needed. Maximum throughput is not guaranteed.
 “Queued layers” refers to the server in that row.
 Read the report, check the copy offline and keep the entire archive folder.
 Not all project dependencies can be transferred automatically.
 After cancelling, choose “Continue this archive”. After reopening the original
 project, use “Resume archive…” and select the entire previous archive folder.
-A new folder retains completed layers and retries missing or partial layers.
-Interrupted layers restart from the beginning. Space for a data copy is required;
-the previous folder stays unchanged. This does not recover from application crashes.
+A new folder retains completed layers and successfully saved or empty map tiles.
+Only missing tiles receive up to three new attempts. An unfinished vector layer
+starts that layer again. Keep the entire folder and allow space for a data copy.
+After an unexpected QGIS exit, select the folder whose name contains .in-progress-.
+The dialog suggests the last available folder. Previous results remain available.
+Before a planned shutdown, use Cancel and wait for saving; damaged storage or
+files can prevent progress recovery.
+GeoTIFFs include overviews for faster display. Maps retain separately downloaded
+zooms and styles, including correctly empty levels; missing tiles are not filled
+using another scale.
+Open the .qgz project to work with the archive, or raport.html to review results.
+Keep dane/ (data) and zasoby/ (resources) with the project. The manifest, log and saved progress
+are in diagnostyka/; there is no need to open them manually. Move the whole folder.
+Confirmed empty vector layers in the copy receive _nie-bylo-obiketow-w-zasiegu.
+Fields and styles remain. Errors and unconfirmed empty MSSQL reads do not receive
+this suffix; original names remain unchanged.
 See INSTRUKCJA.md for an English quick start.
 
 Diagnostics
-The automatic local diagnostic.jsonl records CPU, memory, read/write operations,
+The automatic local diagnostyka/diagnostic.jsonl records CPU, memory, read/write operations,
 queues and server responses. Computer samples are taken about every 5 seconds,
 including during waits. The log is not sent automatically.
 From 1.2.0, it is usually enough for performance analysis. Include manifest.json

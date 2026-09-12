@@ -4,6 +4,7 @@
 
 import json
 import math
+import os
 import time
 from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
@@ -13,7 +14,9 @@ from .resources import process_memory
 PROTOCOL = 1
 
 
-def write_state(path, value, *, cancelled=lambda: False, diagnostic=None):
+def write_state(
+    path, value, *, cancelled=lambda: False, diagnostic=None, durable=False
+):
     """Atomically publish IPC, tolerating short Windows sharing/lock conflicts.
 
     Keep the previous complete file until replacement succeeds. Never fall back
@@ -21,7 +24,11 @@ def write_state(path, value, *, cancelled=lambda: False, diagnostic=None):
     Retries total at most 250 ms, below the 2 s permission lease.
     """
     temporary = path.with_suffix(".new")
-    temporary.write_text(json.dumps(value), encoding="utf-8")
+    with temporary.open("w", encoding="utf-8") as stream:
+        json.dump(value, stream)
+        if durable:
+            stream.flush()
+            os.fsync(stream.fileno())
     delays = (0.01, 0.02, 0.04, 0.08, 0.10)
     for attempt in range(len(delays) + 1):
         try:
@@ -48,6 +55,12 @@ def write_state(path, value, *, cancelled=lambda: False, diagnostic=None):
             if cancelled():
                 raise InterruptedError() from error
         else:
+            if durable and os.name != "nt":
+                descriptor = os.open(path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
             if attempt and diagnostic:
                 diagnostic.emit(
                     "ipc_replace_recovered", file=path.name, attempts=attempt + 1
@@ -101,6 +114,9 @@ class HostPolicy:
     rate: float = 0.0
     baseline: float = 0.0
     poor_windows: int = 0
+    stable_rate: float = 0.0
+    healthy_seconds: float = 0.0
+    retry_seconds: float = 30.0
     history: list = field(default_factory=list)
 
     def change(self, now, reason):
@@ -109,6 +125,7 @@ class HostPolicy:
         self.sampled_at = now
         self.measured_successes = 0
         self.successes = 0
+        self.healthy_seconds = 0.0
         self.history.append(
             {
                 "at": now,
@@ -116,6 +133,9 @@ class HostPolicy:
                 "generation": self.generation,
                 "reason": reason,
                 "pause_seconds": max(0, self.until - now),
+                "rate": self.rate,
+                "baseline_rate": self.baseline,
+                "retry_after_healthy_seconds": self.retry_seconds,
             }
         )
 
@@ -137,12 +157,27 @@ class HostPolicy:
         if generation != self.generation:
             # Other in-flight requests from the same wave must not count as probes.
             if status in (429, 503) and delay is not None:
+                previous = self.until
                 self.until = max(self.until, now + delay)
                 if delay > 300:
                     self.blocked = True
                     self.change(now, "retry_after_exceeds_300s")
+                elif self.until > max(now, previous):
+                    # A late deadline still applies after a successful probe.
+                    # Invalidate any in-flight probe from the earlier deadline.
+                    self.recovering = self.frozen = True
+                    self.baseline = self.stable_rate = 0.0
+                    self.poor_windows = 0
+                    self.retry_seconds = max(60.0, self.retry_seconds)
+                    self.change(now, "retry_after_extended")
             return
-        if status == "timeout":
+        # Even a single transient error invalidates a healthy measurement.
+        self.successes = 0
+        self.window_started = now
+        self.sampled_at = now
+        self.measured_successes = 0
+        self.healthy_seconds = 0.0
+        if status in ("timeout", 502, 504):
             self.timeouts += 1
             if self.timeouts < 3 and not probe:
                 return
@@ -150,14 +185,12 @@ class HostPolicy:
             probe and status not in (401, 403, 404, 407)
         ):
             self.timeouts = 0
-            # Broken windows cannot justify a concurrency increase.
-            self.successes = 0
-            self.window_started = now
-            self.sampled_at = now
-            self.measured_successes = 0
             return
         self.limit = max(1, self.limit - 1)
         self.frozen = True
+        self.baseline = self.stable_rate = 0.0
+        self.poor_windows = 0
+        self.retry_seconds = min(300.0, max(60.0, self.retry_seconds * 2))
         if probe:
             self.probe_failures += 1
         self.recovering = True
@@ -192,20 +225,51 @@ class HostPolicy:
         self.successes = 0
         self.measured_successes = 0
         self.window_started = now
-        if self.frozen or not memory_ok:
-            return
+        self.healthy_seconds += elapsed
+        # Compare a trial with the most recent lower-concurrency window, not
+        # with an early fast layer for the rest of the archive.
         if self.baseline and self.rate < self.baseline * 1.10:
             self.poor_windows += 1
             if self.poor_windows >= 2:
                 self.limit = max(1, self.limit - 1)
                 self.frozen = True
+                self.baseline = self.stable_rate = 0.0
+                self.poor_windows = 0
+                self.retry_seconds = min(300.0, max(60.0, self.retry_seconds * 2))
                 self.change(now, "no_throughput_gain")
             return
+        if self.baseline:
+            self.baseline = 0.0
+            self.stable_rate = self.rate
+            self.retry_seconds = 30.0
+        elif (
+            self.limit > 1 and self.stable_rate and self.rate < self.stable_rate * 0.75
+        ):
+            # Keep monitoring an established limit, including periods with no
+            # spare computer slots. Two poor full windows justify reducing it.
+            self.poor_windows += 1
+            if self.poor_windows >= 2:
+                self.limit -= 1
+                self.frozen = True
+                self.stable_rate = 0.0
+                self.poor_windows = 0
+                self.retry_seconds = min(300.0, max(60.0, self.retry_seconds * 2))
+                self.change(now, "throughput_drop")
+            return
         self.poor_windows = 0
-        if backlog and self.limit < self.ceiling:
+        self.stable_rate = (
+            self.stable_rate * 0.75 + self.rate * 0.25
+            if self.stable_rate
+            else self.rate
+        )
+        if self.frozen and self.healthy_seconds < self.retry_seconds:
+            return
+        if memory_ok and backlog and self.limit < self.ceiling:
             self.baseline = self.rate
             self.limit += 1
-            self.change(now, "increase")
+            reason = "reprobe" if self.frozen else "increase"
+            self.frozen = False
+            self.change(now, reason)
 
 
 class WorkerGate:
@@ -301,19 +365,23 @@ class WorkerGate:
             self.counts[key] = self.counts.get(key, 0) + 1
         else:
             self.sequence += 1
-            self.required_ack = self.sequence
+            status = (
+                "success"
+                if error is None
+                else "timeout"
+                if isinstance(error, TimeoutError)
+                else getattr(error, "status", None)
+            )
+            if probe or status in ("timeout", 429, 502, 503, 504):
+                # Only feedback which can change permission needs synchronous ACK.
+                # Other errors remain queued until the coordinator consumes them.
+                self.required_ack = self.sequence
             self.events.append(
                 {
                     "sequence": self.sequence,
                     "generation": generation,
                     "probe": probe,
-                    "status": (
-                        "success"
-                        if error is None
-                        else "timeout"
-                        if isinstance(error, TimeoutError)
-                        else getattr(error, "status", None)
-                    ),
+                    "status": status,
                     "delay": getattr(error, "delay", None),
                 }
             )

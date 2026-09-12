@@ -231,7 +231,7 @@ class RasterTests(unittest.TestCase):
             self.assertEqual(ds.GetRasterBand(1).ReadRaster(20, 20, 1, 1)[0], red)
             ds = None
 
-    def test_empty_result_is_reported_and_transparent_tiles_not_stored(self):
+    def test_empty_result_stores_only_transparent_zoom_markers(self):
         def empty(layer, project, bounds, width, height, cancelled, progress):
             image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
             image.fill(QColor(0, 0, 0, 0))
@@ -243,8 +243,20 @@ class RasterTests(unittest.TestCase):
             record = self.render()
         self.assertEqual(record["status"], "empty")
         self.assertEqual(record["tile_count"], 0)
+        self.assertEqual(record["raster"]["empty_zoom_placeholders"], [16, 17])
         with closing(sqlite3.connect(self.database)) as db:
-            self.assertEqual(db.execute("SELECT count(*) FROM map").fetchone()[0], 0)
+            rows = db.execute(
+                "SELECT zoom_level,tile_data FROM map ORDER BY zoom_level"
+            ).fetchall()
+        self.assertEqual([zoom for zoom, _ in rows], [16, 17])
+        for _, payload in rows:
+            image = QImage.fromData(payload, "PNG").convertToFormat(
+                QImage.Format_RGBA8888
+            )
+            self.assertEqual((image.width(), image.height()), (256, 256))
+            self.assertEqual(
+                image.constBits().asstring(image.sizeInBytes())[3::4], bytes(256 * 256)
+            )
         uri = str(self.database) + "|option:TABLE=map|option:ZOOM_LEVEL=17"
         layer = QgsRasterLayer(uri, "Pusty", "gdal")
         self.assertTrue(layer.isValid(), layer.error().summary())
@@ -329,12 +341,12 @@ class RasterTests(unittest.TestCase):
                 zoom_min=17,
                 zoom_max=17,
             )
-        manifest = json.loads((result / "manifest.json").read_text())
+        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
         statuses = {r["id"]: r["status"] for r in manifest["layers"]}
         self.assertTrue(manifest["cancelled"])
         self.assertEqual(statuses[self.layer.id()], "saved")
         self.assertEqual(statuses[second.id()], "cancelled")
-        with closing(sqlite3.connect(result / "dane.gpkg")) as db:
+        with closing(sqlite3.connect(result / "dane" / "dane.gpkg")) as db:
             self.assertEqual(
                 db.execute("SELECT data_type FROM gpkg_contents").fetchall(),
                 [("features",)],
@@ -391,7 +403,7 @@ class RasterTests(unittest.TestCase):
             zoom_min=17,
             zoom_max=17,
         )
-        manifest = json.loads((result / "manifest.json").read_text())
+        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
         record = next(r for r in manifest["layers"] if r["id"] == raster.id())
         self.assertEqual(record["method"], "raster_data", record)
         local_path = result / record["local_source"][2:]
@@ -454,7 +466,8 @@ class LocalWmsTests(unittest.TestCase):
                 if parameters.get("REQUEST", "").lower() == "getcapabilities":
                     body = f"""<?xml version="1.0"?>
                     <WMS_Capabilities version="1.3.0"
-                    xmlns="http://www.opengis.net/wms" xmlns:xlink="http://www.w3.org/1999/xlink">
+                    xmlns="http://www.opengis.net/wms"
+                    xmlns:xlink="http://www.w3.org/1999/xlink">
                     <Service><Name>WMS</Name><Title>Local fixture</Title></Service>
                     <Capability><Request>
                     <GetMap><Format>image/png</Format>
@@ -562,7 +575,7 @@ class LocalWmsTests(unittest.TestCase):
             zoom_max=17,
             workers=2,
         )
-        manifest = json.loads((result / "manifest.json").read_text())
+        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
         record = next(r for r in manifest["layers"] if r["id"] == layer.id())
         self.assertEqual(record["status"], "failed")
         self.assertIn("worker_pid", record)
@@ -605,7 +618,7 @@ class LocalWmsTests(unittest.TestCase):
             cancelled=lambda: cancelled,
             progress=progress,
         )
-        manifest = json.loads((result / "manifest.json").read_text())
+        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
         self.assertTrue(manifest["cancelled"])
         statuses = {r["id"]: r["status"] for r in manifest["layers"]}
         self.assertEqual(statuses[self.layer.id()], "saved")
@@ -647,7 +660,7 @@ class LocalWmsTests(unittest.TestCase):
             per_server_limit=per_server_limit,
             worker_activity=lambda rows: activities.extend(rows),
         )
-        manifest = json.loads((result / "manifest.json").read_text())
+        manifest = json.loads((result / "diagnostyka" / "manifest.json").read_text())
         if workers > 1:
             self.assertTrue(
                 any(
@@ -685,6 +698,19 @@ class LocalWmsTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         moved = self.folder / "offline"
+        self.assertEqual(
+            {path.name for path in result.iterdir() if path.is_file()},
+            {next(result.glob("*.qgz")).name, "raport.html"},
+        )
+        self.assertEqual(
+            {path.name for path in (result / "diagnostyka").iterdir()},
+            {"manifest.json", "diagnostic.jsonl"},
+        )
+        statistics = {
+            path.relative_to(result): path.read_bytes()
+            for path in (result / "dane").glob("*.aux.xml")
+        }
+        self.assertTrue(statistics)
         shutil.move(result, moved)
         requests_before_open = len(self.server.requests)
         copy = QgsProject()
@@ -695,6 +721,9 @@ class LocalWmsTests(unittest.TestCase):
             self.assertEqual(raster.providerType(), "gdal")
             self.assertEqual(raster.crs().authid(), "EPSG:2180")
             self.assertNotIn("127.0.0.1", raster.source())
+            self.assertFalse(list(moved.glob("*.aux.xml")))
+            for relative, contents in statistics.items():
+                self.assertEqual((moved / relative).read_bytes(), contents)
             image = _render_image(
                 raster,
                 copy,

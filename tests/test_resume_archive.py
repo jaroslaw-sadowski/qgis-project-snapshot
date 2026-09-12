@@ -20,12 +20,59 @@ from mbtiles_batch_exporter import archive as archive_module
 from mbtiles_batch_exporter.parallel_archive import RasterWorkers
 
 
+def legacy_resume_layout(folder):
+    """Place recovery artifacts exactly where releases through 1.4.0 kept them."""
+    manifest = archive_module.read_resume_manifest(folder)
+    manifest.pop("data_file")
+    for record in manifest["layers"]:
+        if record.get("local_source"):
+            record["local_source"] = record["local_source"].replace(
+                "./dane/dane.gpkg|", "./dane.gpkg|", 1
+            )
+    manifest["sha256"] = {
+        name.removeprefix("dane/").removeprefix("diagnostyka/"): digest
+        for name, digest in manifest["sha256"].items()
+    }
+    for directory in (folder / "dane", folder / "diagnostyka"):
+        for path in directory.iterdir():
+            shutil.move(path, folder / path.name)
+        directory.rmdir()
+    (folder / "manifest.json").write_text(json.dumps(manifest))
+
+
 class ResumeArchiveTests(unittest.TestCase):
     setUp = fixtures.ArchiveTests.setUp
     tearDown = fixtures.ArchiveTests.tearDown
     add_points = fixtures.ArchiveTests.add_points
     archive = fixtures.ArchiveTests.archive
     manifest = fixtures.ArchiveTests.manifest
+
+    def test_legacy_root_layout_reuses_data_and_keeps_previous_archive(self):
+        previous = self.archive()
+        legacy_resume_layout(previous)
+        original_files = {
+            path.relative_to(previous): path.read_bytes()
+            for path in previous.rglob("*")
+            if path.is_file()
+        }
+        with patch.object(archive_module, "_write_vector") as write:
+            result = self.archive(resume_from=previous)
+        write.assert_not_called()
+        manifest = self.manifest(result)
+        self.assertEqual(manifest["data_file"], "dane/dane.gpkg")
+        self.assertTrue(manifest["layers"][0]["reused"])
+        self.assertTrue(manifest["local_layer_audit"]["passed"])
+        self.assertTrue((result / "dane" / "dane.gpkg").is_file())
+        self.assertFalse((result / "dane.gpkg").exists())
+        self.assertFalse((result / "manifest.json").exists())
+        self.assertEqual(
+            {
+                path.relative_to(previous): path.read_bytes()
+                for path in previous.rglob("*")
+                if path.is_file()
+            },
+            original_files,
+        )
 
     def test_cancel_then_resume_reuses_completed_and_empty_vectors(self):
         empty = self.add_points("No objects in the area", [(1, 9)])
@@ -142,7 +189,7 @@ class ResumeArchiveTests(unittest.TestCase):
 
     def test_missing_or_changed_database_is_rejected_before_export(self):
         previous = self.archive()
-        database = previous / "dane.gpkg"
+        database = previous / "dane" / "dane.gpkg"
         original = database.read_bytes()
         for change in ("missing", "changed"):
             with self.subTest(change=change):
@@ -166,7 +213,7 @@ class ResumeArchiveTests(unittest.TestCase):
         manifest["sha256"]["../outside.txt"] = hashlib.sha256(
             outside.read_bytes()
         ).hexdigest()
-        (previous / "manifest.json").write_text(json.dumps(manifest))
+        (previous / "diagnostyka" / "manifest.json").write_text(json.dumps(manifest))
         with (
             patch.object(archive_module, "_write_vector") as write,
             self.assertRaises((ValueError, OSError, RuntimeError)),
@@ -180,7 +227,7 @@ class ResumeArchiveTests(unittest.TestCase):
         manifest = self.manifest(previous)
         for record in manifest["layers"]:
             record.pop("source_fingerprint", None)
-        (previous / "manifest.json").write_text(json.dumps(manifest))
+        (previous / "diagnostyka" / "manifest.json").write_text(json.dumps(manifest))
         for continuation in range(2):
             with self.subTest(continuation=continuation):
                 with patch.object(archive_module, "_write_vector") as write:
@@ -266,7 +313,7 @@ class ResumeRasterTests(unittest.TestCase):
         manifest = self.manifest(previous)
         record = manifest["layers"][0]
         self.assertEqual(record["method"], "raster_render")
-        database = previous / "dane.gpkg"
+        database = previous / "dane" / "dane.gpkg"
         with closing(sqlite3.connect(database)) as connection:
             table = record["table"]
             with connection:
@@ -284,10 +331,10 @@ class ResumeRasterTests(unittest.TestCase):
             if level["zoom"] == zoom:
                 level["nonempty"] -= 1
                 level["failed"] += 1
-        manifest["sha256"]["dane.gpkg"] = hashlib.sha256(
+        manifest["sha256"]["dane/dane.gpkg"] = hashlib.sha256(
             database.read_bytes()
         ).hexdigest()
-        (previous / "manifest.json").write_text(json.dumps(manifest))
+        (previous / "diagnostyka" / "manifest.json").write_text(json.dumps(manifest))
         previous_bytes = database.read_bytes()
 
         for stop in (False, True):
@@ -322,7 +369,9 @@ class ResumeRasterTests(unittest.TestCase):
                     current["layers"][0]["local_source"], record["local_source"]
                 )
                 self.assertTrue(current["local_layer_audit"]["passed"])
-                with closing(sqlite3.connect(continued / "dane.gpkg")) as connection:
+                with closing(
+                    sqlite3.connect(continued / "dane" / "dane.gpkg")
+                ) as connection:
                     tiles = connection.execute(
                         "SELECT zoom_level,tile_column,tile_row,tile_data "
                         f'FROM "{table}" '
@@ -389,7 +438,7 @@ class ResumeWmsTests(unittest.TestCase):
         self.assertEqual(records[fast_id]["status"], "saved")
         self.assertEqual(records[pending_id]["status"], "cancelled")
         self.assertIn("worker_pid", records[fast_id])
-        previous_bytes = (previous / "dane.gpkg").read_bytes()
+        previous_bytes = (previous / "dane" / "dane.gpkg").read_bytes()
         self.project.clear()
         self.assertTrue(self.project.read(str(original_project)))
         current_layers = [
@@ -417,7 +466,7 @@ class ResumeWmsTests(unittest.TestCase):
         self.assertTrue(after["local_layer_audit"]["passed"])
         self.assertFalse(after["cancelled"])
         self.assertFalse((continued / ".workers").exists())
-        self.assertEqual((previous / "dane.gpkg").read_bytes(), previous_bytes)
+        self.assertEqual((previous / "dane" / "dane.gpkg").read_bytes(), previous_bytes)
         self.assertEqual(original_project.read_bytes(), original_bytes)
 
 

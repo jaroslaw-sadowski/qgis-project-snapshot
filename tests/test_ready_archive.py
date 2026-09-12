@@ -109,7 +109,9 @@ class ReadyWmsTests(fixtures.unittest.TestCase):
         self.assertEqual(manifest["parallel"]["completed_in_workers"], 8)
         self.assertFalse((folder / ".workers").exists())
         selected = {r["id"]: r for r in manifest["layers"]}
-        with fixtures.closing(fixtures.sqlite3.connect(folder / "dane.gpkg")) as db:
+        with fixtures.closing(
+            fixtures.sqlite3.connect(folder / "dane" / "dane.gpkg")
+        ) as db:
             for layer in layers:
                 record = selected[layer.id()]
                 self.assertEqual(record["status"], "saved")
@@ -153,7 +155,9 @@ class ReadyWmsTests(fixtures.unittest.TestCase):
         self.assertTrue(manifest["cancelled"])
         self.assertEqual(manifest["parallel"]["completed_in_workers"], 1)
         self.assertFalse((folder / ".workers").exists())
-        with fixtures.closing(fixtures.sqlite3.connect(folder / "dane.gpkg")) as db:
+        with fixtures.closing(
+            fixtures.sqlite3.connect(folder / "dane" / "dane.gpkg")
+        ) as db:
             self.assertGreater(
                 db.execute(
                     f'SELECT count(*) FROM "{selected[fast.id()]["table"]}"'
@@ -162,7 +166,9 @@ class ReadyWmsTests(fixtures.unittest.TestCase):
             )
         diagnostics = [
             json.loads(line)
-            for line in (folder / "diagnostic.jsonl").read_text().splitlines()
+            for line in (folder / "diagnostyka" / "diagnostic.jsonl")
+            .read_text()
+            .splitlines()
         ]
         self.assertTrue(
             any(

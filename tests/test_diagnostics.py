@@ -88,7 +88,8 @@ class ResponseDiagnosticsTests(unittest.TestCase):
             self.reply(
                 b"<ows:ExceptionReport>"
                 b'<ows:Exception exceptionCode="InvalidParameterValue">'
-                b"<ows:ExceptionText>password=secret https://user:pass@host/private</ows:ExceptionText>"
+                b"<ows:ExceptionText>password=secret "
+                b"https://user:pass@host/private</ows:ExceptionText>"
                 b"</ows:Exception></ows:ExceptionReport>"
             )
         )

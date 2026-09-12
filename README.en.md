@@ -1,6 +1,6 @@
 # <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
 
-[Polski](README.md) · English · Version **1.2.0**
+[Polski](README.md) · English · Version **1.4.1**
 
 ## What it is and what it does
 
@@ -27,7 +27,7 @@ and authentication, need checking on your own workstation.
 
 ## How to install
 
-1. Obtain the **`qgis-project-snapshot-1.2.0.zip`** release package.
+1. Obtain the **`qgis-project-snapshot-1.4.1.zip`** release package.
    Use the plugin's installation ZIP, not a ZIP of the entire repository.
 2. In QGIS, choose **Plugins → Manage and Install Plugins → Install from ZIP**.
 3. Select the package and install it. Restart QGIS when upgrading.
@@ -52,30 +52,61 @@ checking. Not all fonts, forms and expressions can be transferred automatically.
 The archive date describes acquisition time, not a simultaneous state of all
 sources. Archives and reports may contain confidential data; inspect them before sharing.
 
+Open the **`.qgz` project** to work with the archive, or **`raport.html`** to review
+results. `dane/` holds the GeoPackage and files that help read it faster,
+`zasoby/` holds required resources, and
+`diagnostyka/` contains the manifest, log and any saved progress for resuming.
+You do not need to open those files manually. Move the entire folder together
+and keep its contents until continuation is complete.
+
+Confirmed empty vector layers in the project copy receive the exact suffix
+**`_nie-bylo-obiketow-w-zasiegu`**. Their fields and style remain, with zero features.
+Original names stay unchanged. Errors and unconfirmed empty MSSQL reads do not
+receive this suffix.
+
 ## How to continue an archive
 
 After an export finishes or is cancelled, choose **Continue this archive**.
 After restarting QGIS, open the original project, choose **Resume archive…**
 and select the entire previous archive folder.
 
-The plugin checks the saved files and creates a new folder. It copies completed
-layers and resources, then retries missing or partial layers. Empty zooms still
-need review but are not downloaded again automatically. An unfinished layer
-starts again from the beginning; if the retry does not complete, its earlier
-partial image is kept in the result. The previous folder stays unchanged.
+The plugin checks saved files and creates a new folder. It retains completed
+layers, resources, and successfully saved or empty map tiles. Only missing tiles
+are downloaded, with up to three new attempts per tile. An unfinished vector layer
+starts that layer again from the beginning. The previous folder remains available.
+Older zero-feature WFS/MSSQL results and unconfirmed empty MSSQL reads are checked
+again; a correctly empty result remains valid.
+
+From 1.4.0, map progress is saved during downloads. After an unexpected QGIS exit,
+use **Resume archive…** and select the folder whose name contains `.in-progress-`.
+The dialog suggests the last available folder; you still choose whether to resume.
+Empty zoom levels need comparison with the source, but successfully empty tiles
+are not downloaded again.
 
 You need the entire archive folder and space for a copy; a report or JSON alone
 is not enough. Continuation uses the previous area and zooms. Changed sources,
-styles or unsaved edits require a new archive. For archives from 1.0.0, source
-and style compatibility cannot be confirmed, so use the same original project.
-Resuming requires a saved result; it cannot recover an export after a crash or power loss.
+styles or unsaved edits require a new archive. Archives older than 1.4.0 retain
+completed layers, but unfinished maps without a tile record restart that layer.
+For archives from 1.0.0, source and style compatibility cannot be confirmed,
+so use the same original project.
+Before a planned shutdown, use **Cancel** and wait for saving to finish. Recovery
+uses the data still available; it cannot repair files damaged by storage or power failure.
+
+## Faster raster display
+
+Archived GeoTIFFs include overviews to help display them when zoomed out.
+Maps retain separately downloaded zoom levels and their styles, including correctly
+empty levels. Overviews do not fill missing images using a different scale.
 
 ## Automatic parallel downloads
 
 The plugin downloads maps in separate QGIS processes. It starts with one task
 per server and gradually increases concurrency using available RAM, CPU,
 download speed and server responses. Errors reduce the load or trigger a pause.
-You do not need to set the number of processes manually.
+After a period of healthy responses, it checks whether more tasks improve download
+speed; a sustained slowdown may reduce the limit. On Windows it also checks how
+much memory the system can still allocate. You do not need to set the number of
+processes manually.
 
 The window shows active tasks and limits. **Queued layers** counts layers waiting
 to download from the server in that row. Automatic adjustment helps speed up
@@ -87,7 +118,8 @@ QGIS network settings. Continuing an archive uses the same automatic server load
 From version 1.2.0, the plugin automatically records CPU, memory, read/write
 operations, queues and server activity in `diagnostic.jsonl`. Computer measurements
 are taken about every 5 seconds, including while downloads are waiting. The log
-stays in the local archive folder; the plugin does not send it automatically.
+stays locally; from 1.4.1, it is in **`diagnostyka/`** alongside `manifest.json`.
+The plugin does not send these files automatically.
 
 **`diagnostic.jsonl`** is usually enough for a typical performance review. Include
 `manifest.json` to identify layers by name or examine missing results in detail.

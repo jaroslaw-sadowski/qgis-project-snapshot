@@ -32,7 +32,7 @@ class MeasuredWorkerTests(unittest.TestCase):
         self.futures = {}
         for target, value in (
             ("time.monotonic", lambda: self.clock),
-            ("available_memory", lambda: self.memory),
+            ("available_memory", lambda **kwargs: self.memory),
         ):
             mocked = patch(
                 "mbtiles_batch_exporter.parallel_archive." + target,
@@ -221,3 +221,77 @@ class MeasuredWorkerTests(unittest.TestCase):
         self.assertTrue(self.futures["a"].running())
         self.assertTrue(self.futures["b"].running())
         self.assertFalse(self.futures["c"].running())
+
+    def test_low_windows_commit_blocks_starts_despite_free_physical_ram(self):
+        commit = [2 * GIB]
+        self.memory = 5 * GIB
+        with patch(
+            "mbtiles_batch_exporter.parallel_archive.available_memory",
+            side_effect=lambda *, include_commit=False: (
+                commit[0] if include_commit else self.memory
+            ),
+        ):
+            self._start([(name, name) for name in "abc"])
+            self._wait_started(1)
+            commit[0] = 325 * MIB
+            self._advance(5)
+            self.assertFalse(self.workers.memory_ok)
+            self.assertEqual(self.workers.memory_available, 5 * GIB)
+            self.assertEqual(self.workers.memory_budget_available, 325 * MIB)
+            self.assertEqual(len(self.started), 1)
+            self.assertTrue(self.futures["a"].running())
+            self.assertFalse(self.workers.stop.is_set())
+            commit[0] = 4 * GIB
+            self._advance(10)
+            self._wait_started(3)
+            self.assertTrue(self.workers.memory_ok)
+
+    def test_deferred_host_finishes_without_waiting_for_free_memory(self):
+        folder = self.workers.folder / "blocked"
+        folder.mkdir()
+        self.workers._register("offline", folder)
+        self.workers.policies["offline"].blocked = True
+        future = Future()
+        self.workers.queue.append(("offline", future, folder))
+        self.workers.memory_ok = False
+        self.workers.launch_slots = 0
+        self.workers.pool.submit(self.workers._work_loop)
+        result = future.result(3)
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(result["raster"]["deferred"])
+        self.assertEqual(self.started, [])
+
+    def test_reprobe_reuses_parked_process_without_a_queue_or_free_start_slot(self):
+        self.memory = 3 * GIB
+        self.samples = {name: 500 * MIB for name in "ab"}
+        self._start([(name, "same-server") for name in "ab"])
+        self._wait_started(1)
+        with self.workers.condition:
+            policy = self.workers.policies["same-server"]
+            policy.limit = 2
+        self._advance(5)
+        self._wait_started(2)
+        with self.workers.condition:
+            self.memory = 1100 * MIB
+            policy.limit = 1
+            policy.frozen = True
+            policy.retry_seconds = 60
+            policy.change(5, "no_throughput_gain")
+        for now in (20, 35, 50, 65):
+            with self.workers.condition:
+                self._publish("a", 500 * MIB, count=now * 2)
+            self._advance(now)
+            self.assertEqual(self.workers.workers, 2)
+            self.assertEqual(self.workers.launch_slots, 0)
+            self.assertEqual(policy.limit, 1)
+            self.assertTrue(self.workers.memory_ok)
+            self.assertFalse(self.workers.memory_growth_ok)
+        with self.workers.condition:
+            self.memory = 1500 * MIB
+            self._publish("a", 500 * MIB, count=160)
+        self._advance(80)
+        self.assertEqual(self.workers.launch_slots, 0)
+        self.assertTrue(self.workers.memory_growth_ok)
+        self.assertEqual(policy.limit, 2)
+        self.assertEqual(policy.history[-1]["reason"], "reprobe")
+        self.assertEqual(len(self.started), 2)

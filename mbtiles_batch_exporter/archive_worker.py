@@ -28,6 +28,7 @@ def main():
     stage = "bootstrap"
     network_error = {}
     project = gate = network_monitor = None
+    cache_lock = None
     last_progress = 0.0
     server_warnings = []
     last_message = ""
@@ -68,13 +69,24 @@ def main():
             QgsGeometry,
             QgsProject,
         )
-        from qgis.PyQt.QtCore import QCoreApplication
+        from qgis.PyQt.QtCore import QCoreApplication, QLockFile
 
         from .adaptive import WorkerGate
         from .raster_archive import write_rendered_raster
         from .worker_network import configure_network
 
         parameters = json.loads((folder / "input.json").read_text())
+        cache = (
+            Path(parameters["cache_folder"])
+            if parameters.get("cache_folder")
+            else folder
+        )
+        if parameters.get("cache_folder"):
+            cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+            cache_lock = QLockFile(str(cache / ".archive.lock"))
+            cache_lock.setStaleLockTime(0)
+            if not cache_lock.tryLock(0):
+                raise RuntimeError("Download cache is in use")
         app = QgsApplication([], False)
         app.initQgis()
         app.setMaxThreads(1)
@@ -127,12 +139,18 @@ def main():
             project,
             QgsGeometry.fromWkt(parameters["area"]),
             QgsCoordinateReferenceSystem(parameters["area_crs"]),
-            folder / "raster.gpkg",
+            cache / "raster.gpkg",
             parameters["table"],
             parameters["levels"],
             lambda: (folder / "cancel").exists(),
             progress,
             gate=gate,
+            resume=(cache / "raster.gpkg").exists()
+            or (cache / "tiles.sqlite").exists(),
+            ledger_path=cache / "tiles.sqlite"
+            if parameters.get("cache_folder")
+            else None,
+            legacy_retries=not parameters.get("adaptive", False),
         )
         raster_stats = result.get("raster", {})
         diagnostic.emit(
@@ -182,6 +200,8 @@ def main():
             network_monitor.close()
         if gate:
             gate.close()
+        if cache_lock:
+            cache_lock.unlock()
         if project:
             project.clear()
             # Destroy project styles while QgsApplication still owns its models.
