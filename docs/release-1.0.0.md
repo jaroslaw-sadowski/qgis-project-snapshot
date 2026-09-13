@@ -132,6 +132,10 @@ na fizyczną awarię nośnika.
 pierwotny tag wskazywał commit `1c84110aeb54858a2dff05b32f2bc65dd5e60463`.
 Pierwotna paczka miała SHA-256:
 `b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37`. Korekta menu/opisów zastępuje ją w tym samym wydaniu.
+Zaktualizowany tag v1.0.0 wskazuje `fd134c45ae7dc615a7decb01b2f8c1ed460f305a`.
+Oba załączniki i suma w opisie wydania zostały podmienione; ponowne pobranie
+bez logowania potwierdziło zgodność ZIP/SHA z lokalnymi plikami oraz wszystkich
+plików paczki ze źródłem pod tagiem. Wydanie nadal jest stabilne i publiczne.
 Sprawdzono dostęp do źródeł i załączników bez logowania (HTTP 200), zgodność
 pobranego ZIP-a z lokalnym i SHA-256. Historia oraz bieżące źródła bez trafień
 sekretów. Spełniono wymóg publicznych źródeł z

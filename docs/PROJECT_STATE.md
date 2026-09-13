@@ -29,7 +29,8 @@ pozycję bezpośrednio w menu Wtyczki, bez zmiany algorytmów i numeru 1.0.0.
 
 Przed publikacją uzupełniono tagi: 17 EN, potem 13 PL. Sprawdzono metadane
 i integralność nowego ZIP-a; porównanie potwierdziło zmianę wyłącznie pola tags.
-Kod jest identyczny jak w paczce z pełnym odbiorem. Aktualna suma w raporcie.
+Wtedy kod był identyczny jak w paczce z pełnym odbiorem. Późniejszą korektę
+menu opisano osobno poniżej; aktualna suma znajduje się w raporcie.
 
 **Odbiór bazowego kodu: 231/231 testów z ZIP-a w każdym runtime**, bez pominięć,
 kody procesów 0. Qt5: 170,064 s; Qt6: 171,448 s. Ruff/format, Flake8, składnia
@@ -57,8 +58,8 @@ włączenie bez duplikatów oraz zachowanie cudzych pozycji menu. Ruff/format,
 Flake8, składnia 3.10 i diff OK. Flake8 uruchomiono z --jobs 1, ponieważ sandbox
 blokuje gniazdo forkserver; zakres kontroli bez zmian. Pełne 231 testów jest
 wcześniejszą bazą odbioru; nie powtarzano ich dla zmiany tekstów/menu.
-W ramach istniejącego wydania podmieniamy ZIP i tag v1.0.0, zgodnie z poleceniem
-zachowania numeru. Stan synchronizacji poniżej.
+W ramach istniejącego wydania podmieniono ZIP i tag v1.0.0, zgodnie z poleceniem
+zachowania numeru. Synchronizację potwierdzono poniżej.
 
 ## Środowiska i ograniczenia
 
@@ -100,7 +101,11 @@ jest opublikowany jako stabilny, z ZIP-em i plikiem SHA-256. Pierwotny tag wskaz
 issues, strona wydania i oba załączniki sprawdzone bez logowania (HTTP 200).
 Pierwotnie pobrany publicznie ZIP był identyczny z lokalnym; poprzedni SHA-256:
 `b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37`.
-Aktualna korekta paczki: `fb36f7a64cd005d9ef3fb505abe5349fd65983a553481b570b88da50b9dbdae4`; synchronizacja wydania w toku.
+Aktualna paczka po korekcie opisów/menu: `fb36f7a64cd005d9ef3fb505abe5349fd65983a553481b570b88da50b9dbdae4`.
+Tag v1.0.0 wskazuje teraz commit `fd134c45ae7dc615a7decb01b2f8c1ed460f305a`.
+Podmieniono oba załączniki i sumę w opisie istniejącego wydania. Pobrano je
+publicznie bez logowania: ZIP i SHA są identyczne z lokalnymi. Każdy plik ZIP-a
+jest zgodny ze źródłem pod tagiem. Repo pozostaje publiczne, wydanie stabilne.
 Przed zmianą widoczności przejrzano 20 commitów: 444 unikalne obiekty plików,
 434 tekstowe przeskanowane, zero trafień sekretów i brak plików projektów/danych.
 Bieżące 96 plików źródeł/dokumentacji również bez trafień sekretów.
