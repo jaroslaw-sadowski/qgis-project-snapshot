@@ -289,7 +289,7 @@ class ResumeRasterTests(unittest.TestCase):
     def test_completed_transparent_map_is_reused_and_still_marked_for_review(self):
         def transparent(layer, project, bounds, width, height, cancelled, progress):
             image = raster_fixtures.QImage(
-                width, height, raster_fixtures.QImage.Format_RGBA8888
+                width, height, raster_fixtures.QImage.Format.Format_RGBA8888
             )
             image.fill(0)
             return image

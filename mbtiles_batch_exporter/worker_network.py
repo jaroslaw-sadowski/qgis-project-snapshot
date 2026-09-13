@@ -2,17 +2,31 @@
 
 """Transfer QGIS proxy configuration as plain data over a private stdin pipe."""
 
-from qgis.core import QgsNetworkAccessManager, QgsSettings
+from qgis.core import QgsNetworkAccessManager, QgsSettings, QgsSettingsTree
 from qgis.PyQt.QtNetwork import QNetworkProxy, QNetworkProxyFactory
+
+# The native settings tree replaced the legacy proxy keys in newer QGIS.
+# Keep the pipe protocol stable; translate only the local profile keys.
+_PROXY_KEYS = {
+    legacy: f"proxy/{native if QgsSettingsTree.node('proxy') else legacy}"
+    for legacy, native in (
+        ("proxyEnabled", "proxy-enabled"),
+        ("proxyType", "proxy-type"),
+        ("proxyHost", "proxy-host"),
+        ("proxyPort", "proxy-port"),
+        ("proxyExcludedUrls", "proxy-excluded-urls"),
+        ("noProxyUrls", "no-proxy-urls"),
+    )
+}
 
 
 def network_snapshot():
     """Called only on the desktop main thread; never log the returned data."""
     settings = QgsSettings()
     manager = QgsNetworkAccessManager.instance()
-    enabled = settings.value("proxy/proxyEnabled", False, type=bool)
+    enabled = settings.value(_PROXY_KEYS["proxyEnabled"], False, type=bool)
     keys = ("proxyType", "proxyHost", "proxyPort", "proxyExcludedUrls", "noProxyUrls")
-    values = {key: settings.value("proxy/" + key) for key in keys}
+    values = {key: settings.value(_PROXY_KEYS[key]) for key in keys}
     values["proxyEnabled"] = enabled
     # The live manager has already resolved the profile's authentication config.
     proxy = manager.fallbackProxy()
@@ -38,12 +52,14 @@ def configure_network(snapshot, diagnostic=None):
     settings.remove("proxy")
     for key, value in snapshot["settings"].items():
         if value is not None:
-            settings.setValue("proxy/" + key, value)
+            settings.setValue(_PROXY_KEYS[key], value)
     # Never persist the proxy password, user name or the desktop auth database.
     settings.sync()
     QNetworkProxyFactory.setUseSystemConfiguration(snapshot["system"])
     if not snapshot["settings"]["proxyEnabled"]:
-        QNetworkProxy.setApplicationProxy(QNetworkProxy(QNetworkProxy.NoProxy))
+        QNetworkProxy.setApplicationProxy(
+            QNetworkProxy(QNetworkProxy.ProxyType.NoProxy)
+        )
     manager = QgsNetworkAccessManager.instance()
     manager.setupDefaultProxyAndCache()
     manager.setTimeout(snapshot["timeout"])

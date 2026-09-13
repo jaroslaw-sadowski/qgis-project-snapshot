@@ -398,8 +398,8 @@ class RepairTests(unittest.TestCase):
             if empty_key[0] is None:
                 empty_key[0] = key
             if key == empty_key[0]:
-                image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
-                image.fill(Qt.transparent)
+                image = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
+                image.fill(Qt.GlobalColor.transparent)
                 return image
             if failed_key[0] is None:
                 failed_key[0] = key

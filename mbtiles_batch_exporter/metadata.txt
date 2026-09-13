@@ -1,36 +1,23 @@
 [general]
 name=QGIS Project Snapshot
 qgisMinimumVersion=3.40
-qgisMaximumVersion=3.99
+qgisMaximumVersion=4.99
 description=Save a QGIS project copy with local vector data, map images and an archive report for offline use.
-version=1.4.3
+version=1.0.0
 author=Jarosław Sadowski
 email=github.com.amenity983@passfwd.com
-about=Choose an area, layers and map detail to create a separate project archive. Preserves the layer tree, styles and vector attributes; saves map images as lossless PNG with transparency. Produces an HTML report and a manifest describing saved data and missing results. Keep the entire archive folder and verify it offline. Some fonts, forms and external resources require manual checks.
-    Automatically downloads maps in separate QGIS processes, adjusting concurrency to available CPU, measured memory use and server responses. Periodically retests higher concurrency after healthy periods and reduces sustained slowdowns. Windows also checks available memory commit before starting more processes. Uses the active QGIS proxy configuration and available credentials. No maximum download speed is guaranteed.
-    Continue from the original project after cancellation or an unexpected QGIS exit. Copies completed layers and saved map progress to a new folder, retaining successful and empty tiles and retrying only missing tiles. Unfinished vector layers restart that layer. Keep the complete previous folder and allow disk space for its copy; damaged storage may prevent recovery. GeoTIFF overviews speed up display; maps retain independently downloaded zoom levels and styles.
-    Saves local diagnostic measurements of CPU, memory, process I/O, download queues and observed network responses for troubleshooting. Diagnostic files are not sent automatically; measurements do not establish maximum computer or server throughput.
-    Requires QGIS 3.40–3.x with Qt5/PyQt5, Python 3.10 or newer and GDAL 3.7 or newer, supplied with a compatible QGIS installation. No extra Python packages or plugin dependencies. Tested on Ubuntu; Windows and macOS need platform validation. QGIS 4/Qt6 is not supported. Access to the selected project sources and sufficient disk space are required. Interface and documentation: English and Polish.
-    Respect each layer's license, attribution requirements and service terms for downloading, copying, offline use and redistribution. The plugin grants no rights to third-party content. To the extent permitted by law, the author accepts no liability for prohibited copying or redistribution by users. Do not archive services that prohibit offline downloads.
-    Developed through vibe coding with AI assistance, with automated tests and code review. Free software under GNU GPL version 2 (GPL-2.0-only), without warranty. License: https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/main/LICENSE
-    PL: Zapisuje osobną kopię projektu, lokalne dane i mapy z raportem. Automatycznie dobiera równoległość pobierania. Sprawdź całe archiwum bez sieci oraz licencje warstw i warunki usług. Autor nie udziela praw do cudzych treści i w granicach prawa nie odpowiada za ich niedozwolone kopiowanie przez użytkownika. Wtyczka powstała metodą vibe coding z pomocą AI; kod jest na licencji GNU GPL v2. Instrukcja PL/EN w repozytorium i paczce.
+about=EN: Archive a QGIS project for offline use, with vector data, lossless maps, styles and a report. Automatic parallel downloads adapt to client resources and server responses; interrupted downloads can be resumed. Requires QGIS 3.40+/4.x, Python >=3.10 and GDAL >=3.7 supplied by QGIS, source access and disk space; no extra Python packages. Install the release ZIP through the QGIS Plugin Manager, then restart QGIS.
+    Runs locally without analytics or uploading projects/diagnostics to the author. Requests send the required area, layer parameters and authentication to selected data services. Respect their licenses, attribution and download/reuse restrictions; the author is not liable for users' violations to the extent permitted by law. GPL-2.0-only. Developed with AI/vibe coding; tested (Bandit, secret scanning, Qt6 checks, Ruff/Flake8, proxy/error handling, integrity and crash recovery).
+    PL: Archiwizuje projekt QGIS do pracy offline: wektory, bezstratne mapy, style i raport. Automatyczne pobieranie równoległe dobiera obciążenie do komputera i serwerów; umożliwia wznowienie po przerwaniu. Wymaga QGIS 3.40+/4.x, Pythona >=3.10 i GDAL >=3.7 z QGIS, dostępu do źródeł i miejsca na dysku; bez dodatkowych pakietów. Zainstaluj ZIP przez Menedżer wtyczek i uruchom QGIS ponownie.
+    Działa lokalnie, bez analityki i wysyłania projektu/diagnostyki do autora. Zapytania przekazują usługom wymagany zasięg, parametry warstw i uwierzytelnienie. Przestrzegaj licencji, zasad podawania źródeł oraz ograniczeń pobierania/użycia danych; w granicach prawa autor nie odpowiada za naruszenia użytkownika. GPL-2.0-only. Wykorzystano AI/vibe coding; testy (Bandit, skan sekretów, Qt6, Ruff/Flake8, proxy/błędy, integralność i wznowienie po awarii).
 license=GPL-2.0-only
 icon=icon.svg
 homepage=https://github.com/jaroslaw-sadowski/qgis-project-snapshot#readme
 repository=https://github.com/jaroslaw-sadowski/qgis-project-snapshot
 tracker=https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues
-tags=archive,snapshot,offline,project,geopackage,wms,wfs,raster,vector
-changelog=1.4.3: Reduce temporary QGIS project loading overhead using native read flags. Skip unused layouts, 3D views and editor style backups in render workers and technical checks; preserve the archived project, rendering styles and provider validation. Keep adaptive server limits, memory headroom and resumable downloads.
-    1.4.2: Correct the Polish empty-vector suffix and translate it into English. Localize generated archive names, reports, data, resources and diagnostic paths. Resume older archives and switch output language while preserving saved tiles, raster values and attachments. Record GeoTIFF dimensions and overview decisions in diagnostics.
-    1.4.1: Mark confirmed empty vector layers in the project copy with _nie-bylo-obiketow-w-zasiegu; retain original names. Group manifests, logs and saved progress under diagnostyka/, and GeoPackage data with supporting files under dane/. Keep the project and report easy to find. Resume older archive layouts. Keep a failed retry of an unverified empty vector from aborting other results.
-    1.4.0: Save map progress for continuation after cancellation or an unexpected QGIS exit; retain successful and empty tiles and renew missing-tile attempts. Remember the recovery folder. Add native GeoTIFF overviews and preserve correctly empty map zooms. Check WFS errors and cache before accepting empty reads, and verify source access for empty MSSQL results.
-    1.3.0: Retest higher server concurrency after healthy periods, reduce sustained throughput drops and handle ordinary WMS errors without waiting for each acknowledgement. Bound new Windows processes by available commit as well as RAM. Preserve download quality and archive continuation.
-    1.2.0: Record local CPU, memory, process I/O, scheduler and network measurements for diagnosing slow exports. Add periodic performance samples and final layer summaries without new dependencies or changing download limits.
-    1.1.0: Resume a cancelled archive in a new folder, retaining completed layers and retrying missing or partial layers. Verify previous data and source settings, preserve previous partial images if continuation cannot complete them. Interrupted layers restart from the beginning.
-    1.0.0: Prepare the stable distribution for the QGIS Plugin Directory, simplify English/Polish instructions, clarify data licenses and AI-assisted development, validate release metadata and package contents.
-    0.9.7: Measure map process memory to adjust parallel downloads and reserve startup and growth headroom.
-    0.9.6: Grow server concurrency within CPU/RAM limits, measure full load, clarify labels and display name, stop on proxy authentication refusal.
-    0.9.5: Recover deferred hosts and prioritize downloads across servers.
+tags=archive,snapshot,offline,project,project packaging,data export,download,tiles,raster,vector,geopackage,wms,wmts,wfs,xyz,parallel downloads,resume downloads,archiwizacja,kopia projektu,praca offline,projekt,pakowanie projektu,eksport danych,pobieranie,kafelki,rastry,wektory,geopaczka,pobieranie równoległe,wznawianie pobierania
+changelog=1.0.0: First official release. Offline project archives, automatic parallel downloads, persistent recovery, English/Polish output and QGIS 3/Qt5 plus QGIS 4/Qt6 compatibility. Earlier 1.1–1.4 builds were development versions; restart QGIS after replacing them with this official ZIP.
+    PL: Pierwsze oficjalne wydanie. Archiwa offline, automatyczne pobieranie równoległe, trwałe wznowienie, nazwy PL/EN i zgodność QGIS 3/Qt5 oraz QGIS 4/Qt6. Wcześniejsze 1.1–1.4 były wersjami rozwojowymi; po zastąpieniu ich oficjalnym ZIP-em uruchom QGIS ponownie.
 experimental=False
 deprecated=False
 server=False

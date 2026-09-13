@@ -29,7 +29,11 @@ def build(output):
         }
     )
     sources.update(
-        {"LICENSE": ROOT / "LICENSE", "INSTRUKCJA.md": ROOT / "docs" / "team-guide.md"}
+        {
+            "LICENSE": ROOT / "LICENSE",
+            "INSTRUKCJA.md": ROOT / "docs" / "team-guide.md",
+            ".flake8": ROOT / ".flake8",
+        }
     )
     for name, path in sources.items():
         if path.is_symlink() or not path.is_file():

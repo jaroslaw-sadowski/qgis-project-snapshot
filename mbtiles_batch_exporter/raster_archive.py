@@ -141,7 +141,7 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
     settings.setDestinationCrs(project.crs())
     settings.setTransformContext(project.transformContext())
     settings.setLayers([layer])
-    settings.setBackgroundColor(Qt.transparent)
+    settings.setBackgroundColor(Qt.GlobalColor.transparent)
     settings.setOutputDpi(96)
     settings.setOutputSize(QSize(width, height))
     settings.setExtent(bounds)
@@ -188,11 +188,11 @@ def _render_image(layer, project, bounds, width, height, cancelled, progress):
             .lower()
         )
         operation = QUrlQuery(reply.request().url()).queryItemValue("REQUEST").lower()
-        if reply.error() != QNetworkReply.NoError or (
+        if reply.error() != QNetworkReply.NetworkError.NoError or (
             operation == "getmap" and "xml" in content_type
         ):
-            code = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
-            if reply.error() == QNetworkReply.TimeoutError:
+            code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+            if reply.error() == QNetworkReply.NetworkError.TimeoutError:
                 code = "timeout"
             network_errors.append(
                 (
@@ -376,8 +376,8 @@ def _render_tile(
             )
         )
     counters["subdivisions"] += 1
-    result = QImage(size, size, QImage.Format_ARGB32_Premultiplied)
-    result.fill(Qt.transparent)
+    result = QImage(size, size, QImage.Format.Format_ARGB32_Premultiplied)
+    result.fill(Qt.GlobalColor.transparent)
     painter = QPainter(result)
     try:
         half = size // 2
@@ -406,16 +406,16 @@ def _render_tile(
 def _mask_image(image, area, bounds, resolution, stats=None):
     started = time.monotonic()
     if stats is not None:
-        rgba = image.convertToFormat(QImage.Format_RGBA8888)
+        rgba = image.convertToFormat(QImage.Format.Format_RGBA8888)
         raw_nonempty = any(rgba.constBits().asstring(rgba.sizeInBytes())[3::4])
         stats["raw_nonempty" if raw_nonempty else "raw_empty"] += 1
     clipped = area.intersection(QgsGeometry.fromRect(bounds))
     if clipped.lastError() or (not clipped.isEmpty() and not clipped.isGeosValid()):
         raise RuntimeError(tr("Nie udało się wyznaczyć maski fragmentu mapy."))
-    mask = QImage(image.size(), QImage.Format_ARGB32_Premultiplied)
-    mask.fill(Qt.transparent)
+    mask = QImage(image.size(), QImage.Format.Format_ARGB32_Premultiplied)
+    mask.fill(Qt.GlobalColor.transparent)
     path = QPainterPath()
-    path.setFillRule(Qt.OddEvenFill)
+    path.setFillRule(Qt.FillRule.OddEvenFill)
     # A tile touching only a boundary may intersect as a line/point, not a polygon.
     if not clipped.isEmpty() and clipped.area() > 0:
         polygons = (
@@ -435,14 +435,14 @@ def _mask_image(image, area, bounds, resolution, stats=None):
                     )
                 )
     painter = QPainter(mask)
-    painter.setRenderHint(QPainter.Antialiasing)
-    painter.fillPath(path, Qt.white)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.fillPath(path, Qt.GlobalColor.white)
     painter.end()
     painter = QPainter(image)
-    painter.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
     painter.drawImage(0, 0, mask)
     painter.end()
-    result = image.convertToFormat(QImage.Format_RGBA8888)
+    result = image.convertToFormat(QImage.Format.Format_RGBA8888)
     if stats is not None:
         if raw_nonempty and not any(
             result.constBits().asstring(result.sizeInBytes())[3::4]
@@ -550,7 +550,7 @@ def write_rendered_raster(
     clone.setScaleBasedVisibility(False)
     # Blend against other layers in the archive, not against a transparent capture
     # canvas.
-    clone.setBlendMode(QPainter.CompositionMode_SourceOver)
+    clone.setBlendMode(QPainter.CompositionMode.CompositionMode_SourceOver)
     dataset = None
     stats = {
         "retries": 0,
@@ -1042,7 +1042,7 @@ def _capture_adaptive(
                     )
                     transparent = False
                     if valid:
-                        rgba = image.convertToFormat(QImage.Format_RGBA8888)
+                        rgba = image.convertToFormat(QImage.Format.Format_RGBA8888)
                         transparent = not any(
                             rgba.constBits().asstring(rgba.sizeInBytes())[3::4]
                         )

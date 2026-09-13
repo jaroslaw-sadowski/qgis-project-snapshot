@@ -68,7 +68,7 @@ class RasterEvidenceTests(unittest.TestCase):
             "timing_seconds": {"mask": 0.0},
         }
         for color in (QColor("red"), QColor(0, 0, 0, 0)):
-            image = QImage(256, 256, QImage.Format_ARGB32_Premultiplied)
+            image = QImage(256, 256, QImage.Format.Format_ARGB32_Premultiplied)
             image.fill(color)
             _mask_image(image, area, bounds, 1, stats)
         self.assertEqual(stats["raw_empty"], 1)

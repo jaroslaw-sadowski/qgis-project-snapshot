@@ -1,165 +1,54 @@
-# <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
+# QGIS Project Snapshot 1.0.0
 
-[Polski](README.md) · English · Version **1.4.3**
+## English
 
-## What it is and what it does
+Save a QGIS project for offline use: vector data, lossless map images, styles
+and a report. Choose the map view or a polygon layer as the area; keep the
+whole archive folder to move it or resume interrupted downloads.
 
-QGIS Project Snapshot creates a local copy of a QGIS project for later offline
-use. It helps preserve project data and map appearance before the original
-databases or services change.
+**Install:** QGIS 3.40–3.x (Qt5) or QGIS 4.x (Qt6), with Python ≥3.10 and
+GDAL ≥3.7 supplied by QGIS. No extra Python packages. You need access to the
+source services and enough disk space. In **Plugins → Manage and Install
+Plugins → Install from ZIP**, select `qgis-project-snapshot-1.0.0.zip` and
+restart QGIS. Open **Plugins → QGIS Project Snapshot → Archive project…**.
 
-It saves a project copy, vector features with attributes, map images, local
-rasters and available resources, and a report in a separate folder. It preserves
-layer groups, order, visibility and styles. PNG maps retain transparency.
-You choose the layers, area and detail levels; the original project stays unchanged.
+**Processing and privacy:** runs locally, using multiple QGIS processes and
+supervising threads. Automatically adjusts concurrency to client memory/CPU
+and server responses. Projects and diagnostics are not uploaded to the author;
+there is no analytics. Download requests do send the necessary area, layer
+parameters and authentication to the selected services. Review the result offline.
 
-## Installation requirements
+**Responsibility:** respect service licenses, attribution and download/reuse
+restrictions. This plugin grants no rights to third-party data. To the extent
+permitted by law, the author is not liable for users' violations. GPL-2.0-only.
 
-- **QGIS 3.40 or a later 3.x release**, with Qt5/PyQt5 and GDAL 3.7 or newer.
-  The plugin uses libraries supplied with QGIS; no separate Python installation
-  or additional packages are needed.
-- Access to the project's sources during export and enough disk space.
-- Permission to download and store the selected data and maps.
+Developed with AI and vibe coding; tested (Bandit, secret scanning, Qt6 checks,
+Ruff/Flake8, proxy/error handling, archive integrity and crash recovery).
+[User guide](docs/team-guide.md) · [Release checks](docs/release-1.0.0.md).
 
-The interface uses Polish or English according to the QGIS language.
-Tested with QGIS 3.40 on Ubuntu. Other environments, especially company databases
-and authentication, need checking on your own workstation.
+## Polski
 
-## How to install
+Zapisuje projekt QGIS do pracy offline: dane wektorowe, bezstratne obrazy map,
+style i raport. Obszar wybierasz z widoku mapy lub warstwy poligonowej.
+Zachowaj cały folder, aby przenieść archiwum lub wznowić przerwane pobieranie.
 
-1. Obtain the **`qgis-project-snapshot-1.4.3.zip`** release package.
-   Use the plugin's installation ZIP, not a ZIP of the entire repository.
-2. In QGIS, choose **Plugins → Manage and Install Plugins → Install from ZIP**.
-3. Select the package and install it. Restart QGIS when upgrading.
+**Instalacja:** QGIS 3.40–3.x (Qt5) lub QGIS 4.x (Qt6), z Pythonem ≥3.10 i
+GDAL ≥3.7 dostarczanymi przez QGIS. Bez dodatkowych pakietów Pythona.
+Potrzebujesz dostępu do źródeł i miejsca na dysku. W **Wtyczki → Zarządzanie
+wtyczkami → Instaluj z ZIP** wskaż `qgis-project-snapshot-1.0.0.zip` i uruchom
+QGIS ponownie. Otwórz **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**.
 
-Once publication is approved in the [QGIS plugin catalogue](https://plugins.qgis.org/),
-you will be able to search for **QGIS Project Snapshot** directly in the plugin
-manager. Providing a ZIP does not mean catalogue approval.
+**Działanie i prywatność:** działa lokalnie, korzystając z wielu procesów QGIS
+i wątków nadzorujących. Samodzielnie dobiera obciążenie do pamięci/CPU komputera
+i odpowiedzi serwerów. Nie wysyła projektu ani diagnostyki do autora i nie
+prowadzi analityki. Zapytania o dane przekazują wybranym usługom niezbędny zasięg,
+parametry warstw i uwierzytelnienie. Sprawdź wynik bez dostępu do źródeł.
 
-## How to use
+**Odpowiedzialność:** przestrzegaj licencji usług, zasad podawania źródeł oraz
+ograniczeń pobierania i wykorzystania danych. Wtyczka nie nadaje praw do cudzych
+treści. W granicach prawa autor nie odpowiada za naruszenia użytkownika.
+Licencja kodu: GPL-2.0-only.
 
-1. Open a project and choose **Plugins → QGIS Project Snapshot → Archive project…**
-   or the map-in-an-archive-box toolbar icon.
-2. Choose a folder, area (map view or polygons), layers and map detail.
-   Hover over an option for an explanation.
-3. Select **Create archive**, then read the report when the export finishes.
-4. Open the project copy without access to the original services and databases.
-   Check its data and appearance. Keep the **entire archive folder**, not just
-   the `.qgz` file.
-
-The report identifies missing data, empty results and dependencies that need
-checking. Not all fonts, forms and expressions can be transferred automatically.
-The archive date describes acquisition time, not a simultaneous state of all
-sources. Archives and reports may contain confidential data; inspect them before sharing.
-
-Open the **`.qgz` project** to work with the archive, or **`report.html`** to review
-results. `data/` holds the GeoPackage and files that help read it faster,
-`resources/` holds required resources, and
-`diagnostics/` contains the manifest, log and any saved progress for resuming.
-You do not need to open those files manually. Move the entire folder together
-and keep its contents until continuation is complete.
-Generated names follow the plugin language. The Polish interface uses
-`raport.html`, `dane/`, `zasoby/` and `diagnostyka/`. Resuming can change language.
-
-Confirmed empty vector layers in the project copy receive the exact suffix
-**`_no-features-in-area`**. Their fields and style remain, with zero features.
-Original names stay unchanged. Errors and unconfirmed empty MSSQL reads do not
-receive this suffix.
-
-## How to continue an archive
-
-After an export finishes or is cancelled, choose **Continue this archive**.
-After restarting QGIS, open the original project, choose **Resume archive…**
-and select the entire previous archive folder.
-
-The plugin checks saved files and creates a new folder. It retains completed
-layers, resources, and successfully saved or empty map tiles. Only missing tiles
-are downloaded, with up to three new attempts per tile. An unfinished vector layer
-starts that layer again from the beginning. The previous folder remains available.
-Older zero-feature WFS/MSSQL results and unconfirmed empty MSSQL reads are checked
-again; a correctly empty result remains valid.
-
-From 1.4.0, map progress is saved during downloads. After an unexpected QGIS exit,
-use **Resume archive…** and select the folder whose name contains `.in-progress-`.
-The dialog suggests the last available folder; you still choose whether to resume.
-Empty zoom levels need comparison with the source, but successfully empty tiles
-are not downloaded again.
-
-You need the entire archive folder and space for a copy; a report or JSON alone
-is not enough. Continuation uses the previous area and zooms. Changed sources,
-styles or unsaved edits require a new archive. Archives older than 1.4.0 retain
-completed layers, but unfinished maps without a tile record restart that layer.
-For archives from 1.0.0, source and style compatibility cannot be confirmed,
-so use the same original project.
-Before a planned shutdown, use **Cancel** and wait for saving to finish. Recovery
-uses the data still available; it cannot repair files damaged by storage or power failure.
-
-## Faster raster display
-
-Archived GeoTIFFs include overviews to help display them when zoomed out.
-Maps retain separately downloaded zoom levels and their styles, including correctly
-empty levels. Overviews do not fill missing images using a different scale.
-
-## Automatic parallel downloads
-
-The plugin downloads maps in separate QGIS processes. It starts with one task
-per server and gradually increases concurrency using available RAM, CPU,
-download speed and server responses. Errors reduce the load or trigger a pause.
-After a period of healthy responses, it checks whether more tasks improve download
-speed; a sustained slowdown may reduce the limit. On Windows it also checks how
-much memory the system can still allocate. You do not need to set the number of
-processes manually.
-
-The window shows active tasks and limits. **Queued layers** counts layers waiting
-to download from the server in that row. Automatic adjustment helps speed up
-exports but does not guarantee maximum throughput. Downloads use the active
-QGIS network settings. Continuing an archive uses the same automatic server load rules.
-
-## Diagnosing slow downloads
-
-From version 1.2.0, the plugin automatically records CPU, memory, read/write
-operations, queues and server activity in `diagnostic.jsonl`. Computer measurements
-are taken about every 5 seconds, including while downloads are waiting. The log
-stays locally; from 1.4.2, it is in **`diagnostics/`** alongside `manifest.json`.
-The plugin does not send these files automatically.
-
-**`diagnostic.jsonl`** is usually enough for a typical performance review. Include
-`manifest.json` to identify layers by name or examine missing results in detail.
-HTML and AUX files are usually unnecessary for this review; keep the entire folder
-for resuming. You can manually compress a longer log into a ZIP before sharing.
-These measurements help identify slowdowns but do not establish maximum computer
-or server throughput.
-
-## Data licences and service terms
-
-**Check and respect each layer's licence and its provider's terms before
-exporting.** This includes downloading, copying, offline storage, redistribution,
-required attribution and service limits. Being able to display a map in QGIS
-does not grant permission to archive it.
-
-For example, the standard **`tile.openstreetmap.org` service does not permit
-downloading maps for offline use**. Choose a source whose terms explicitly
-allow it; see the [OSMF tile policy](https://operations.osmfoundation.org/policies/tiles/).
-
-The plugin does not grant rights to third-party content or check its licence
-automatically. Users are responsible for choosing data and using it lawfully.
-To the extent permitted by applicable law, the author accepts no liability for
-users' unauthorized copying or distribution of content.
-
-## Plugin licence and development
-
-Author: **Jarosław Sadowski**. The plugin is free and open source under
-**GNU GPL version 2 (GPL-2.0-only)**; see [LICENSE](LICENSE) for the terms
-and warranty disclaimer. This licence covers the plugin, not downloaded data.
-
-The project was developed through **vibe coding with AI assistance**.
-Check each archive's completeness and offline operation before relying on it.
-
-## Help and feedback
-
-[Detailed guide](docs/team-guide.md) ·
-[Bug reports and suggestions](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues) ·
-[Development documentation and ZIP build instructions](docs/development.md)
-
-Include your QGIS and plugin versions and steps to reproduce the problem in a report.
-Do not publish passwords, confidential projects or company data.
+Powstała z pomocą AI i vibe codingu; wykonano testy (Bandit, skan sekretów,
+kontrola Qt6, Ruff/Flake8, obsługa proxy/błędów, integralność archiwum i wznowienie
+po awarii). [Instrukcja](docs/team-guide.md) · [Kontrole wydania](docs/release-1.0.0.md).

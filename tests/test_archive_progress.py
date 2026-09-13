@@ -52,13 +52,13 @@ class ProgressTests(unittest.TestCase):
             item = dialog._items[self.layer.id()]
             dialog.tree.setCurrentItem(item)
             selected = dialog._selected_ids()
-            QTest.keyClick(dialog.tree, Qt.Key_Space)
+            QTest.keyClick(dialog.tree, Qt.Key.Key_Space)
             self.assertEqual(dialog._selected_ids(), selected)
             group = dialog.tree.topLevelItem(0)
             dialog.tree.setCurrentItem(group)
-            QTest.keyClick(dialog.tree, Qt.Key_Left)
+            QTest.keyClick(dialog.tree, Qt.Key.Key_Left)
             self.assertFalse(group.isExpanded())
-            QTest.keyClick(dialog.tree, Qt.Key_Right)
+            QTest.keyClick(dialog.tree, Qt.Key.Key_Right)
             self.assertTrue(group.isExpanded())
             inspected.append(True)
 
@@ -72,7 +72,7 @@ class ProgressTests(unittest.TestCase):
             self.assertIsNotNone(dialog._result, dialog.log.toPlainText())
             self.assertTrue(inspected)
             self.assertTrue(
-                dialog._items[self.layer.id()].flags() & Qt.ItemIsUserCheckable
+                dialog._items[self.layer.id()].flags() & Qt.ItemFlag.ItemIsUserCheckable
             )
             self.assertEqual(dialog.progress.value(), dialog.progress.maximum())
             self.assertIn("sprawdź raport", dialog.progress.format())

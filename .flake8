@@ -1,0 +1,8 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203
+exclude = .git,dist,build,.venv,venv
+per-file-ignores =
+    tests/test_archive.py:E402
+    tests/test_raster_archive.py:E402
+    tests/test_archive_resources.py:E402

@@ -73,7 +73,9 @@ class HostRecoveryTests(unittest.TestCase):
                     operations.append((key, self.clock))
                     if len(operations) <= 3:
                         raise TimeoutError("Test timeout")
-                    image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
+                    image = QImage(
+                        width, height, QImage.Format.Format_ARGB32_Premultiplied
+                    )
                     image.fill(QColor("red"))
                     return image
 
@@ -411,7 +413,7 @@ class LocalWmsRecoveryTests(unittest.TestCase):
                     lambda: False,
                     lambda _: None,
                 )
-                image = image.convertToFormat(QImage.Format_RGBA8888)
+                image = image.convertToFormat(QImage.Format.Format_RGBA8888)
                 pixels = image.constBits().asstring(image.sizeInBytes())
                 self.assertTrue(any(pixels[3::4]))
             self.assertEqual(len(self.server.requests), requests_before_offline)

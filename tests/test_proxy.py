@@ -13,6 +13,7 @@ from qgis.core import (
     QgsNetworkAccessManager,
     QgsRasterLayer,
     QgsSettings,
+    QgsSettingsTree,
 )
 from qgis.PyQt.QtNetwork import QNetworkProxy, QNetworkProxyFactory
 
@@ -91,6 +92,16 @@ class ProxyTests(unittest.TestCase):
             "proxyPassword": "fixture-password" if credentials else "",
         }
         for key, value in values.items():
+            if QgsSettingsTree.node("proxy"):
+                key = {
+                    "proxyEnabled": "proxy-enabled",
+                    "proxyType": "proxy-type",
+                    "proxyHost": "proxy-host",
+                    "proxyPort": "proxy-port",
+                    "noProxyUrls": "no-proxy-urls",
+                    "proxyUser": "proxy-user",
+                    "proxyPassword": "proxy-password",
+                }[key]
             settings.setValue("proxy/" + key, value)
         settings.sync()
         QgsNetworkAccessManager.instance().setupDefaultProxyAndCache()

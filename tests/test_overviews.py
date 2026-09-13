@@ -174,7 +174,7 @@ class MapOverviewTests(unittest.TestCase):
 
         def render(layer, project, bounds, width, height, cancelled, progress):
             zoom = zoom_by_resolution[round(bounds.width() / width, 9)]
-            image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
+            image = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
             image.fill(
                 QColor(0, 0, 0, 0)
                 if zoom == empty_zoom

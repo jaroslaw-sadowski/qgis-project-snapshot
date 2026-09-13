@@ -77,7 +77,7 @@ class ResponseDiagnosticsTests(unittest.TestCase):
         )
         reply.error.return_value = 0
         reply.attribute.side_effect = lambda key: (
-            200 if key == QNetworkRequest.HttpStatusCodeAttribute else False
+            200 if key == QNetworkRequest.Attribute.HttpStatusCodeAttribute else False
         )
         return reply
 
@@ -195,7 +195,7 @@ class ResponseDiagnosticsTests(unittest.TestCase):
         parameters = Mock()
         parameters.request.return_value = request
         reply = self.reply(b"", b"image/png")
-        reply.error.return_value = QNetworkReply.OperationCanceledError
+        reply.error.return_value = QNetworkReply.NetworkError.OperationCanceledError
         reply.attribute.return_value = None
         reply.request.return_value = request
         with patch("time.monotonic", return_value=15.0):
@@ -285,7 +285,7 @@ class ResponseDiagnosticsTests(unittest.TestCase):
             observer.started(parameters)
         reply = self.reply(b"abc", b"image/png")
         reply.attribute.side_effect = lambda key: (
-            503 if key == QNetworkRequest.HttpStatusCodeAttribute else True
+            503 if key == QNetworkRequest.Attribute.HttpStatusCodeAttribute else True
         )
         reply.error.return_value = 5
         reply.requestId.return_value = 1

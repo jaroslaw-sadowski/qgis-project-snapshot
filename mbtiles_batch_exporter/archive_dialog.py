@@ -66,7 +66,7 @@ class ArchiveDialog(QDialog):
         self._items = {}
         self.setWindowTitle(tr("QGIS Project Snapshot — Archiwizuj projekt"))
         self.setWindowIcon(QIcon(str(Path(__file__).with_name("icon.svg"))))
-        self.setWindowModality(Qt.ApplicationModal)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.resize(860, 790)
         layout = QVBoxLayout(self)
         notice = QLabel(
@@ -93,7 +93,7 @@ class ArchiveDialog(QDialog):
         output = QHBoxLayout()
         output.addWidget(self.output_edit)
         browse = QPushButton(tr("Wybierz…"))
-        browse.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
+        browse.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
         browse.setToolTip(
             tr(
                 (
@@ -116,7 +116,7 @@ class ArchiveDialog(QDialog):
             if (
                 isinstance(layer, QgsVectorLayer)
                 and layer.isValid()
-                and layer.geometryType() == QgsWkbTypes.PolygonGeometry
+                and layer.geometryType() == QgsWkbTypes.GeometryType.PolygonGeometry
             ):
                 self.polygon_combo.addItem(layer.name(), layer.id())
         form.addRow(tr("Warstwa obszaru:"), self.polygon_combo)
@@ -145,7 +145,7 @@ class ArchiveDialog(QDialog):
             ]
         )
         self.servers.headerItem().setIcon(
-            0, self.style().standardIcon(QStyle.SP_ComputerIcon)
+            0, self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon)
         )
         self.servers.headerItem().setToolTip(
             2,
@@ -245,11 +245,11 @@ class ArchiveDialog(QDialog):
         layout.addLayout(resources)
         layout.addWidget(self.servers)
         self.status = QLabel(tr("Gotowe do wyboru obszaru i folderu."))
-        self.status.setTextFormat(Qt.PlainText)
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         self.server_warning = QLabel()
-        self.server_warning.setTextFormat(Qt.PlainText)
+        self.server_warning.setTextFormat(Qt.TextFormat.PlainText)
         self.server_warning.setWordWrap(True)
         self.server_warning.setStyleSheet(
             (
@@ -268,7 +268,7 @@ class ArchiveDialog(QDialog):
         self.elapsed = QLabel(tr("Czas: 00:00"))
         layout.addWidget(self.elapsed)
         self.workers_status = QLabel("")
-        self.workers_status.setTextFormat(Qt.PlainText)
+        self.workers_status.setTextFormat(Qt.TextFormat.PlainText)
         self.workers_status.setWordWrap(True)
         self.workers_status.hide()
         layout.addWidget(self.workers_status)
@@ -339,10 +339,10 @@ class ArchiveDialog(QDialog):
         self.close_button.clicked.connect(self.reject)
         buttons.addWidget(self.close_button)
         for button, standard_icon in (
-            (self.report_button, QStyle.SP_FileIcon),
-            (self.copy_button, QStyle.SP_FileDialogDetailedView),
-            (self.cancel_button, QStyle.SP_MediaStop),
-            (self.retry_button, QStyle.SP_BrowserReload),
+            (self.report_button, QStyle.StandardPixmap.SP_FileIcon),
+            (self.copy_button, QStyle.StandardPixmap.SP_FileDialogDetailedView),
+            (self.cancel_button, QStyle.StandardPixmap.SP_MediaStop),
+            (self.retry_button, QStyle.StandardPixmap.SP_BrowserReload),
         ):
             button.setIcon(self.style().standardIcon(standard_icon))
         self.start_button.setIcon(self.windowIcon())
@@ -490,8 +490,8 @@ class ArchiveDialog(QDialog):
         for widget, text in tips.items():
             widget.setToolTip(f"<p>{escape(text)}</p>")
         for row in range(form.rowCount()):
-            label = form.itemAt(row, QFormLayout.LabelRole)
-            field = form.itemAt(row, QFormLayout.FieldRole)
+            label = form.itemAt(row, QFormLayout.ItemRole.LabelRole)
+            field = form.itemAt(row, QFormLayout.ItemRole.FieldRole)
             if label and label.widget() and field:
                 widget = field.widget() or self.output_edit
                 label.widget().setToolTip(widget.toolTip())
@@ -583,13 +583,13 @@ class ArchiveDialog(QDialog):
     def _populate_tree(self, node, parent):
         for child in node.children():
             item = QTreeWidgetItem(parent, [child.name()])
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             if isinstance(child, QgsLayerTreeGroup):
-                item.setFlags(item.flags() | Qt.ItemIsAutoTristate)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsAutoTristate)
                 self._populate_tree(child, item)
             else:
                 layer = child.layer()
-                item.setData(0, Qt.UserRole, child.layerId())
+                item.setData(0, Qt.ItemDataRole.UserRole, child.layerId())
                 self._items[child.layerId()] = item
                 item.setText(
                     1,
@@ -608,10 +608,10 @@ class ArchiveDialog(QDialog):
                         )
                     ),
                 )
-            item.setCheckState(0, Qt.Checked)
+            item.setCheckState(0, Qt.CheckState.Checked)
 
     def _select_all(self, checked):
-        state = Qt.Checked if checked else Qt.Unchecked
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
         for index in range(self.tree.topLevelItemCount()):
             self.tree.topLevelItem(index).setCheckState(0, state)
 
@@ -718,8 +718,8 @@ class ArchiveDialog(QDialog):
         iterator = QTreeWidgetItemIterator(self.tree)
         while iterator.value():
             item = iterator.value()
-            layer_id = item.data(0, Qt.UserRole)
-            if layer_id and item.checkState(0) == Qt.Checked:
+            layer_id = item.data(0, Qt.ItemDataRole.UserRole)
+            if layer_id and item.checkState(0) == Qt.CheckState.Checked:
                 ids.add(layer_id)
             iterator += 1
         return ids
@@ -813,7 +813,7 @@ class ArchiveDialog(QDialog):
         while iterator.value():
             item = iterator.value()
             selection_flags.append((item, item.flags()))
-            item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
             iterator += 1
         self.options.setEnabled(False)
         self.start_button.setEnabled(False)
@@ -985,7 +985,10 @@ class ArchiveDialog(QDialog):
             )
         )
         for layer_id, item in self._items.items():
-            item.setCheckState(0, Qt.Checked if layer_id in retry else Qt.Unchecked)
+            item.setCheckState(
+                0,
+                Qt.CheckState.Checked if layer_id in retry else Qt.CheckState.Unchecked,
+            )
         self.results.setPlainText("\n".join(lines))
         self.log.hide()
         self.results.show()

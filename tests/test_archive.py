@@ -27,6 +27,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QGIS_SNAPSHOT_LANGUAGE", "pl")
 
 from qgis.core import (
+    Qgis,
     QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsFeature,
@@ -101,6 +102,8 @@ class ArchiveTests(unittest.TestCase):
         return read_resume_manifest(result)
 
     def test_vectors_keep_attributes_edits_styles_tree_and_source_state(self):
+        macro = "# Source-only macro: must not reach an offline copy."
+        self.project.writeEntry("Macros", "pythonCode", macro)
         second = self.add_points("Ta sama nazwa", [(6, 6)])
         self.project.layerTreeRoot().setHasCustomLayerOrder(True)
         self.project.layerTreeRoot().setCustomLayerOrder([second, self.layer])
@@ -142,6 +145,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(len({row["table"] for row in manifest["layers"]}), 2)
         self.assertEqual(self.project.fileName(), str(self.original))
         self.assertEqual(self.project.filePathStorage(), original_path_type)
+        self.assertEqual(self.project.readEntry("Macros", "pythonCode")[0], macro)
         self.assertTrue(self.project.isDirty())
         self.assertTrue(self.layer.isModified())
         self.assertFalse(self.group.itemVisibilityChecked())
@@ -153,6 +157,8 @@ class ArchiveTests(unittest.TestCase):
         copy = QgsProject()
         try:
             self.assertTrue(copy.read(str(next(moved.glob("*.qgz")))))
+            self.assertEqual(copy.filePathStorage(), Qgis.FilePathType.Relative)
+            self.assertFalse(copy.readEntry("Macros", "pythonCode")[1])
             self.assertEqual(copy.crs(), self.crs)
             self.assertEqual(set(copy.mapLayers()), {self.layer.id(), second.id()})
             local = copy.mapLayer(self.layer.id())
@@ -395,7 +401,7 @@ class ArchiveTests(unittest.TestCase):
             self.assertFalse(self.group.itemVisibilityChecked())
             dialog._select_all(False)
             self.assertEqual(dialog._selected_ids(), set())
-            dialog.tree.topLevelItem(0).setCheckState(0, Qt.Checked)
+            dialog.tree.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
             self.assertEqual(dialog._selected_ids(), {self.layer.id()})
             dialog._running = True
             dialog.reject()

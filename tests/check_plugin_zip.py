@@ -15,6 +15,7 @@ import unittest
 from configparser import ConfigParser
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 
@@ -45,8 +46,9 @@ def check(filename):
                 path = Path(name)
                 assert not path.is_absolute() and ".." not in path.parts
                 assert path.parts[0] == "mbtiles_batch_exporter"
-                assert len(path.parts) == 2 and not path.name.startswith(".")
-                assert path.name == "LICENSE" or path.suffix in {
+                assert len(path.parts) == 2
+                assert not path.name.startswith(".") or path.name == ".flake8"
+                assert path.name in {"LICENSE", ".flake8"} or path.suffix in {
                     ".py",
                     ".svg",
                     ".txt",
@@ -81,7 +83,7 @@ def check(filename):
             assert re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", general["email"])
             assert re.fullmatch(r"\d+\.\d+\.\d+", general["version"])
             assert general["qgisMinimumVersion"] == "3.40"
-            assert general["qgisMaximumVersion"] == "3.99"
+            assert general["qgisMaximumVersion"] == "4.99"
             assert general["license"] == "GPL-2.0-only"
             for field in ("homepage", "repository", "tracker"):
                 url = urlsplit(general[field])
@@ -179,7 +181,17 @@ def check(filename):
         # All tests now import the installed package, including its worker entry point.
         tests = Path(__file__).resolve().parent
         suite = unittest.defaultTestLoader.discover(str(tests), pattern="test_*.py")
-        result = unittest.TextTestRunner(verbosity=1).run(suite)
+
+        def unexpected_warning(parent, title, message, *args, **kwargs):
+            raise AssertionError(
+                f"Unexpected dialog warning: {title}: {message}"
+            ) from sys.exc_info()[1]
+
+        # Unexpected modal warnings must fail CI instead of waiting for a click.
+        with patch(
+            "qgis.PyQt.QtWidgets.QMessageBox.warning", side_effect=unexpected_warning
+        ):
+            result = unittest.TextTestRunner(verbosity=2).run(suite)
         loaded = [
             m
             for name, m in sys.modules.items()
@@ -190,6 +202,10 @@ def check(filename):
             for m in loaded
             if getattr(m, "__file__", None)
         )
+        QgsProject.instance().clear()
+        interface.window.close()
+        # Standalone QGIS must flush deferred provider cleanup before teardown.
+        app.exitQgis()
         if not result.wasSuccessful() or result.skipped:
             raise RuntimeError(
                 (
@@ -197,8 +213,6 @@ def check(filename):
                     "również lokalny WMS."
                 )
             )
-        QgsProject.instance().clear()
-        interface.window.close()
         print(f"ZIP: {result.testsRun} testów z zainstalowanej paczki — OK", flush=True)
 
 

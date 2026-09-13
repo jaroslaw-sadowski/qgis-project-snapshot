@@ -92,7 +92,9 @@ class TileResumeTests(unittest.TestCase):
                 cancelled.set()
                 raise InterruptedError()
             if key == empty[0]:
-                image = fixtures.QImage(width, height, fixtures.QImage.Format_RGBA8888)
+                image = fixtures.QImage(
+                    width, height, fixtures.QImage.Format.Format_RGBA8888
+                )
                 image.fill(0)
                 return image
             return fixtures._render_image(
@@ -308,7 +310,9 @@ class TileResumeTests(unittest.TestCase):
 
     def test_empty_zoom_markers_are_rebuilt_without_redownloading_empty_tiles(self):
         def transparent(layer, project, bounds, width, height, cancelled, progress):
-            image = fixtures.QImage(width, height, fixtures.QImage.Format_RGBA8888)
+            image = fixtures.QImage(
+                width, height, fixtures.QImage.Format.Format_RGBA8888
+            )
             image.fill(0)
             return image
 

@@ -1,164 +1,54 @@
-# <img src="mbtiles_batch_exporter/icon.svg" width="40" height="40" alt=""> QGIS Project Snapshot
+# QGIS Project Snapshot 1.0.0
 
-Polski · [English](README.en.md) · Wersja **1.4.3**
+## English
 
-## Co to jest i co robi
+Save a QGIS project for offline use: vector data, lossless map images, styles
+and a report. Choose the map view or a polygon layer as the area; keep the
+whole archive folder to move it or resume interrupted downloads.
 
-QGIS Project Snapshot tworzy lokalną kopię projektu QGIS do późniejszego odczytu
-bez internetu. Pomaga zachować dane i wygląd map, zanim zmienią się źródłowe
-bazy lub usługi.
+**Install:** QGIS 3.40–3.x (Qt5) or QGIS 4.x (Qt6), with Python ≥3.10 and
+GDAL ≥3.7 supplied by QGIS. No extra Python packages. You need access to the
+source services and enough disk space. In **Plugins → Manage and Install
+Plugins → Install from ZIP**, select `qgis-project-snapshot-1.0.0.zip` and
+restart QGIS. Open **Plugins → QGIS Project Snapshot → Archive project…**.
 
-W osobnym folderze zapisuje kopię projektu, wektory z atrybutami, obrazy map,
-lokalne rastry i dostępne zasoby oraz raport. Zachowuje grupy, kolejność,
-widoczność i style warstw. Mapy PNG zachowują przezroczystość. Wybierasz warstwy,
-obszar oraz poziomy szczegółowości; oryginalny projekt pozostaje bez zmian.
+**Processing and privacy:** runs locally, using multiple QGIS processes and
+supervising threads. Automatically adjusts concurrency to client memory/CPU
+and server responses. Projects and diagnostics are not uploaded to the author;
+there is no analytics. Download requests do send the necessary area, layer
+parameters and authentication to the selected services. Review the result offline.
 
-## Co jest potrzebne do instalacji
+**Responsibility:** respect service licenses, attribution and download/reuse
+restrictions. This plugin grants no rights to third-party data. To the extent
+permitted by law, the author is not liable for users' violations. GPL-2.0-only.
 
-- **QGIS 3.40 lub nowszy z serii 3.x**, z Qt5/PyQt5 i GDAL co najmniej 3.7.
-  Wtyczka korzysta z bibliotek dostarczanych z QGIS; nie instalujesz osobno Pythona
-  ani dodatkowych pakietów.
-- Dostęp do źródeł projektu podczas tworzenia archiwum i miejsce na dysku.
-- Uprawnienie do pobierania i przechowywania wybranych danych oraz map.
+Developed with AI and vibe coding; tested (Bandit, secret scanning, Qt6 checks,
+Ruff/Flake8, proxy/error handling, archive integrity and crash recovery).
+[User guide](docs/team-guide.md) · [Release checks](docs/release-1.0.0.md).
 
-Interfejs jest po polsku lub angielsku, zgodnie z językiem QGIS.
-Sprawdzono QGIS 3.40 na Ubuntu. Inne środowiska, zwłaszcza firmowe bazy
-i uwierzytelnianie, wymagają sprawdzenia na własnym stanowisku.
+## Polski
 
-## Jak zainstalować
+Zapisuje projekt QGIS do pracy offline: dane wektorowe, bezstratne obrazy map,
+style i raport. Obszar wybierasz z widoku mapy lub warstwy poligonowej.
+Zachowaj cały folder, aby przenieść archiwum lub wznowić przerwane pobieranie.
 
-1. Użyj udostępnionej przez autora paczki wydania **`qgis-project-snapshot-1.4.3.zip`**.
-   Użyj instalacyjnego ZIP-a wtyczki, nie ZIP-a całego repozytorium.
-2. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-3. Wskaż paczkę i zainstaluj wtyczkę. Przy aktualizacji uruchom ponownie QGIS.
+**Instalacja:** QGIS 3.40–3.x (Qt5) lub QGIS 4.x (Qt6), z Pythonem ≥3.10 i
+GDAL ≥3.7 dostarczanymi przez QGIS. Bez dodatkowych pakietów Pythona.
+Potrzebujesz dostępu do źródeł i miejsca na dysku. W **Wtyczki → Zarządzanie
+wtyczkami → Instaluj z ZIP** wskaż `qgis-project-snapshot-1.0.0.zip` i uruchom
+QGIS ponownie. Otwórz **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**.
 
-Po zatwierdzeniu publikacji w [katalogu wtyczek QGIS](https://plugins.qgis.org/)
-będzie można wyszukać **QGIS Project Snapshot** bezpośrednio w menedżerze wtyczek.
-Samo udostępnienie ZIP-a nie oznacza zatwierdzenia w katalogu.
+**Działanie i prywatność:** działa lokalnie, korzystając z wielu procesów QGIS
+i wątków nadzorujących. Samodzielnie dobiera obciążenie do pamięci/CPU komputera
+i odpowiedzi serwerów. Nie wysyła projektu ani diagnostyki do autora i nie
+prowadzi analityki. Zapytania o dane przekazują wybranym usługom niezbędny zasięg,
+parametry warstw i uwierzytelnienie. Sprawdź wynik bez dostępu do źródeł.
 
-## Jak używać
+**Odpowiedzialność:** przestrzegaj licencji usług, zasad podawania źródeł oraz
+ograniczeń pobierania i wykorzystania danych. Wtyczka nie nadaje praw do cudzych
+treści. W granicach prawa autor nie odpowiada za naruszenia użytkownika.
+Licencja kodu: GPL-2.0-only.
 
-1. Otwórz projekt i wybierz **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**
-   lub ikonę mapy w pudełku na pasku wtyczek.
-2. Wskaż folder, obszar (widok mapy lub poligony), warstwy i szczegółowość map.
-   Najechanie na opcję wyświetla jej opis.
-3. Wybierz **Utwórz archiwum** i po zakończeniu przeczytaj raport.
-4. Otwórz kopię projektu bez dostępu do źródłowych usług i baz. Sprawdź dane
-   i wygląd map. Przenoś **cały folder archiwum**, nie sam plik `.qgz`.
-
-Raport wskazuje braki, puste wyniki i zależności wymagające sprawdzenia.
-Nie wszystkie fonty, formularze i wyrażenia da się przenieść automatycznie.
-Data archiwum oznacza czas pobierania, nie jednoczesny stan wszystkich źródeł.
-Archiwum i raport mogą zawierać dane poufne — sprawdź je przed udostępnieniem.
-
-Do pracy otwieraj **projekt `.qgz`**, a do sprawdzenia wyniku **`raport.html`**.
-`dane/` zawiera GeoPackage i pliki przyspieszające jego odczyt,
-`zasoby/` potrzebne zasoby, a `diagnostyka/` manifest,
-log i ewentualny postęp do wznowienia. Tych plików nie trzeba otwierać ręcznie.
-Przenoś cały folder razem; nie usuwaj jego zawartości przed wznowieniem.
-Nazwy te dotyczą polskiego interfejsu. W angielskim powstają `report.html`,
-`data/`, `resources/` i `diagnostics/`. Wznowienie obsługuje także zmianę języka.
-
-Potwierdzone puste warstwy wektorowe w kopii projektu otrzymują końcówkę
-**`_nie-bylo-obiektow-w-zasiegu`**. Nadal zawierają pola i styl, ale zero obiektów.
-Oryginalne nazwy pozostają bez zmian; błąd lub niepotwierdzony pusty odczyt MSSQL
-nie otrzymuje tej końcówki.
-W angielskim interfejsie końcówka to **`_no-features-in-area`**.
-
-## Jak kontynuować archiwum
-
-Po zakończeniu lub anulowaniu pobierania wybierz **Kontynuuj to archiwum**.
-Po ponownym uruchomieniu QGIS otwórz oryginalny projekt, wybierz
-**Wznów archiwum…** i wskaż cały folder poprzedniego wyniku.
-
-Wtyczka sprawdzi zapisane pliki i utworzy nowy folder. Zachowa ukończone warstwy,
-zasoby oraz poprawnie zapisane i puste kafelki map. Pobierze tylko brakujące kafelki,
-z nowym limitem do trzech prób na kafelek. Nieukończony wektor zacznie swoją warstwę
-od początku. Poprzedni folder pozostaje dostępny.
-Starsze zerowe wyniki WFS/MSSQL oraz niepotwierdzone puste odczyty MSSQL są
-sprawdzane ponownie; poprawnie pusty wynik nadal jest prawidłowy.
-
-Od 1.4.0 postęp map jest zapisywany na bieżąco. Po nieoczekiwanym zamknięciu QGIS
-użyj **Wznów archiwum…** i wskaż folder z nazwą zawierającą `.w-trakcie-`.
-Okno podpowiada ostatni zachowany folder; wybór nadal należy do użytkownika.
-Puste zoomy wymagają porównania ze źródłem, ale poprawnie puste kafelki nie są
-pobierane ponownie.
-
-Potrzebny jest cały folder archiwum i miejsce na jego kopię; sam raport lub JSON
-nie wystarczy. Kontynuacja używa poprzedniego obszaru i zoomów. Zmienione źródła,
-style lub niezapisane edycje wymagają nowego archiwum. Archiwa sprzed 1.4.0 zachowują ukończone warstwy,
-ale nieukończone mapy bez rejestru kafelków pobierają od początku warstwy.
-Dla archiwów 1.0.0 wtyczka nie potwierdzi zgodności źródeł i stylów — użyj tego
-samego oryginalnego projektu.
-Przed planowanym zamknięciem użyj **Przerwij** i poczekaj na zapis. Odzyskiwanie
-korzysta z zachowanych danych; nie naprawi plików uszkodzonych przez dysk lub awarię zasilania.
-
-## Szybszy odczyt rastrów
-
-Archiwalne GeoTIFF-y otrzymują piramidy ułatwiające wyświetlanie przy oddaleniu.
-Mapy zachowują osobno pobrane poziomy szczegółowości i ich style, także prawidłowo
-puste poziomy. Piramidy nie uzupełniają braków obrazem z innej skali.
-
-## Automatyczne pobieranie równoległe
-
-Wtyczka pobiera mapy w osobnych procesach QGIS. Zaczyna od jednego zadania
-na serwer i stopniowo zwiększa ich liczbę, uwzględniając wolny RAM, procesor,
-szybkość pobierania i odpowiedzi serwera. Przy błędach ogranicza obciążenie
-lub robi przerwę. Po okresie poprawnej pracy ponownie sprawdza, czy więcej zadań
-przyspieszy pobieranie; utrwalony spadek szybkości może obniżyć limit. W Windows
-uwzględnia też dostępny limit przydzielania pamięci. Nie trzeba ręcznie ustawiać
-liczby procesów.
-
-Okno pokazuje aktywne zadania i limity. **Warstwy w kolejce** to warstwy czekające
-na pobranie z serwera w tym samym wierszu. Automat pomaga przyspieszyć eksport,
-ale nie gwarantuje maksymalnej przepustowości. Korzysta z ustawień sieciowych
-aktywnego QGIS. Kontynuacja nie zmienia zasad automatycznego obciążania serwerów.
-
-## Diagnostyka długiego pobierania
-
-Wtyczka automatycznie zapisuje w `diagnostyka.jsonl` pomiary CPU,
-pamięci, operacji odczytu i zapisu oraz pracy kolejek i serwerów. Pomiary komputera
-powstają co około 5 sekund, również podczas oczekiwania na pobranie. Log pozostaje
-lokalnie; od 1.4.2 jest w podfolderze **`diagnostyka/`**, razem z `manifest.json`.
-Wtyczka nie wysyła tych plików automatycznie.
-
-Do typowej analizy wydajności zwykle wystarczy **`diagnostyka.jsonl`**. Dołącz
-`manifest.json`, gdy trzeba wskazać warstwy po nazwie lub sprawdzić szczegóły braków.
-HTML i pliki AUX zwykle nie są potrzebne do tej analizy; do wznowienia zachowaj
-cały folder. Dłuższy log możesz ręcznie spakować do ZIP-a przed przekazaniem.
-Pomiary pomagają znaleźć przyczynę spowolnienia, ale nie dowodzą maksymalnej
-wydajności komputera lub serwera.
-
-## Licencje danych i warunki usług
-
-**Przed eksportem sprawdź i respektuj licencję każdej warstwy oraz regulamin
-jej dostawcy.** Dotyczy to pobierania, kopiowania, przechowywania offline,
-dalszego udostępniania, wymaganych oznaczeń autorstwa i limitów usług.
-Możliwość wyświetlenia mapy w QGIS nie oznacza zgody na jej archiwizację.
-
-Na przykład standardowy serwer **`tile.openstreetmap.org` nie zezwala
-na pobieranie map do użytku offline**. Użyj źródła, którego warunki wyraźnie
-na to pozwalają; zobacz [zasady OSMF](https://operations.osmfoundation.org/policies/tiles/).
-
-Wtyczka nie przyznaje praw do cudzych treści ani nie sprawdza automatycznie
-ich licencji. Za wybór danych i zgodne z prawem korzystanie z nich odpowiada
-użytkownik. W zakresie dopuszczalnym przez obowiązujące prawo autor nie ponosi
-odpowiedzialności za niedozwolone kopiowanie lub udostępnianie treści przez użytkownika.
-
-## Licencja wtyczki i sposób powstania
-
-Autor: **Jarosław Sadowski**. Wtyczka jest bezpłatna i otwartoźródłowa na licencji
-**GNU GPL w wersji 2 (GPL-2.0-only)**; warunki i wyłączenie gwarancji zawiera
-[LICENSE](LICENSE). Ta licencja dotyczy wtyczki, a nie pobranych danych.
-
-Projekt powstał metodą **vibe coding z pomocą AI**. Przed wykorzystaniem
-archiwum sprawdź jego kompletność i działanie bez sieci.
-
-## Pomoc i zgłoszenia
-
-[Szczegółowa instrukcja](docs/team-guide.md) ·
-[Zgłoszenia błędów i propozycje](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/issues) ·
-[Dokumentacja rozwoju i budowa ZIP-a](docs/development.md)
-
-W zgłoszeniu podaj wersję QGIS i wtyczki oraz kroki odtworzenia problemu.
-Nie publikuj haseł, poufnych projektów ani danych firmowych.
+Powstała z pomocą AI i vibe codingu; wykonano testy (Bandit, skan sekretów,
+kontrola Qt6, Ruff/Flake8, obsługa proxy/błędów, integralność archiwum i wznowienie
+po awarii). [Instrukcja](docs/team-guide.md) · [Kontrole wydania](docs/release-1.0.0.md).

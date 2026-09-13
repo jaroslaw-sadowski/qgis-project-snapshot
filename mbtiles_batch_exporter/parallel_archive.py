@@ -244,8 +244,9 @@ class RasterWorkers:
                 for child in list(parent):
                     if child.tag == "layer-tree-layer":
                         parent.remove(child)
-            macros = root.find("./properties/Macros")
-            if macros is not None:
+            for macros in root.findall("./properties/Macros") + root.findall(
+                "./properties/properties[@name='Macros']"
+            ):
                 root.find("properties").remove(macros)
             # Interleave servers so a long queue from one host cannot occupy
             # every supervising thread while other servers remain idle.

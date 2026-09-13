@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from qgis.PyQt.QtNetwork import QNetworkConfigurationManager
+from qgis.PyQt.QtNetwork import QNetworkInterface
 
 MAX_WORKERS = 32
 MEMORY_RESERVE = 768 * 1024**2
@@ -329,5 +329,12 @@ def detect_resources():
             cpu = min(cpu, len(os.sched_getaffinity(0)))
         except OSError:
             pass
-    manager = QNetworkConfigurationManager()
-    return {"cpu": cpu, "memory": available_memory(), "online": manager.isOnline()}
+    # Interface availability is only a local hint, not an Internet/VPN probe.
+    flags = QNetworkInterface.InterfaceFlag
+    online = any(
+        interface.flags() & flags.IsUp
+        and interface.flags() & flags.IsRunning
+        and not interface.flags() & flags.IsLoopBack
+        for interface in QNetworkInterface.allInterfaces()
+    )
+    return {"cpu": cpu, "memory": available_memory(), "online": online}

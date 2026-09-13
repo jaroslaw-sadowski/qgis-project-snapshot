@@ -4,8 +4,7 @@
 
 from pathlib import Path
 
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QAction, QIcon
 
 from .archive_dialog import ArchiveDialog
 from .i18n import tr
@@ -51,6 +50,6 @@ class ProjectSnapshotPlugin:
             return
         self.archive_dlg = ArchiveDialog(self.iface, self.iface.mainWindow())
         try:
-            self.archive_dlg.exec_()
+            self.archive_dlg.exec()
         finally:
             self.archive_dlg = None

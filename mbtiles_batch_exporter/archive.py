@@ -113,7 +113,7 @@ def _write_vector(
         raise RuntimeError(tr("Nie udało się rozpocząć odczytu obiektów."))
     # WFS delivers downloader errors through queued calls to the provider.
     # Drain earlier calls before the baseline, without processing UI events.
-    QCoreApplication.sendPostedEvents(provider, QEvent.MetaCall)
+    QCoreApplication.sendPostedEvents(provider, QEvent.Type.MetaCall)
     refreshed = layer.providerType() == "WFS" and not layer.isEditable()
     if refreshed:
         # Keep the live layer/edit buffer. Reloading during editing can change
@@ -175,9 +175,9 @@ def _write_vector(
     options.fileEncoding = "UTF-8"
     options.layerOptions = ["FID=" + primary_key, "SPATIAL_INDEX=YES"]
     options.actionOnExistingFile = (
-        QgsVectorFileWriter.CreateOrOverwriteLayer
+        QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
         if path.exists()
-        else QgsVectorFileWriter.CreateOrOverwriteFile
+        else QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteFile
     )
     writer = None
     iterator = None
@@ -199,7 +199,7 @@ def _write_vector(
             project.transformContext(),
             options,
         )
-        if not writer or writer.hasError() != QgsVectorFileWriter.NoError:
+        if not writer or writer.hasError() != QgsVectorFileWriter.WriterError.NoError:
             raise RuntimeError(tr("Nie można utworzyć tabeli GeoPackage."))
         stage = "iterator_open"
         iterator = layer.getFeatures(request)
@@ -230,7 +230,7 @@ def _write_vector(
                     counters["outside_mask"] += 1
                     continue
             stage = "writer_insert"
-            if not writer.addFeature(feature, QgsFeatureSink.FastInsert):
+            if not writer.addFeature(feature, QgsFeatureSink.Flag.FastInsert):
                 raise RuntimeError(tr("Nie udało się zapisać obiektu do GeoPackage."))
             count += 1
             counters["written"] = count
@@ -242,7 +242,7 @@ def _write_vector(
         stage = "provider_check"
         # WFS can close its iterator before the GUI thread delivers its error.
         # A closed iterator alone does not prove success.
-        QCoreApplication.sendPostedEvents(provider, QEvent.MetaCall)
+        QCoreApplication.sendPostedEvents(provider, QEvent.Type.MetaCall)
         if errors or list(provider.errors()) != old_errors:
             # Provider messages may contain credentials or a full database URI.
             raise RuntimeError(
@@ -287,7 +287,10 @@ def _write_vector(
             empty_verified = True
         read_complete = True
         stage = "writer_flush"
-        if not writer.flushBuffer() or writer.hasError() != QgsVectorFileWriter.NoError:
+        if (
+            not writer.flushBuffer()
+            or writer.hasError() != QgsVectorFileWriter.WriterError.NoError
+        ):
             raise RuntimeError(tr("Nie udało się zakończyć zapisu tabeli GeoPackage."))
     finally:
         if diagnostic:
@@ -527,12 +530,15 @@ def _local_project(snapshot, destination, records, resources=None):
     home = root.find("homePath")
     if home is not None:
         home.set("path", "")
-    paths = root.find("./properties/Paths/Absolute")
-    if paths is not None:
+    # Qt6 writes project property names as attributes instead of XML tags.
+    for paths in root.findall("./properties/Paths/Absolute") + root.findall(
+        "./properties/properties[@name='Paths']/properties[@name='Absolute']"
+    ):
         paths.text = "false"
     # Project macros must not execute on opening an archive.
-    macros = root.find("./properties/Macros")
-    if macros is not None:
+    for macros in root.findall("./properties/Macros") + root.findall(
+        "./properties/properties[@name='Macros']"
+    ):
         root.find("properties").remove(macros)
     resource_report = (
         resources.rewrite(root, records)

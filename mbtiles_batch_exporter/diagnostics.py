@@ -227,10 +227,12 @@ def response_details(reply):
     content_bytes = None if content.isNull() else content.size()
     length = bytes(reply.rawHeader(b"Content-Length")).strip()
     declared_length = int(length) if re.fullmatch(rb"[0-9]{1,19}", length) else None
-    cached = reply.attribute(QNetworkRequest.SourceIsFromCacheAttribute)
+    cached = reply.attribute(QNetworkRequest.Attribute.SourceIsFromCacheAttribute)
     result = {
-        "http_status": reply.attribute(QNetworkRequest.HttpStatusCodeAttribute),
-        "qt_error": int(reply.error()),
+        "http_status": reply.attribute(
+            QNetworkRequest.Attribute.HttpStatusCodeAttribute
+        ),
+        "qt_error": int(getattr(reply.error(), "value", reply.error())),
         "content_type": mime.decode("ascii") if mime in known else "other",
         "from_cache": None if cached is None else bool(cached),
         "content_bytes": content_bytes,
@@ -363,7 +365,9 @@ class NetworkDiagnostics:
         operation = "other"
         request_crs = None
         bbox_present = False
-        for key, value in QUrlQuery(url).queryItems(QUrl.FullyDecoded):
+        for key, value in QUrlQuery(url).queryItems(
+            QUrl.ComponentFormattingOption.FullyDecoded
+        ):
             if key.lower() == "request" and value.lower() in (
                 "getmap",
                 "gettile",

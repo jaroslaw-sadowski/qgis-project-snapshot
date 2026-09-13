@@ -58,7 +58,9 @@ Ponytail jest zaleceniem, nie bezwzględnym wymogiem; poprawność i dane mają 
 
 ## Testy i przekazanie pracy
 
-Korzystaj z lokalnego QGIS 3.40 na Ubuntu. Polecenia są w `docs/development.md`.
+Sprawdzaj wspólny ZIP w QGIS 3.40/Qt5 oraz QGIS 4/Qt6 na Ubuntu.
+Nie zastępuj Qt6 samą kontrolą statyczną. Izolowane środowiska są w ignorowanym
+`dist/test-environments/`; nie należą do źródeł ani paczki. Polecenia są w `docs/development.md`.
 Wykonuj kontrole odpowiednie do zmian; naprawiaj przyczyny błędów zamiast je omijać.
 Sprawdź, czy WMS nie został pominięty wskutek blokady lokalnych gniazd.
 Nie powtarzaj szerokich testów, które już przeszły, bez nowych zmian lub obaw.

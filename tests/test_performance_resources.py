@@ -17,9 +17,7 @@ from mbtiles_batch_exporter.resources import available_memory, performance_count
 
 class PerformanceResourceTests(unittest.TestCase):
     def test_native_cpu_and_io_increase_without_qt_or_network(self):
-        with patch(
-            "mbtiles_batch_exporter.resources.QNetworkConfigurationManager"
-        ) as qt:
+        with patch("mbtiles_batch_exporter.resources.QNetworkInterface") as qt:
             first = performance_counters()
             sum(value * value for value in range(200_000))
             with tempfile.TemporaryFile() as stream:

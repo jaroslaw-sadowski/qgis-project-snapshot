@@ -1,4 +1,7 @@
-# Działanie i ograniczenia archiwizacji (1.4.3)
+# Działanie i ograniczenia archiwizacji (1.0.0)
+
+Pierwsze oficjalne wydanie to 1.0.0. Numery 1.1–1.4 poniżej odnoszą się
+do wcześniejszych wersji rozwojowych i historii wdrażania funkcji.
 
 Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
@@ -562,3 +565,22 @@ pozostałych kafelków i zoomów przy odrzuconym uwierzytelnianiu proxy. Zachowa
 PNG dają wynik partial; bez nich mapa ma status failed. Raport wskazuje proxy,
 `stop_http_status=407` i `stopped_early=true`; nie jest to odłożenie całego hosta.
 Pozostałe kody, w tym 403/404 pojedynczego kafelka, zachowują poprzednie reguły.
+
+## Zgodność QGIS 3 i 4
+
+Importy Qt przechodzą przez `qgis.PyQt`; enumy mają pełne nazwy wspólne dla
+Qt5/Qt6. `QAction` pochodzi z QtGui, okna używają `exec()`. Wstępny sygnał
+obecności sieci pochodzi z aktywnych interfejsów QNetworkInterface, bez
+usuniętego w Qt6 QNetworkConfigurationManager. To nie test dostępu do Internetu
+lub VPN; rzeczywiste błędy usług nadal obsługuje mechanizm pobierania.
+
+Qt5 i Qt6 serializują właściwości projektu w różnych strukturach XML. Obie
+ścieżki usuwają makra z kopii dla procesów i wynikowego projektu, a wynik
+ustawia względne ścieżki. Oryginalny projekt i jego makra pozostają niezmienione.
+Kod błędu sieciowego w diagnostyce zachowuje postać liczby także dla enumów Qt6.
+
+QGIS 4 używa kluczy proxy o nazwach z myślnikami. `worker_network` wykrywa
+natywny węzeł QgsSettingsTree i mapuje klucze profilu na niezmieniony protokół
+przekazywany w stdin. QGIS 3.40 zachowuje stare klucze. Testy sprawdzają
+rzeczywiste żądania przez proxy, wyjątki adresów, logowanie, HTTP 407 i brak
+poświadczeń w plikach końcowych.

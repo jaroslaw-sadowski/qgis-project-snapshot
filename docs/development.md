@@ -2,7 +2,9 @@
 
 Polecenia wykonuj z katalogu głównego repozytorium. Użyj interpretera z modułami
 `qgis` i `osgeo` dostarczonymi z QGIS; zwykłe środowisko Pythona może ich nie mieć.
-Zweryfikowano Ubuntu, QGIS 3.40.15, PyQt5, GDAL 3.12.2, Python 3.14.4.
+Środowiska odbioru 1.0.0: Ubuntu, QGIS 3.40.15/Qt5 i QGIS 4.0.3/Qt6 6.10.2,
+GDAL 3.12.2, Python 3.14.4. Wyniki: [odbiór wydania](release-1.0.0.md).
+Numery 1.1–1.4 w dalszych opisach oznaczają historyczne wersje rozwojowe.
 
 ## Testy źródeł
 
@@ -49,7 +51,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.4.3.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.0.0.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -133,7 +135,7 @@ Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
 Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
 procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
 przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md).
-Bieżące wydanie: [1.4.2](validation-1.4.2.md).
+Bieżące wydanie: [1.0.0](release-1.0.0.md).
 
 ## Kontrole adaptacji i budżetu Windows (1.3.0)
 
@@ -302,7 +304,8 @@ nie deklaruj pełnego odbioru wszystkich metod na podstawie testu HTTP Basic.
 ## Kontrole katalogu QGIS
 
 Aktualne wymagania i ręczne kroki publikacji: [publishing.md](publishing.md).
-Metadane wydania wskazują zakres QGIS 3.40–3.99; testy Qt5 nie potwierdzają QGIS4.
+Metadane wydania wskazują zakres QGIS 3.40–4.99. Ten sam ZIP sprawdzaj
+osobno interpreterem QGIS 3/Qt5 i QGIS 4/Qt6; jeden runtime nie zastępuje drugiego.
 Test ZIP-a kontroluje wymagane pola, wersję, adres autora, licencję, HTTPS,
 rozmiar do 25 000 000 bajtów, prawa 0644 i brak obcych plików. Nie potwierdza
 publicznej dostępności GitHub — sprawdź ją osobno, bez logowania.
@@ -327,3 +330,31 @@ Flake8/pycodestyle E203 dotyczące spacji w przekrojach koliduje z formatem Ruff
 pominięcie jest jawne. Limit 88 znaków oraz E203 to konwencja projektu, nie deklaracja
 ścisłego zastosowania każdej reguły PEP 8. Kod produkcyjny nie wymaga wyłączenia E402.
 Pliki .qm to dane Qt, a dołączone .ts są ich źródłem; nie są bibliotekami binarnymi.
+
+## Odbiór Qt6 i kontroler katalogu
+
+Używaj `qgis.PyQt`, pełnych nazw enumów i `QDialog.exec()`. Qt6 zapisuje
+właściwości projektu przez elementy `properties name="..."`; Qt5 używa nazw
+w tagach. Usuwanie makr i ustawienie ścieżek względnych musi obsługiwać oba
+formaty. Testy przenoszą archiwum, otwierają je offline i sprawdzają brak makr
+w projekcie wynikowym oraz plikach procesów pomocniczych.
+
+Do sprawdzenia gotowej paczki użyj tego samego polecenia `check_plugin_zip.py`
+z interpreterem QGIS 4. Na tym stanowisku runtime jest rozpakowany w ignorowanym
+`dist/test-environments/`, bez zastępowania systemowego QGIS 3. Środowisko musi
+wskazywać własne `QGIS_PREFIX_PATH`, biblioteki Qt6, pluginy Qt6 i moduły Pythona.
+Nie kopiuj tych ścieżek do kodu ani paczki. Test tworzy własny profil i działa
+z `QT_QPA_PLATFORM=offscreen`; nieoczekiwane okna ostrzeżeń kończą test błędem. Na koniec samodzielny program
+wywołuje `exitQgis()`, aby zamknąć dostawców przed niszczeniem bibliotek.
+
+Uruchom również oficjalny [pyqgis4-checker](https://github.com/qgis/pyqgis4-checker).
+Używa skryptu `scripts/pyqt5_to_pyqt6/pyqt5_to_pyqt6.py` z QGIS; parametr
+`--dry_run` kontroluje kod bez jego przepisywania. Wymaga środowiska Qt6 i
+zależności developerskich podanych przez narzędzie. Przypnij sprawdzoną rewizję
+przy odtwarzaniu audytu. Sam kontroler nie wykrywa wszystkich zmian zachowania.
+
+Konfiguracja `.flake8` w repozytorium i ZIP-ie ustala ten sam limit 88 znaków
+oraz E203 co Ruff. Nie wyłącza kontroli bezpieczeństwa. Bandit i skan sekretów
+uruchamiaj także na rozpakowanej paczce. Zmiana zakresu na 4.99 jest zgodna z
+[aktualną instrukcją QGIS](https://plugins.qgis.org/docs/migrate-qgis4);
+nie dodawaj wycofanego pola `supportsQt6`.

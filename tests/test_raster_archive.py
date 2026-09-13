@@ -208,7 +208,7 @@ class RasterTests(unittest.TestCase):
 
     def test_tile_touching_only_polygon_boundary_is_transparent(self):
         area = QgsGeometry.fromRect(QgsRectangle(0, 0, 256, 256))
-        image = QImage(256, 256, QImage.Format_ARGB32_Premultiplied)
+        image = QImage(256, 256, QImage.Format.Format_ARGB32_Premultiplied)
         image.fill(QColor("red"))
         result = _mask_image(image, area, QgsRectangle(256, 0, 512, 256), 1)
         self.assertFalse(any(result.constBits().asstring(result.sizeInBytes())[3::4]))
@@ -218,7 +218,7 @@ class RasterTests(unittest.TestCase):
         threshold = sum(level["resolution"] for level in resolutions) / 2
 
         def render(layer, project, bounds, width, height, cancelled, progress):
-            image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
+            image = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
             image.fill(QColor("red" if bounds.width() / width > threshold else "blue"))
             return image
 
@@ -237,7 +237,7 @@ class RasterTests(unittest.TestCase):
 
     def test_empty_result_stores_only_transparent_zoom_markers(self):
         def empty(layer, project, bounds, width, height, cancelled, progress):
-            image = QImage(width, height, QImage.Format_ARGB32_Premultiplied)
+            image = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
             image.fill(QColor(0, 0, 0, 0))
             return image
 
@@ -255,7 +255,7 @@ class RasterTests(unittest.TestCase):
         self.assertEqual([zoom for zoom, _ in rows], [16, 17])
         for _, payload in rows:
             image = QImage.fromData(payload, "PNG").convertToFormat(
-                QImage.Format_RGBA8888
+                QImage.Format.Format_RGBA8888
             )
             self.assertEqual((image.width(), image.height()), (256, 256))
             self.assertEqual(
@@ -514,10 +514,10 @@ class LocalWmsTests(unittest.TestCase):
                     if self.server.fail_large and width > 170:
                         self.send_error(503)
                         return
-                    image = QImage(width, height, QImage.Format_ARGB32)
+                    image = QImage(width, height, QImage.Format.Format_ARGB32)
                     image.fill(QColor(20, 80, 130, 128))
                     buffer = QBuffer()
-                    buffer.open(QIODevice.WriteOnly)
+                    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
                     image.save(buffer, "PNG")
                     body = bytes(buffer.data())
                     content_type = "image/png"
@@ -549,7 +549,21 @@ class LocalWmsTests(unittest.TestCase):
         self.capture(1)
 
     def test_parallel_processes_merge_two_wms_layers_and_open_offline(self):
-        self.capture(2)
+        from mbtiles_batch_exporter.parallel_archive import RasterWorkers
+
+        macro = "# Source-only macro: must not reach a worker."
+        self.project.writeEntry("Macros", "pythonCode", macro)
+        original_run = RasterWorkers._run
+        checked = []
+
+        def run(worker, folder):
+            self.assertNotIn(macro, (folder / "source.qgs").read_text())
+            checked.append(folder)
+            return original_run(worker, folder)
+
+        with patch.object(RasterWorkers, "_run", run):
+            self.capture(2)
+        self.assertEqual(len(checked), 2)
 
     def test_parallel_workers_use_english_and_respect_server_limit(self):
         with patch.dict(os.environ, QGIS_SNAPSHOT_LANGUAGE="en"):
