@@ -88,7 +88,10 @@ tagów, integralność ZIP-a i zgodność ze źródłami. W paczce zmieniły si�
 README.txt oraz pola description/about/tags w metadata.txt. Cały kod i katalogi
 tłumaczeń są identyczne z poprzednim wydaniem; nie powtarzano testów wykonania
 ani lintowania kodu dla samego tekstu. Wersja pozostaje 1.0.0.
-Aktualizacja załączników istniejącego wydania w toku.
+Załączniki istniejącego wydania zaktualizowano. Publiczne pobranie ZIP/SHA
+bez logowania potwierdziło zgodność z lokalną paczką i wszystkimi źródłami tagu.
+Aktualny tag v1.0.0: `e23a433d73136f5ca5f2334b59c15d1ab7a8c779`.
+Aktualny SHA-256: `744729baf9df0843f9701500d3caba2c3a0cbd60aeb9922afb06f5550447832a`.
 
 ## Środowiska i ograniczenia
 

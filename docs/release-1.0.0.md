@@ -28,7 +28,9 @@ Odczyt metadanych, spójność języków/tagów, integralność ZIP i porównani
 przeszły. Jedynymi zmienionymi plikami paczki są README.txt i metadata.txt;
 pola metadanych zmienione tylko w description/about/tags. Kod identyczny
 z poprzednią paczką, bez powtarzania testów wykonania dla zmian dokumentacyjnych.
-Propozycja commitu: `Highlight WMS, WMTS and OpenStreetMap downloads`.
+Opublikowano w tym samym wydaniu v1.0.0, commit `e23a433d73136f5ca5f2334b59c15d1ab7a8c779`.
+Publiczne pobranie ZIP/SHA bez logowania i porównanie wszystkich źródeł
+z tagiem potwierdziły zgodność paczki. Aktualna suma jest na początku raportu.
 
 ## Wskazówka o długim pobieraniu
 
