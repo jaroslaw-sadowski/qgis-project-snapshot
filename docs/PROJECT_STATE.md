@@ -1,6 +1,6 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 13 września 2026. Przygotowanie poprawki **1.0.2**,
+Aktualizacja: 13 września 2026. Opublikowano poprawkę **1.0.2**,
 wspólna paczka dla QGIS 3/Qt5 i QGIS 4/Qt6.
 
 ## Bieżący etap
@@ -22,6 +22,12 @@ aktualną dokumentację oraz audyt zabezpieczeń. Nie usuwano archiwów użytkow
 Odbiór zakończony: 236/236 Qt5 (188,870 s) i 236/236 Qt6 (196,924 s),
 kody 0, bez pominięć. Skaner upstream: 5/5, zero zgłoszeń, `config_files=[]`.
 Walidator metadanych, Ruff/format, Flake8 i kontroler Qt6 przeszły.
+Stabilny GitHub Release v1.0.2 jest publiczny, tag wskazuje
+`ea088b4b2746ae70fc54297fa0a4d84a00a54fef`. Publiczne pobranie ZIP/SHA
+potwierdziło zgodność ze sprawdzoną paczką i wszystkimi 28 źródłami tagu.
+ZIP 150 754 bajty, SHA-256
+`212875e603838513d7f4a3eeaeb758863780186a8aebcb78ea5a4b8c646f5053`.
+Nie wysłano z tej sesji paczki do plugins.qgis.org.
 Wyniki odbioru i status publikacji: [release-1.0.2.md](release-1.0.2.md).
 Nie utożsamiaj lokalnego skanu ani GitHub Release z akceptacją plugins.qgis.org.
 Wersja 1.0.0 była zablokowana przez Bandit. 1.0.1 usunęła te trafienia, ale zawierała

@@ -74,7 +74,11 @@ nie odbiorem połączenia z firmową bazą.
 
 ## Publikacja
 
-Przygotowanie GitHub Release v1.0.2. Starsze tagi i wydania pozostają w historii.
+Opublikowano stabilny [GitHub Release v1.0.2](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.2).
+Tag wskazuje `ea088b4b2746ae70fc54297fa0a4d84a00a54fef`. Publiczne pobranie ZIP-a
+i SHA bez logowania potwierdziło zgodność z lokalnymi załącznikami; wszystkie
+28 plików odpowiada źródłom pod tagiem. Repo jest publiczne.
+Starsze tagi i wydania pozostają w historii.
 Do plugins.qgis.org należy wysłać ZIP z załączników wydania jako nową wersję
 istniejącej wtyczki. Lokalny odbiór nie zastępuje skanu portalu i akceptacji
 moderatora. Paczki nie wysłano z tej sesji do plugins.qgis.org.
