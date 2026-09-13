@@ -64,6 +64,10 @@ odbioru nowego Qt6 na Windows/macOS i firmowego MSSQL/VPN na Ubuntu pozostaje.
 
 ## Publikacja
 
-Paczka przygotowana do GitHub Release v1.0.1 i ponownego zgłoszenia do QGIS.
+Opublikowano stabilny [GitHub Release v1.0.1](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.1),
+commit `4eac9847b3db0612e942277037073f58e4400f64`, z ZIP-em i SHA-256.
+Pobranie obu plików bez logowania potwierdziło zgodność z lokalną paczką;
+każdy plik ZIP-a odpowiada źródłu pod tagiem. Opis 1.0.0 wskazuje poprawkę 1.0.1.
+Paczka jest gotowa do ponownego zgłoszenia przez użytkownika do QGIS.
 Stary tag v1.0.0 pozostaje historyczny; nowy numer nie nadpisuje jego źródeł.
 Publikacja GitHub nie oznacza wysłania lub zatwierdzenia w plugins.qgis.org.

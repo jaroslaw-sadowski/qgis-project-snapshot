@@ -37,7 +37,10 @@ ZIP-a 1.0.1: po 15/15 testów Qt5 i Qt6, kody 0; pełny identyczny kod wcześnie
 po 236/236. Ruff/format i Flake8 również OK.
 [Raport 1.0.1](release-1.0.1.md), [wynik skanera](portal-scan-1.0.1.json).
 
-Przygotowano wydanie GitHub v1.0.1; publikacja i weryfikacja załączników w toku.
+Opublikowano stabilny [GitHub Release v1.0.1](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.1).
+Tag wskazuje `4eac9847b3db0612e942277037073f58e4400f64`. Publiczne pobranie ZIP-a i SHA bez logowania
+potwierdziło zgodność z lokalnymi plikami i wszystkimi źródłami tagu.
+Opis starego wydania 1.0.0 kieruje do poprawki. Repo pozostaje publiczne.
 Tag 1.0.0 pozostaje historyczny. Poprawionej paczki nie wysłano jeszcze do
 plugins.qgis.org — należy ją zgłosić jako nową wersję istniejącej wtyczki.
 Poniższe sekcje stanowią historię przygotowania 1.0.0, przed poprawką bezpieczeństwa.
