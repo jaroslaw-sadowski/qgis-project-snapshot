@@ -52,8 +52,8 @@ lokalny Ubuntu nie sprawdza firmowego VPN ani wszystkich metod uwierzytelniania.
 ## Kroki publikacji
 
 1. Zatwierdź sprawdzone źródła i udostępnij je publicznie pod adresami metadanych.
-   Kontrola bez logowania 13 września 2026 nadal zwraca HTTP 404. Zmiana
-   widoczności istniejącego repozytorium ujawnia również jego historię.
+   Wykonano 13 września 2026: repozytorium publiczne, odnośniki bez logowania
+   zwracają HTTP 200. Przed upublicznieniem sprawdzono historię i sekrety.
 2. Sprawdź bez logowania README, kod, GPL i zgłoszenia błędów. Źródła muszą
    odpowiadać paczce, włącznie z instrukcją i konfiguracją stylu.
 3. Utwórz tag `v1.0.0` i GitHub Release; załącz
@@ -64,6 +64,8 @@ lokalny Ubuntu nie sprawdza firmowego VPN ani wszystkich metod uwierzytelniania.
    nie archiwum całego repozytorium. Przeczytaj wynik skanowania i uwagi opiekunów.
 5. Po zatwierdzeniu sprawdź instalację przez Menedżer wtyczek QGIS 3 i QGIS 4.
 
-Użytkownik zlecił upublicznienie repozytorium i GitHub Release po audycie poligonu.
+Po audycie poligonu upubliczniono repozytorium i opublikowano
+[GitHub Release v1.0.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.0).
+ZIP pobrany bez logowania zgadza się z lokalnym i opublikowaną sumą SHA-256.
 Aktualny stan wykonania: [PROJECT_STATE.md](PROJECT_STATE.md).
 Zgłoszenie do plugins.qgis.org pozostaje odrębnym krokiem.

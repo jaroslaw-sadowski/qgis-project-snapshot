@@ -109,11 +109,14 @@ jednego archiwum wymaga osobnej próby. Kontrola źródeł/stylów nadal odrzuca
 niezgodny projekt. Testy nie są obietnicą maksymalnej przepustowości lub odporności
 na fizyczną awarię nośnika.
 
-Publiczny adres repozytorium z metadanych zwracał HTTP 404 bez logowania.
-Przed zgłoszeniem trzeba udostępnić źródła i sprawdzić odnośniki, zgodnie z
-[wymaganiami publikacji](https://plugins.qgis.org/docs/publish/).
-Użytkownik zlecił udostępnienie repozytorium i GitHub Release;
-aktualny stan publikacji zapisuje PROJECT_STATE.md. Kroki: [publishing.md](publishing.md).
+13 września 2026 upubliczniono repozytorium i opublikowano
+[GitHub Release v1.0.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.0),
+tag wskazuje commit `1c84110aeb54858a2dff05b32f2bc65dd5e60463`.
+Sprawdzono dostęp do źródeł i załączników bez logowania (HTTP 200), zgodność
+pobranego ZIP-a z lokalnym i SHA-256. Historia oraz bieżące źródła bez trafień
+sekretów. Spełniono wymóg publicznych źródeł z
+[zasad publikacji](https://plugins.qgis.org/docs/publish/).
+Nie zgłoszono jeszcze paczki do plugins.qgis.org. Kroki: [publishing.md](publishing.md).
 Propozycja commitu: `Prepare official 1.0.0 release with QGIS 4 compatibility`.
 
 ## Release notes

@@ -75,12 +75,20 @@ PNG RGBA, osobne zoomy, jeden zapisujący GeoPackage i trwały postęp wznowieni
 
 ## Publikacja i dalsza praca
 
-Zlecono publikację publicznego repozytorium i GitHub Release v1.0.0.
+**Wykonano publikację:** repozytorium jest PUBLIC,
+[GitHub Release v1.0.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.0)
+jest opublikowany jako stabilny, z ZIP-em i plikiem SHA-256. Tag wskazuje commit
+`1c84110aeb54858a2dff05b32f2bc65dd5e60463`. Publiczne źródła, README, GPL,
+issues, strona wydania i oba załączniki sprawdzone bez logowania (HTTP 200).
+Pobrany publicznie ZIP jest identyczny z lokalnym; SHA-256:
+`b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37`.
 Przed zmianą widoczności przejrzano 20 commitów: 444 unikalne obiekty plików,
 434 tekstowe przeskanowane, zero trafień sekretów i brak plików projektów/danych.
-Binaria historii to własna ikona PNG i katalog tłumaczeń Qt. Widoczność
-i stan wydania należy potwierdzić w GitHub;
-lokalny odbiór nie oznacza akceptacji moderatorów. Kroki: [publishing.md](publishing.md).
+Bieżące 96 plików źródeł/dokumentacji również bez trafień sekretów.
+Binaria historii to własna ikona PNG i katalog tłumaczeń Qt.
+**Nie wysłano wtyczki do plugins.qgis.org**; to następny krok użytkownika.
+Lokalny odbiór i GitHub Release nie oznaczają akceptacji moderatorów.
+Kroki: [publishing.md](publishing.md).
 Testerzy z wersją rozwojową 1.4.x muszą ręcznie zainstalować oficjalny ZIP 1.0.0
 oraz uruchomić QGIS ponownie — niższy numer nie będzie automatyczną aktualizacją.
 
