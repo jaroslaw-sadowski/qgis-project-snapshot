@@ -3,6 +3,22 @@
 Aktualizacja: 13 września 2026. Opublikowano poprawkę **1.0.2**,
 wspólna paczka dla QGIS 3/Qt5 i QGIS 4/Qt6.
 
+## Korekta opisów po wydaniu 1.0.2
+
+README repozytorium, README wtyczki i opisowe pola metadanych przeredagowano
+na prostsze, pełne zdania po angielsku i po polsku. Zachowano zakres informacji,
+warunki korzystania ze źródeł, informację o AI oraz wymagania instalacji.
+Usunięto średniki i długie myślniki z tych tekstów. Numer pozostaje 1.0.2.
+Walidator metadanych portalu przeszedł. Sprawdzono zgodność obu README,
+odnośniki i diff. Porównanie ZIP-ów potwierdziło zmiany wyłącznie w README.txt
+i polach description/about/changelog. Cały kod wykonawczy pozostaje identyczny
+z odebranym wydaniem. Nie powtarzano pełnych testów dla samych tekstów.
+
+Zmiany dotyczą bieżących źródeł w repozytorium. Opublikowany tag i załączniki
+1.0.2 pozostają niezmienione. Paczka do kontroli tekstów jest osobno
+w ignorowanym `dist/editorial-preview/`, nie jest nowym wydaniem.
+Przy kolejnym wydaniu należy uwzględnić te opisy i nadać nowy numer.
+
 ## Bieżący etap
 
 Użytkownik zlecił usunięcie oznaczenia „Validated (configured)”, porządki i wydanie
