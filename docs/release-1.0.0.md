@@ -29,7 +29,9 @@ Przebudowano katalog QM: 337 gotowych tłumaczeń. Zmienione pliki paczki to tyl
 README.txt, metadata.txt, archive_dialog.py i katalogi tłumaczeń en.ts/en.qm.
 Gotowa paczka: 15/15 testów Qt5 (1,628 s) i Qt6 (1,503 s), kody 0; kompletność
 i odczyt tłumaczeń oraz załadowanie/okno wtyczki OK. Ruff/format, Flake8 i diff OK.
-Propozycja commitu: `Explain download duration for large high-zoom archives`.
+Opublikowano pod tym samym v1.0.0, commit `8654be889a8b64314efbc9acf8eb0207a860d413`.
+Publiczne pobranie ZIP/SHA bez logowania potwierdziło zgodność z lokalną paczką
+i ze źródłami pod tagiem. Suma aktualnej paczki znajduje się na początku raportu.
 
 ## Korekta opisów i menu bez zmiany numeru
 

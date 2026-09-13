@@ -71,7 +71,10 @@ Zaktualizowano TS i skompilowano QM (337 kompletnych tłumaczeń). Nie zmieniono
 obliczeń szacunku, algorytmów pobierania ani numeru wersji.
 Gotowy ZIP: 15/15 testów w Qt5 (1,628 s) i Qt6 (1,503 s), kody 0; obejmują
 zgodność katalogu tłumaczeń i ładowanie/okno wtyczki. Ruff/format, Flake8 i diff OK.
-Paczka i suma przygotowane do zastąpienia załączników istniejącego wydania.
+Załączniki istniejącego wydania zastąpiono. Publiczne pobranie bez logowania
+potwierdziło identyczny ZIP/SHA i zgodność wszystkich plików paczki z tagiem.
+Aktualny tag v1.0.0: `8654be889a8b64314efbc9acf8eb0207a860d413`.
+Aktualny SHA-256: `74a756dffe1e992455183c588dc7d3d29d22f1fb8d874840feb47e20a3e66bd1`.
 
 ## Środowiska i ograniczenia
 
