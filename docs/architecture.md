@@ -584,3 +584,19 @@ natywny węzeł QgsSettingsTree i mapuje klucze profilu na niezmieniony protokó
 przekazywany w stdin. QGIS 3.40 zachowuje stare klucze. Testy sprawdzają
 rzeczywiste żądania przez proxy, wyjątki adresów, logowanie, HTTP 407 i brak
 poświadczeń w plikach końcowych.
+
+## Zabezpieczenie XML i zapytań po kontroli katalogu
+
+Kopie QGS, XML warstw, SVG i UI czyta prywatna kopia frontendu ElementTree
+z defusedxml 0.7.1. Parser zabrania deklaracji encji i odwołań zewnętrznych;
+zwykły DOCTYPE QGIS pozostaje obsługiwany. Bez globalnego monkey patchingu.
+Styl jest sprawdzany przed dotychczasową kanonizacją, dzięki czemu nie zmieniają
+się fingerprinty poprawnych źródeł i zgodność wznowienia. Odrzucony SVG/UI
+jest usuwany z kopii i z jej odwołań, z uwagą w raporcie; źródło pozostaje.
+
+SQL SQLite używa QgsSqliteUtils.quotedIdentifier dla nazw oraz parametrów
+dla wartości. Kontrola MSSQL zachowuje cytowane nawiasami identyfikatory
+i istniejący filtr SQL z dostawcy QGIS. Proces uruchamia się absolutną ścieżką
+interpretera, listą argumentów i shell=False; ścieżki symlinków venv nie są
+rozwijane. Poświadczenia nadal tylko przez stdin. Uzasadnienia punktowych
+adnotacji skanera: [raport naprawy](security-scan-fix.md).

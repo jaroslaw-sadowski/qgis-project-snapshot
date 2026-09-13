@@ -35,6 +35,13 @@ def build(output):
             ".flake8": ROOT / ".flake8",
         }
     )
+    sources.update(
+        {
+            path.relative_to(package).as_posix(): path
+            for path in (package / "vendor").rglob("*")
+            if path.is_file() and path.suffix in {".py", ".md", ".txt"}
+        }
+    )
     for name, path in sources.items():
         if path.is_symlink() or not path.is_file():
             raise ValueError(f"Brak zwykłego pliku paczki: {name}")

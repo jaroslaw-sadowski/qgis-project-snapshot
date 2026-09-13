@@ -6,11 +6,27 @@ rozwojowe; ich raporty zachowano, ale nie oznaczają kolejnych oficjalnych wyda�
 
 ## Bieżący etap
 
-Użytkownik zlecił audyt poligonu, a po pozytywnej ocenie gotowości kodu —
-utworzenie GitHub Release i upublicznienie repozytorium. Obejmuje to commit,
-push i tag wydania. Nie zlecił instalacji w profilu ani zgłoszenia do plugins.qgis.org. Git był czysty na początku tego etapu;
-po publikacji użytkownik zlecił łagodniejszy język README/metadanych i jedną
-pozycję bezpośrednio w menu Wtyczki, bez zmiany algorytmów i numeru 1.0.0.
+Użytkownik wysłał 1.0.0 do plugins.qgis.org. Portal zablokował zgłoszenie
+[6293], skan 13 września 2026 o 15:15 CEST: 19 uwag Bandit, pozostałe cztery
+kontrole przeszły. Wcześniejsza ocena „bez high/Critical” była błędna w odniesieniu
+do portalu: jego kontrola Bandit ma zbiorczą kategorię critical także dla
+wykrytych ostrzeżeń. Nie opieraj gotowości publikacji na lokalnej skali HIGH.
+
+Poprawka zabezpieczeń jest gotowa lokalnie: defusedxml w prywatnej paczce,
+cytowanie SQL przez QGIS, jawne uruchamianie własnego procesu bez shell,
+punktowe udokumentowane nosec tylko dla sprawdzonych zastosowań. Pełny odbiór
+236/236 Qt5 (185,951 s) i 236/236 Qt6 (192,549 s), kody 0, bez pominięć.
+Końcową konfigurację Flake8 sprawdzono również z listą bezwzględnych ścieżek,
+jak w portalu. Skan ZIP-a obejmuje vendor: Bandit 0 po punktowych adnotacjach,
+sekrety 0. Bez globalnego wyłączania Bandita lub pomijania vendor w tym skanerze.
+Szczegóły: [security-scan-fix.md](security-scan-fix.md).
+
+Użytkownik wcześniej wymagał numeru 1.0.0. Publiczny kod formularza portalu
+odrzuca istniejący numer, a ponowny skan nie odblokowuje starego zgłoszenia.
+Wysłano pytanie o zgodę na 1.0.1 albo zachowanie 1.0.0 i uzgodnienie usunięcia
+zablokowanego zgłoszenia. Do odpowiedzi numer pozostaje 1.0.0; naprawa nie
+została jeszcze ponownie zgłoszona do portalu. Poniższe opisy wydania stanowią
+historię sprzed poprawki zabezpieczeń.
 
 - Krótkie README i metadane: angielski przed polskim, wymagania i instalacja,
   automatyczna równoległość, licencje źródeł, AI/vibe coding i zakres testów.
@@ -35,7 +51,8 @@ menu opisano osobno poniżej; aktualna suma znajduje się w raporcie.
 **Odbiór bazowego kodu: 231/231 testów z ZIP-a w każdym runtime**, bez pominięć,
 kody procesów 0. Qt5: 170,064 s; Qt6: 171,448 s. Ruff/format, Flake8, składnia
 Python 3.10, linki i diff OK. Sekrety: 0 w kodzie i ZIP-ie. Kontroler Qt6: 0
-niezgodności. Bandit: 20 przejrzanych ostrzeżeń, bez high/Critical. Aktualna paczka
+niezgodności. Bandit: historycznie 20 ostrzeżeń bez HIGH według lokalnej skali; portal
+później zablokował wersję (patrz bieżący etap). Aktualna paczka
 144 219 bajtów, 23 pliki; powtarzalna budowa i zgodność wszystkich źródeł.
 Samodzielny program odbioru zamyka QGIS przez exitQgis(), aby odroczone sprzątanie
 OGR nie trafiało na końcowe niszczenie bibliotek.
@@ -142,7 +159,8 @@ Przed zmianą widoczności przejrzano 20 commitów: 444 unikalne obiekty plików
 434 tekstowe przeskanowane, zero trafień sekretów i brak plików projektów/danych.
 Bieżące 96 plików źródeł/dokumentacji również bez trafień sekretów.
 Binaria historii to własna ikona PNG i katalog tłumaczeń Qt.
-**Nie wysłano wtyczki do plugins.qgis.org**; to następny krok użytkownika.
+**Użytkownik wysłał wtyczkę do plugins.qgis.org; zgłoszenie zablokowane.**
+Nie wysłano jeszcze poprawionej paczki; patrz bieżący etap.
 Lokalny odbiór i GitHub Release nie oznaczają akceptacji moderatorów.
 Kroki: [publishing.md](publishing.md).
 Testerzy z wersją rozwojową 1.4.x muszą ręcznie zainstalować oficjalny ZIP 1.0.0

@@ -29,6 +29,7 @@ from qgis.core import (
     QgsPointXY,
     QgsRectangle,
     QgsScaleCalculator,
+    QgsSqliteUtils,
     QgsVectorLayer,
 )
 from qgis.PyQt.QtCore import (
@@ -469,6 +470,7 @@ def write_rendered_raster(
     legacy_retries=False,
 ):
     """One sparse RGBA tile table; each zoom is rendered independently."""
+    quoted_table = QgsSqliteUtils.quotedIdentifier(table)
     mask = QgsGeometry(area)
     if area_crs != project.crs():
         mask.transform(QgsCoordinateTransform(area_crs, project.crs(), project))
@@ -822,7 +824,8 @@ def write_rendered_raster(
                 raise InterruptedError(tr("Przerwano pobieranie obrazu."))
             with closing(sqlite3.connect(database)) as connection:
                 tiles = connection.execute(
-                    f'SELECT count(*) FROM "{table}"'
+                    # Quoted identifier; values bound.
+                    f"SELECT count(*) FROM {quoted_table}"  # nosec B608
                 ).fetchone()[0]
             nonempty = sum(level["nonempty"] for level in stats["levels"])
             if tiles != nonempty:
@@ -939,7 +942,8 @@ def _capture_adaptive(
         },
         sort_keys=True,
     )
-    quoted_table = '"' + table.replace('"', '""') + '"'
+    # SQLite binds values, not identifiers; use the native QGIS quoting.
+    quoted_table = QgsSqliteUtils.quotedIdentifier(table)
     deferred = False
     stop_http_status = None
     stopped_early = False
@@ -962,7 +966,10 @@ def _capture_adaptive(
                     tr("Nie można wznowić kafelków: niezgodny obszar, CRS lub siatka.")
                 )
         else:
-            if stored.execute(f"SELECT count(*) FROM {quoted_table}").fetchone()[0]:
+            # Quoted identifier.
+            if stored.execute(
+                f"SELECT count(*) FROM {quoted_table}"  # nosec B608
+            ).fetchone()[0]:
                 raise ValueError(
                     tr(
                         "Nie można wznowić kafelków: "
@@ -1020,7 +1027,8 @@ def _capture_adaptive(
             # Reconcile both durable stores before opening GDAL for any writes.
             with stored:
                 for zoom, column, row, payload in stored.execute(
-                    "SELECT zoom_level,tile_column,tile_row,tile_data "
+                    # Quoted identifier; values bound.
+                    "SELECT zoom_level,tile_column,tile_row,tile_data "  # nosec B608
                     f"FROM {quoted_table}"
                 ):
                     if cancelled():
@@ -1049,7 +1057,8 @@ def _capture_adaptive(
                     if transparent and (old is None or old[0] == "empty"):
                         # Empty-zoom overview markers are derived, not downloads.
                         stored.execute(
-                            f"DELETE FROM {quoted_table} "
+                            # Quoted identifier; values bound.
+                            f"DELETE FROM {quoted_table} "  # nosec B608
                             "WHERE zoom_level=? AND tile_column=? AND tile_row=?",
                             (zoom, column, row),
                         )
@@ -1069,7 +1078,8 @@ def _capture_adaptive(
                         )
                     elif old:
                         stored.execute(
-                            f"DELETE FROM {quoted_table} "
+                            # Quoted identifier; values bound.
+                            f"DELETE FROM {quoted_table} "  # nosec B608
                             "WHERE zoom_level=? AND tile_column=? AND tile_row=?",
                             (zoom, column, row),
                         )
@@ -1095,7 +1105,8 @@ def _capture_adaptive(
                     progress(tr("Sprawdzanie zachowanych kafelków…"))
                     updated = time.monotonic()
                 if not stored.execute(
-                    f"SELECT 1 FROM {quoted_table} "
+                    # Quoted identifier; values bound.
+                    f"SELECT 1 FROM {quoted_table} "  # nosec B608
                     "WHERE zoom_level=? AND tile_column=? AND tile_row=?",
                     (zoom, column, row),
                 ).fetchone():
@@ -1228,7 +1239,9 @@ def _capture_adaptive(
                                 checksum = ""
                                 if not empty:
                                     written = stored.execute(
-                                        f"SELECT tile_data FROM {quoted_table} "
+                                        # Quoted identifier; values bound.
+                                        "SELECT tile_data "  # nosec B608
+                                        f"FROM {quoted_table} "
                                         "WHERE zoom_level=? AND tile_column=? "
                                         "AND tile_row=?",
                                         (zoom, column, row),
@@ -1618,6 +1631,7 @@ def write_raster_data(
 
 def _empty_zoom_overviews(database, table, stats):
     """Expose successfully empty zooms to GDAL without resampling another zoom."""
+    quoted_table = QgsSqliteUtils.quotedIdentifier(table)
     previous = set(stats.get("empty_zoom_placeholders", []))
     placeholders = []
     empty_zooms = [
@@ -1634,7 +1648,10 @@ def _empty_zoom_overviews(database, table, stats):
             missing = []
             for zoom in empty_zooms:
                 exists = connection.execute(
-                    f'SELECT 1 FROM "{table}" WHERE zoom_level=? LIMIT 1', (zoom,)
+                    # Quoted identifier; values bound.
+                    f"SELECT 1 FROM {quoted_table} "  # nosec B608
+                    "WHERE zoom_level=? LIMIT 1",
+                    (zoom,),
                 ).fetchone()
                 if not exists:
                     missing.append(zoom)
@@ -1668,7 +1685,8 @@ def _empty_zoom_overviews(database, table, stats):
                 with connection:
                     for zoom in missing:
                         connection.execute(
-                            f'INSERT INTO "{table}" '
+                            # Quoted identifier; values bound.
+                            f"INSERT INTO {quoted_table} "  # nosec B608
                             "(zoom_level,tile_column,tile_row,tile_data) "
                             "VALUES (?,0,0,?)",
                             (zoom, payload),

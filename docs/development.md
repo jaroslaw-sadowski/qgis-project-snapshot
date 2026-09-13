@@ -361,3 +361,22 @@ oraz E203 co Ruff. Nie wyłącza kontroli bezpieczeństwa. Bandit i skan sekret�
 uruchamiaj także na rozpakowanej paczce. Zmiana zakresu na 4.99 jest zgodna z
 [aktualną instrukcją QGIS](https://plugins.qgis.org/docs/migrate-qgis4);
 nie dodawaj wycofanego pola `supportsQt6`.
+
+## Odtworzenie kontroli portalu po blokadzie
+
+Raport [security-scan-fix.md](security-scan-fix.md) opisuje naprawę i punktowe
+adnotacje Bandit. Skanuj cały rozpakowany ZIP, łącznie z vendor. Sprawdzaj także
+`bandit --ignore-nosec` i oceniaj każde pominięcie; nie dodawaj globalnej listy
+wyłączeń. Portal uruchamia Bandita z JSON i traktuje niepowodzenie całej kontroli
+jako critical — lokalne LOW/MEDIUM nie oznacza, że przesłana paczka przejdzie.
+
+Flake8 portalu dostaje jawnie wszystkie pliki Python i `--config` paczki;
+powtórz taki wariant poza katalogiem źródeł. Samo `exclude=vendor` nie pomija
+plików wskazanych jawnie. Dla dwóch plików upstream defusedxml konfiguracja
+opisuje tylko E501/F811 (formatowanie i zgodne gałęzie importów Python 2/3).
+Biblioteka nadal podlega skanowi bezpieczeństwa. Nie jest instalowana przez pip
+u użytkownika. Budowa pakuje jej prywatny podkatalog i licencję PSF.
+
+Testy `test_security.py`: encje wewnętrzne/zewnętrzne i parametryczne w UTF-8/16,
+poprawny DOCTYPE QGIS, odrzucenie SVG i odwołań do niego bez zmiany oryginału,
+zgodność dawnych fingerprintów wznowienia i SQL z nietypową nazwą tabeli.

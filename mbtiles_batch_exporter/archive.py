@@ -9,7 +9,6 @@ import re
 import shutil
 import sqlite3
 import time
-import xml.etree.ElementTree as ET
 from configparser import ConfigParser
 from contextlib import ExitStack, closing, contextmanager
 from datetime import datetime
@@ -18,6 +17,9 @@ from html import escape
 from pathlib import Path
 from tempfile import mkdtemp
 from urllib.parse import quote
+
+# Canonicalization only, after defusedxml validation in _source_fingerprint.
+from xml.etree.ElementTree import canonicalize  # nosec B405
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from osgeo import gdal, ogr
@@ -53,6 +55,7 @@ from .i18n import tr
 from .parallel_archive import RasterWorkers, WorkerError, merge_raster
 from .raster_archive import write_raster_data, write_rendered_raster, zoom_levels
 from .resources import MAX_WORKERS, detect_resources, recommend
+from .vendor.defusedxml import ElementTree as ET
 from .worker_network import network_snapshot
 
 ARCHIVE_LIMITATIONS = [
@@ -265,11 +268,13 @@ def _write_vector(
                 )
                 if connection is None or not uri.table():
                     raise RuntimeError("MSSQL probe unavailable")
+                # Identifiers are bracket-escaped; the subset is the explicit SQL
+                # filter already used by this QGIS provider, not remote input.
                 source = ".".join(
                     "[" + part.replace("]", "]]") + "]"
                     for part in (uri.schema() or "dbo", uri.table())
                 )
-                sql = "SELECT TOP (1) 1 FROM " + source
+                sql = "SELECT TOP (1) 1 FROM " + source  # nosec B608
                 if layer.subsetString():
                     sql += " WHERE (" + layer.subsetString() + ")"
                 result = connection.executeSql(sql)
@@ -706,12 +711,14 @@ def _source_fingerprint(layer, *, canonical=True):
     """Keep a digest of source and rendering settings, never source credentials."""
     style = QgsMapLayerStyle()
     style.readFromLayer(layer)
+    style_xml = style.xmlData()
+    ET.fromstring(style_xml)  # Reject entities before canonicalize uses its parser.
     settings = [
         layer.source(),
         layer.providerType(),
         layer.crs().toWkt(),
         layer.subsetString() if isinstance(layer, QgsVectorLayer) else "",
-        ET.canonicalize(style.xmlData()) if canonical else style.xmlData(),
+        canonicalize(style_xml) if canonical else style_xml,
     ]
     return sha256(json.dumps(settings, ensure_ascii=False).encode()).hexdigest()
 

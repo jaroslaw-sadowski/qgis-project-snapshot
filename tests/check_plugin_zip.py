@@ -46,7 +46,7 @@ def check(filename, pattern="test_*.py"):
                 path = Path(name)
                 assert not path.is_absolute() and ".." not in path.parts
                 assert path.parts[0] == "mbtiles_batch_exporter"
-                assert len(path.parts) == 2
+                assert len(path.parts) == 2 or path.parts[1] == "vendor"
                 assert not path.name.startswith(".") or path.name == ".flake8"
                 assert path.name in {"LICENSE", ".flake8"} or path.suffix in {
                     ".py",

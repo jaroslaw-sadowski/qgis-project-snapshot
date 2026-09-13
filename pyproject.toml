@@ -1,6 +1,8 @@
 [tool.ruff]
 target-version = "py310"
 line-length = 88
+# Preserve bundled upstream formatting; security checks still scan these files.
+extend-exclude = ["mbtiles_batch_exporter/vendor"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I"]

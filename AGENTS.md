@@ -58,6 +58,11 @@ Ponytail jest zaleceniem, nie bezwzględnym wymogiem; poprawność i dane mają 
 
 ## Testy i przekazanie pracy
 
+Przed zgłoszeniem do katalogu odtwórz wywołania skanerów portalu na całym ZIP-ie,
+także bibliotekach dołączonych do paczki. Lokalny poziom LOW/MEDIUM Bandita
+nie oznacza, że portal nie zablokuje wersji. Punktowe `nosec` wymagają uzasadnienia
+w kodzie, testów zabezpieczenia i przeglądu wyniku `--ignore-nosec`.
+
 Sprawdzaj wspólny ZIP w QGIS 3.40/Qt5 oraz QGIS 4/Qt6 na Ubuntu.
 Nie zastępuj Qt6 samą kontrolą statyczną. Izolowane środowiska są w ignorowanym
 `dist/test-environments/`; nie należą do źródeł ani paczki. Polecenia są w `docs/development.md`.

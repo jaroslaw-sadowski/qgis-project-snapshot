@@ -6,13 +6,14 @@ import os
 import re
 import shutil
 import time
-import xml.etree.ElementTree as ET
 from hashlib import sha256
 from pathlib import Path
 
 from qgis.core import QgsApplication, QgsVectorLayer
 
 from .i18n import tr
+from .vendor.defusedxml import DefusedXmlException
+from .vendor.defusedxml import ElementTree as ET
 
 
 class ProjectResources:
@@ -102,7 +103,9 @@ class ProjectResources:
                             and not reference.startswith("#")
                         ):
                             copied = self.copy(reference, owner, path.parent)
-                            if copied.startswith("./" + tr("zasoby") + "/"):
+                            if not copied:
+                                node.set(key, "")
+                            elif copied.startswith("./" + tr("zasoby") + "/"):
                                 node.set(
                                     key,
                                     os.path.relpath(
@@ -115,7 +118,9 @@ class ProjectResources:
                         and node.text.strip()
                     ):
                         copied = self.copy(node.text.strip(), owner, path.parent)
-                        if copied.startswith("./" + tr("zasoby") + "/"):
+                        if not copied:
+                            node.text = ""
+                        elif copied.startswith("./" + tr("zasoby") + "/"):
                             node.text = os.path.relpath(
                                 self.folder / copied[2:], target.parent
                             )
@@ -130,6 +135,15 @@ class ProjectResources:
                             ),
                         )
                 tree.write(target, encoding="utf-8", xml_declaration=True)
+            except DefusedXmlException:
+                # Do not leave a rejected SVG/UI for QGIS to load later.
+                target.unlink(missing_ok=True)
+                self.files[path] = ""
+                self.issue(
+                    owner,
+                    tr("Nie udało się sprawdzić odwołań wewnątrz SVG lub formularza."),
+                )
+                return ""
             except (ET.ParseError, OSError):
                 self.issue(
                     owner,

@@ -69,3 +69,13 @@ Po audycie poligonu upubliczniono repozytorium i opublikowano
 ZIP pobrany bez logowania zgadza się z lokalnym i opublikowaną sumą SHA-256.
 Aktualny stan wykonania: [PROJECT_STATE.md](PROJECT_STATE.md).
 Zgłoszenie do plugins.qgis.org pozostaje odrębnym krokiem.
+
+## Ponowne zgłoszenie po blokadzie 1.0.0
+
+Użytkownik zgłosił paczkę, ale kontrola Bandit zablokowała wersję [6293].
+Naprawa i wyniki: [security-scan-fix.md](security-scan-fix.md). Nie wystarczy
+ponowny skan starego wpisu: portal wymaga nowego zgłoszenia, a formularz odrzuca
+powtórzony numer wersji. Wymagany jest nowy numer (proponowane 1.0.1) albo
+uzgodnienie usunięcia zablokowanej 1.0.0 z opiekunem portalu, jeśli autor chce
+zachować numer. Nie deklaruj akceptacji katalogu na podstawie samego lokalnego
+wyniku lub GitHub Release. Poprawionej paczki agent nie zgłasza samodzielnie.

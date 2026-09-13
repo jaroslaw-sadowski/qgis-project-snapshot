@@ -5,6 +5,14 @@ i upublicznienie repozytorium po audycie poligonu; profil użytkownika pozostaje
 niezmieniony. Historyczny `validation-1.0.0.md` opisuje wcześniejszy build
 rozwojowy; poniższa suma identyfikuje wydanie oficjalne.
 
+## Blokada portalu i przygotowana poprawka
+
+Po przesłaniu przez użytkownika portal zablokował tę paczkę z powodu 19 uwag
+Bandit. Poniższe wyniki i suma dotyczą poprzedniej paczki 1.0.0. Moja wcześniejsza
+ocena poziomów Critical na podstawie lokalnego HIGH nie potwierdziła się:
+portal traktuje niepowodzenie całej kontroli Bandit jako critical.
+Aktualna poprawka, testy i suma: [security-scan-fix.md](security-scan-fix.md).
+
 ## Paczka
 
 `dist/qgis-project-snapshot-1.0.0.zip`: **144 219 bajtów, 23 pliki**.
@@ -137,8 +145,9 @@ lub cytowania identyfikatorów QGIS oraz istniejącego filtra MSSQL. Wartości d
 są parametryzowane. B314 (4) i B405 (3) dotyczą XML projektu i zasobów parsowanych
 przez standardowy ElementTree. B603/B404 dotyczą uruchamiania własnego procesu
 Pythona listą argumentów, bez powłoki. Przejrzano miejsca użycia; nie ukryto trafień.
-Według [aktualnych reguł portalu](https://plugins.qgis.org/docs/security-scanning/rules)
-są to ostrzeżenia/informacje, nie reguły Critical. Plik `.qm` to katalog tłumaczeń
+Tabela [reguł portalu](https://plugins.qgis.org/docs/security-scanning/rules)
+opisuje je jako ostrzeżenia/informacje, ale rzeczywiste zgłoszenie wykazało, że
+cała kontrola Bandit mimo tego blokuje wersję. Naprawę opisano na początku raportu. Plik `.qm` to katalog tłumaczeń
 Qt, ze źródłem `.ts`, nie wykonywalna biblioteka.
 
 `.flake8` jest [obsługiwanym plikiem konfiguracji portalu](https://plugins.qgis.org/docs/security-scanning/config-files).

@@ -7,10 +7,11 @@ import math
 import os
 import shutil
 import sqlite3
-import subprocess
+
+# Isolated QGIS worker, no shell.
+import subprocess  # nosec B404
 import sys
 import time
-import xml.etree.ElementTree as ET
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import closing
@@ -22,7 +23,7 @@ from threading import Condition, Event, Thread
 from zipfile import ZipFile
 
 from osgeo import gdal
-from qgis.core import Qgis, QgsDataSourceUri, QgsVectorLayer
+from qgis.core import Qgis, QgsDataSourceUri, QgsSqliteUtils, QgsVectorLayer
 from qgis.PyQt.QtCore import QCoreApplication, QUrl
 
 from .adaptive import PROTOCOL, HostPolicy, WorkerGate, write_state
@@ -34,6 +35,7 @@ from .resources import (
     available_memory,
     recommend,
 )
+from .vendor.defusedxml import ElementTree as ET
 from .worker_network import network_snapshot
 
 
@@ -74,7 +76,8 @@ def merge_raster(source, destination, table, cancelled=lambda: False):
         target.SetGeoTransform(raster.GetGeoTransform())
         target.FlushCache()
         raster = target = None
-    # Names originate exclusively from sha256(layer.id()), never from layer names.
+    # SQL parameters cannot bind identifiers. Quote even internal hash names.
+    quoted_table = QgsSqliteUtils.quotedIdentifier(table)
     with closing(sqlite3.connect(destination)) as connection:
         connection.set_progress_handler(lambda: int(cancelled()), 10000)
         connection.execute("ATTACH DATABASE ? AS incoming", (str(source),))
@@ -90,7 +93,8 @@ def merge_raster(source, destination, table, cancelled=lambda: False):
                 (table,),
             )
             connection.execute(
-                f'INSERT INTO "{table}" SELECT * FROM incoming."{table}"'
+                f"INSERT INTO {quoted_table} "  # nosec B608
+                f"SELECT * FROM incoming.{quoted_table}"
             )
             bounds = connection.execute(
                 (
@@ -938,6 +942,7 @@ class RasterWorkers:
         executable = executable or shutil.which("python3")
         if not executable:
             raise WorkerError("interpreter_missing")
+        executable = str(Path(executable).absolute())
         environment = os.environ.copy()
         environment["QT_QPA_PLATFORM"] = "offscreen"
         environment["QGIS_CUSTOM_CONFIG_PATH"] = str(folder / "profile")
@@ -951,13 +956,16 @@ class RasterWorkers:
         # Redirecting output alone does not prevent a console window on Windows.
         creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         try:
-            process = subprocess.Popen(
+            # Absolute interpreter, fixed module and one private path argument.
+            # No shell; credentials go only through stdin below.
+            process = subprocess.Popen(  # nosec B603
                 [
                     executable,
                     "-m",
                     "mbtiles_batch_exporter.archive_worker",
                     str(folder),
                 ],
+                shell=False,
                 env=environment,
                 stdin=subprocess.PIPE,
                 creationflags=creationflags,
