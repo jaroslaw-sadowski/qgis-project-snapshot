@@ -3,8 +3,9 @@
 ## English
 
 Take your QGIS project offline, with vector data, lossless maps, styles
-and a report. Choose the map view or a polygon layer as your area. Keep the
-whole folder to move it or resume interrupted downloads.
+and a report. Download **WMS/WMTS maps and XYZ tiles**, such as OpenStreetMap
+basemaps, for offline use. Choose the map view or a polygon layer as your area.
+Keep the whole folder to move it or resume interrupted downloads.
 
 **Getting started:** use QGIS 3.40–3.x (Qt5) or QGIS 4.x (Qt6), with
 Python ≥3.10 and GDAL ≥3.7 supplied by QGIS. No extra packages needed.
@@ -35,8 +36,9 @@ Qt6 checks, Ruff/Flake8, proxy/error handling, archive integrity and crash recov
 ## Polski
 
 Zabierz projekt QGIS do pracy offline z wektorami, bezstratnymi obrazami
-map, stylami i raportem. Wskaż obszar z widoku mapy lub warstwy poligonowej.
-Zachowaj całe archiwum, żeby je przenieść lub wznowić pobieranie.
+map, stylami i raportem. Pobierz **mapy WMS/WMTS i kafelki XYZ**, np. podkłady
+OpenStreetMap, do pracy bez sieci. Wskaż obszar z widoku mapy lub warstwy
+poligonowej. Zachowaj całe archiwum, żeby je przenieść lub wznowić pobieranie.
 
 **Na początek:** potrzebujesz QGIS 3.40–3.x (Qt5) lub QGIS 4.x (Qt6), z Pythonem
 ≥3.10 i GDAL ≥3.7 dostarczanymi przez QGIS. Bez dodatkowych

@@ -36,7 +36,7 @@ menu opisano osobno poniżej; aktualna suma znajduje się w raporcie.
 kody procesów 0. Qt5: 170,064 s; Qt6: 171,448 s. Ruff/format, Flake8, składnia
 Python 3.10, linki i diff OK. Sekrety: 0 w kodzie i ZIP-ie. Kontroler Qt6: 0
 niezgodności. Bandit: 20 przejrzanych ostrzeżeń, bez high/Critical. Aktualna paczka
-144 005 bajtów, 23 pliki; powtarzalna budowa i zgodność wszystkich źródeł.
+144 219 bajtów, 23 pliki; powtarzalna budowa i zgodność wszystkich źródeł.
 Samodzielny program odbioru zamyka QGIS przez exitQgis(), aby odroczone sprzątanie
 OGR nie trafiało na końcowe niszczenie bibliotek.
 
@@ -73,8 +73,22 @@ Gotowy ZIP: 15/15 testów w Qt5 (1,628 s) i Qt6 (1,503 s), kody 0; obejmują
 zgodność katalogu tłumaczeń i ładowanie/okno wtyczki. Ruff/format, Flake8 i diff OK.
 Załączniki istniejącego wydania zastąpiono. Publiczne pobranie bez logowania
 potwierdziło identyczny ZIP/SHA i zgodność wszystkich plików paczki z tagiem.
-Aktualny tag v1.0.0: `8654be889a8b64314efbc9acf8eb0207a860d413`.
-Aktualny SHA-256: `74a756dffe1e992455183c588dc7d3d29d22f1fb8d874840feb47e20a3e66bd1`.
+Tag po wskazówce o czasie pobierania: `8654be889a8b64314efbc9acf8eb0207a860d413`.
+SHA-256 po wskazówce o czasie pobierania: `74a756dffe1e992455183c588dc7d3d29d22f1fb8d874840feb47e20a3e66bd1`.
+
+## Doprecyzowanie pobierania usług mapowych w 1.0.0
+
+Wstęp README EN/PL i metadane wprost wskazują pobieranie WMS/WMTS oraz
+kafelków XYZ, np. podkładów OpenStreetMap. Tagi zawierają dodatkowo openstreetmap,
+osm, wms download, wmts download, tile services i polskie odpowiedniki
+pobieranie wms, pobieranie wmts, usługi kafelkowe. Wspólne nazwy standardów
+oraz OpenStreetMap nie są dublowane: 22 tagi EN/wspólne, potem 16 PL.
+Sprawdzono odczyt metadanych, kompletność obu języków, unikalność i kolejność
+tagów, integralność ZIP-a i zgodność ze źródłami. W paczce zmieniły się tylko
+README.txt oraz pola description/about/tags w metadata.txt. Cały kod i katalogi
+tłumaczeń są identyczne z poprzednim wydaniem; nie powtarzano testów wykonania
+ani lintowania kodu dla samego tekstu. Wersja pozostaje 1.0.0.
+Aktualizacja załączników istniejącego wydania w toku.
 
 ## Środowiska i ograniczenia
 

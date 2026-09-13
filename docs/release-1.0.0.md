@@ -7,7 +7,7 @@ rozwojowy; poniższa suma identyfikuje wydanie oficjalne.
 
 ## Paczka
 
-`dist/qgis-project-snapshot-1.0.0.zip`: **144 005 bajtów, 23 pliki**.
+`dist/qgis-project-snapshot-1.0.0.zip`: **144 219 bajtów, 23 pliki**.
 Jeden katalog `mbtiles_batch_exporter`, prawa 0644, wymagane metadane, GPL,
 README, instrukcja, tłumaczenia i `.flake8`; bez danych oraz środowisk testowych.
 Powtórna budowa dała identyczny ZIP. Porównano wszystkie pliki paczki ze źródłami;
@@ -16,8 +16,19 @@ kontrola odnośników lokalnych i `git diff --check` przeszła.
 SHA-256:
 
 ```text
-74a756dffe1e992455183c588dc7d3d29d22f1fb8d874840feb47e20a3e66bd1
+744729baf9df0843f9701500d3caba2c3a0cbd60aeb9922afb06f5550447832a
 ```
+
+## Opisy i tagi usług mapowych
+
+README i metadane EN/PL wskazują wprost pobieranie WMS/WMTS oraz kafelków XYZ,
+np. podkładów OpenStreetMap. Dodano tagi EN i PL; łącznie 38 unikalnych wpisów,
+22 EN/wspólne przed 16 PL. Wersja 1.0.0, pozostały zakres opisu bez zmian.
+Odczyt metadanych, spójność języków/tagów, integralność ZIP i porównanie źródeł
+przeszły. Jedynymi zmienionymi plikami paczki są README.txt i metadata.txt;
+pola metadanych zmienione tylko w description/about/tags. Kod identyczny
+z poprzednią paczką, bez powtarzania testów wykonania dla zmian dokumentacyjnych.
+Propozycja commitu: `Highlight WMS, WMTS and OpenStreetMap downloads`.
 
 ## Wskazówka o długim pobieraniu
 
