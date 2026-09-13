@@ -7,7 +7,7 @@ rozwojowy; poniższa suma identyfikuje wydanie oficjalne.
 
 ## Paczka
 
-`dist/qgis-project-snapshot-1.0.0.zip`: **143 179 bajtów, 23 pliki**.
+`dist/qgis-project-snapshot-1.0.0.zip`: **143 205 bajtów, 23 pliki**.
 Jeden katalog `mbtiles_batch_exporter`, prawa 0644, wymagane metadane, GPL,
 README, instrukcja, tłumaczenia i `.flake8`; bez danych oraz środowisk testowych.
 Powtórna budowa dała identyczny ZIP. Porównano wszystkie pliki paczki ze źródłami;
@@ -16,8 +16,26 @@ kontrola odnośników lokalnych i `git diff --check` przeszła.
 SHA-256:
 
 ```text
-b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37
+fb36f7a64cd005d9ef3fb505abe5349fd65983a553481b570b88da50b9dbdae4
 ```
+
+## Korekta opisów i menu bez zmiany numeru
+
+Na życzenie użytkownika pozostaje 1.0.0. README i metadane przeredagowano
+na bardziej naturalny język, zachowując zakres. Akcja „QGIS Project Snapshot”
+trafia bezpośrednio do menu Wtyczki przez natywne API QGIS/Qt. Zaktualizowano
+ścieżkę w instrukcji. Bez zmian pobierania, zapisu, obciążenia i wznowienia.
+Porównanie paczek wykazało różnice tylko w plugin.py, metadata.txt, README.txt
+i INSTRUKCJA.md; w metadanych zmieniono tylko description/about.
+
+Bieżący ZIP przeszedł po 15 testów w Qt5 (1,424 s) i Qt6 (1,328 s), oba procesy
+z kodem 0. Odbiór obejmuje rzeczywisty QMenu, uruchomienie okna oraz cykl
+wyłączenia i włączenia bez pozostawiania akcji lub usuwania cudzych pozycji.
+Ruff/format, Flake8 (--jobs 1 z powodu ograniczenia gniazd sandboxa), składnia
+Python 3.10 i diff OK. Poniższe 231 testów na runtime opisuje bazowy odbiór
+przed tą korektą; nie powtarzano pełnego zestawu bez zmian algorytmów.
+Bieżącą sumę podano powyżej. Korekta zastępuje paczkę istniejącego wydania;
+propozycja commitu: `Refine release wording and simplify Plugins menu`.
 
 ## Aktualizacja tagów przed publikacją
 
@@ -111,7 +129,9 @@ na fizyczną awarię nośnika.
 
 13 września 2026 upubliczniono repozytorium i opublikowano
 [GitHub Release v1.0.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.0),
-tag wskazuje commit `1c84110aeb54858a2dff05b32f2bc65dd5e60463`.
+pierwotny tag wskazywał commit `1c84110aeb54858a2dff05b32f2bc65dd5e60463`.
+Pierwotna paczka miała SHA-256:
+`b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37`. Korekta menu/opisów zastępuje ją w tym samym wydaniu.
 Sprawdzono dostęp do źródeł i załączników bez logowania (HTTP 200), zgodność
 pobranego ZIP-a z lokalnym i SHA-256. Historia oraz bieżące źródła bez trafień
 sekretów. Spełniono wymóg publicznych źródeł z

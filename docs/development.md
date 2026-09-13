@@ -58,7 +58,9 @@ Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie
 ładowanie, okno archiwizacji i wyłączenie wtyczki z minimalnym interfejsem testowym,
 a następnie uruchamia pełne testy z kodu paczki. Weryfikuje ścieżki załadowanych
 modułów, także kod używany przez procesy pomocnicze. Pominięte testy oznaczają
-błąd odbioru. Profil użytkownika nie jest zmieniany. Test nie publikuje paczki.
+błąd odbioru. Dla ograniczonej korekty interfejsu można podać
+`--pattern test_snapshot_options.py`; test instalacji i menu nadal jest wykonywany,
+a zestaw funkcjonalny ogranicza się wtedy do wskazanego pliku. Profil użytkownika nie jest zmieniany. Test nie publikuje paczki.
 
 Przy zmianie wersji zaktualizuj powyższą nazwę w poleceniu, odnośniki w README
 i instrukcję. Raporty historyczne zachowują numery i sumy kontrolne poprzednich prób.
@@ -100,7 +102,8 @@ Widoczna nazwa to **QGIS Project Snapshot**. Prefiks ZIP-a pozostaje
 `qgis-project-snapshot`, a katalog Pythona/identyfikator QGIS —
 `mbtiles_batch_exporter`, aby aktualizacja zastępowała poprzednią instalację.
 Nie zmieniaj go razem z etykietami interfejsu
-bez osobnego planu migracji. Menu tworzy natywne `iface.addPluginToMenu`.
+bez osobnego planu migracji. Jedna akcja o pełnej nazwie trafia bezpośrednio do `iface.pluginMenu()`,
+bez podmenu. Przy wyłączeniu usuwamy tylko własną akcję.
 
 ## Kontrole automatyki 0.9.7
 

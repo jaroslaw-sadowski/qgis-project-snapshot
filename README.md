@@ -2,53 +2,56 @@
 
 ## English
 
-Save a QGIS project for offline use: vector data, lossless map images, styles
-and a report. Choose the map view or a polygon layer as the area; keep the
-whole archive folder to move it or resume interrupted downloads.
+Take your QGIS project offline, with vector data, lossless maps, styles
+and a report. Choose the map view or a polygon layer as your area. Keep the
+whole folder to move it or resume interrupted downloads.
 
-**Install:** QGIS 3.40–3.x (Qt5) or QGIS 4.x (Qt6), with Python ≥3.10 and
-GDAL ≥3.7 supplied by QGIS. No extra Python packages. You need access to the
-source services and enough disk space. In **Plugins → Manage and Install
-Plugins → Install from ZIP**, select `qgis-project-snapshot-1.0.0.zip` and
-restart QGIS. Open **Plugins → QGIS Project Snapshot → Archive project…**.
+**Getting started:** use QGIS 3.40–3.x (Qt5) or QGIS 4.x (Qt6), with
+Python ≥3.10 and GDAL ≥3.7 supplied by QGIS. No extra packages needed.
+You'll need source access and disk space.
+In **Plugins → Manage and Install Plugins → Install from ZIP**, select
+`qgis-project-snapshot-1.0.0.zip` and restart QGIS. Then choose
+**Plugins → QGIS Project Snapshot**.
 
-**Processing and privacy:** runs locally, using multiple QGIS processes and
-supervising threads. Automatically adjusts concurrency to client memory/CPU
-and server responses. Projects and diagnostics are not uploaded to the author;
-there is no analytics. Download requests do send the necessary area, layer
-parameters and authentication to the selected services. Review the result offline.
+**Processing and privacy:** it runs locally, using QGIS processes and supervising threads. It adjusts the load to your
+memory/CPU and server responses. It doesn't upload your project or
+diagnostics to the author and has no analytics. Requests send the
+necessary area, layer settings and authentication to the services you choose.
+Check the result offline.
 
-**Responsibility:** respect service licenses, attribution and download/reuse
-restrictions. This plugin grants no rights to third-party data. To the extent
-permitted by law, the author is not liable for users' violations. GPL-2.0-only.
+**Responsibility:** please respect service licenses, attribution and limits on
+downloading or reusing data; the plugin grants no rights to third-party content.
+To the extent permitted by law, the author isn't liable for users' violations.
+Code license: GPL-2.0-only.
 
-Developed with AI and vibe coding; tested (Bandit, secret scanning, Qt6 checks,
-Ruff/Flake8, proxy/error handling, archive integrity and crash recovery).
+Built with help from AI and vibe coding, and tested (Bandit, secret scanning,
+Qt6 checks, Ruff/Flake8, proxy/error handling, archive integrity and crash recovery).
 [User guide](docs/team-guide.md) · [Release checks](docs/release-1.0.0.md).
 
 ## Polski
 
-Zapisuje projekt QGIS do pracy offline: dane wektorowe, bezstratne obrazy map,
-style i raport. Obszar wybierasz z widoku mapy lub warstwy poligonowej.
-Zachowaj cały folder, aby przenieść archiwum lub wznowić przerwane pobieranie.
+Zabierz projekt QGIS do pracy offline z wektorami, bezstratnymi obrazami
+map, stylami i raportem. Wskaż obszar z widoku mapy lub warstwy poligonowej.
+Zachowaj całe archiwum, żeby je przenieść lub wznowić pobieranie.
 
-**Instalacja:** QGIS 3.40–3.x (Qt5) lub QGIS 4.x (Qt6), z Pythonem ≥3.10 i
-GDAL ≥3.7 dostarczanymi przez QGIS. Bez dodatkowych pakietów Pythona.
-Potrzebujesz dostępu do źródeł i miejsca na dysku. W **Wtyczki → Zarządzanie
-wtyczkami → Instaluj z ZIP** wskaż `qgis-project-snapshot-1.0.0.zip` i uruchom
-QGIS ponownie. Otwórz **Wtyczki → QGIS Project Snapshot → Archiwizuj projekt…**.
+**Na początek:** potrzebujesz QGIS 3.40–3.x (Qt5) lub QGIS 4.x (Qt6), z Pythonem
+≥3.10 i GDAL ≥3.7 dostarczanymi przez QGIS. Bez dodatkowych
+pakietów Pythona. Zadbaj o dostęp do źródeł i miejsce na dysku.
+W **Wtyczki → Zarządzanie wtyczkami → Instaluj z ZIP** wybierz
+`qgis-project-snapshot-1.0.0.zip` i uruchom QGIS ponownie. Wybierz
+**Wtyczki → QGIS Project Snapshot**.
 
-**Działanie i prywatność:** działa lokalnie, korzystając z wielu procesów QGIS
-i wątków nadzorujących. Samodzielnie dobiera obciążenie do pamięci/CPU komputera
-i odpowiedzi serwerów. Nie wysyła projektu ani diagnostyki do autora i nie
-prowadzi analityki. Zapytania o dane przekazują wybranym usługom niezbędny zasięg,
-parametry warstw i uwierzytelnienie. Sprawdź wynik bez dostępu do źródeł.
+**Działanie i prywatność:** działa na Twoim komputerze, w kilku
+procesach QGIS i wątkach nadzorujących. Wtyczka sama dobiera obciążenie do pamięci,
+CPU i odpowiedzi serwerów. Nie wysyła projektu ani diagnostyki do autora i nie
+prowadzi analityki. Zapytania przekazują wybranym usługom niezbędny zasięg,
+ustawienia warstw i uwierzytelnienie. Sprawdź wynik bez dostępu do źródeł.
 
-**Odpowiedzialność:** przestrzegaj licencji usług, zasad podawania źródeł oraz
-ograniczeń pobierania i wykorzystania danych. Wtyczka nie nadaje praw do cudzych
-treści. W granicach prawa autor nie odpowiada za naruszenia użytkownika.
+**Odpowiedzialność:** pamiętaj o licencjach usług, podawaniu źródeł i ograniczeniach
+pobierania oraz wykorzystania danych. Wtyczka nie daje praw do cudzych treści.
+W granicach prawa autor nie odpowiada za naruszenia użytkownika.
 Licencja kodu: GPL-2.0-only.
 
-Powstała z pomocą AI i vibe codingu; wykonano testy (Bandit, skan sekretów,
-kontrola Qt6, Ruff/Flake8, obsługa proxy/błędów, integralność archiwum i wznowienie
+Wtyczka powstała z pomocą AI, metodą vibe codingu. Przeszła testy (Bandit, skan
+sekretów, Qt6, Ruff/Flake8, obsługa proxy/błędów, integralność archiwum i wznowienie
 po awarii). [Instrukcja](docs/team-guide.md) · [Kontrole wydania](docs/release-1.0.0.md).

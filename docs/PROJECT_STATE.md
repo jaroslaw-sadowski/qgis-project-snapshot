@@ -9,7 +9,8 @@ rozwojowe; ich raporty zachowano, ale nie oznaczają kolejnych oficjalnych wyda�
 Użytkownik zlecił audyt poligonu, a po pozytywnej ocenie gotowości kodu —
 utworzenie GitHub Release i upublicznienie repozytorium. Obejmuje to commit,
 push i tag wydania. Nie zlecił instalacji w profilu ani zgłoszenia do plugins.qgis.org. Git był czysty na początku tego etapu;
-obecne zmiany dotyczą przygotowania oficjalnego wydania.
+po publikacji użytkownik zlecił łagodniejszy język README/metadanych i jedną
+pozycję bezpośrednio w menu Wtyczki, bez zmiany algorytmów i numeru 1.0.0.
 
 - Krótkie README i metadane: angielski przed polskim, wymagania i instalacja,
   automatyczna równoległość, licencje źródeł, AI/vibe coding i zakres testów.
@@ -30,17 +31,34 @@ Przed publikacją uzupełniono tagi: 17 EN, potem 13 PL. Sprawdzono metadane
 i integralność nowego ZIP-a; porównanie potwierdziło zmianę wyłącznie pola tags.
 Kod jest identyczny jak w paczce z pełnym odbiorem. Aktualna suma w raporcie.
 
-**Odbiór kodu: 231/231 testów z ZIP-a w każdym runtime**, bez pominięć,
+**Odbiór bazowego kodu: 231/231 testów z ZIP-a w każdym runtime**, bez pominięć,
 kody procesów 0. Qt5: 170,064 s; Qt6: 171,448 s. Ruff/format, Flake8, składnia
 Python 3.10, linki i diff OK. Sekrety: 0 w kodzie i ZIP-ie. Kontroler Qt6: 0
-niezgodności. Bandit: 20 przejrzanych ostrzeżeń, bez high/Critical. Paczka
-143 179 bajtów, 23 pliki; powtarzalna budowa i zgodność wszystkich źródeł.
+niezgodności. Bandit: 20 przejrzanych ostrzeżeń, bez high/Critical. Aktualna paczka
+143 205 bajtów, 23 pliki; powtarzalna budowa i zgodność wszystkich źródeł.
 Samodzielny program odbioru zamyka QGIS przez exitQgis(), aby odroczone sprzątanie
 OGR nie trafiało na końcowe niszczenie bibliotek.
 
 Wyniki i identyfikacja końcowej paczki: [release-1.0.0.md](release-1.0.0.md).
 Historyczny [validation-1.0.0.md](validation-1.0.0.md) dotyczy wcześniejszej
 paczki rozwojowej Qt5; nie używać jej sumy jako identyfikacji wydania oficjalnego.
+
+## Korekta opisów i menu w ramach 1.0.0
+
+README repozytorium/paczki i metadane mają bardziej naturalny język, bez nowych
+obietnic i tematów. Instrukcja wskazuje Wtyczki → QGIS Project Snapshot.
+Menu używa natywnego pluginMenu().addAction/removeAction, jak we wskazanej
+wtyczce Poprawka Odwzorowawcza. Jedyna zmiana kodu produkcyjnego to etykieta
+i rejestracja/usuwanie akcji menu; algorytmy archiwizacji pozostały identyczne.
+
+Aktualny ZIP: po 15/15 testów w QGIS 3.40/Qt5 (1,424 s) i 4.0.3/Qt6 (1,328 s),
+kody 0. Sprawdzono bezpośrednią akcję, otwarcie okna, wyłączenie i ponowne
+włączenie bez duplikatów oraz zachowanie cudzych pozycji menu. Ruff/format,
+Flake8, składnia 3.10 i diff OK. Flake8 uruchomiono z --jobs 1, ponieważ sandbox
+blokuje gniazdo forkserver; zakres kontroli bez zmian. Pełne 231 testów jest
+wcześniejszą bazą odbioru; nie powtarzano ich dla zmiany tekstów/menu.
+W ramach istniejącego wydania podmieniamy ZIP i tag v1.0.0, zgodnie z poleceniem
+zachowania numeru. Stan synchronizacji poniżej.
 
 ## Środowiska i ograniczenia
 
@@ -77,11 +95,12 @@ PNG RGBA, osobne zoomy, jeden zapisujący GeoPackage i trwały postęp wznowieni
 
 **Wykonano publikację:** repozytorium jest PUBLIC,
 [GitHub Release v1.0.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/releases/tag/v1.0.0)
-jest opublikowany jako stabilny, z ZIP-em i plikiem SHA-256. Tag wskazuje commit
+jest opublikowany jako stabilny, z ZIP-em i plikiem SHA-256. Pierwotny tag wskazywał commit
 `1c84110aeb54858a2dff05b32f2bc65dd5e60463`. Publiczne źródła, README, GPL,
 issues, strona wydania i oba załączniki sprawdzone bez logowania (HTTP 200).
-Pobrany publicznie ZIP jest identyczny z lokalnym; SHA-256:
+Pierwotnie pobrany publicznie ZIP był identyczny z lokalnym; poprzedni SHA-256:
 `b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37`.
+Aktualna korekta paczki: `fb36f7a64cd005d9ef3fb505abe5349fd65983a553481b570b88da50b9dbdae4`; synchronizacja wydania w toku.
 Przed zmianą widoczności przejrzano 20 commitów: 444 unikalne obiekty plików,
 434 tekstowe przeskanowane, zero trafień sekretów i brak plików projektów/danych.
 Bieżące 96 plików źródeł/dokumentacji również bez trafień sekretów.

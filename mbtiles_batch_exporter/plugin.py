@@ -19,7 +19,7 @@ class ProjectSnapshotPlugin:
     def initGui(self):
         self.archive_action = QAction(
             QIcon(str(Path(__file__).with_name("icon.svg"))),
-            tr("Archiwizuj projekt…"),
+            "QGIS Project Snapshot",
             self.iface.mainWindow(),
         )
         self.archive_action.setObjectName("QgisProjectSnapshotArchive")
@@ -32,14 +32,14 @@ class ProjectSnapshotPlugin:
                 )
             )
         )
-        self.iface.addPluginToMenu("QGIS Project Snapshot", self.archive_action)
+        self.iface.pluginMenu().addAction(self.archive_action)
         self.iface.addToolBarIcon(self.archive_action)
 
     def unload(self):
         if self.archive_dlg:
             self.archive_dlg.reject()
         if self.archive_action:
-            self.iface.removePluginMenu("QGIS Project Snapshot", self.archive_action)
+            self.iface.pluginMenu().removeAction(self.archive_action)
             self.iface.removeToolBarIcon(self.archive_action)
             self.archive_action.deleteLater()
         self.archive_action = None

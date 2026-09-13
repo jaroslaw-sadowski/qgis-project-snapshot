@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 
-def check(filename):
+def check(filename, pattern="test_*.py"):
     os.environ["QGIS_SNAPSHOT_LANGUAGE"] = "pl"
     import qgis.utils
     from qgis.core import (
@@ -119,7 +119,8 @@ def check(filename):
                 self.canvas = QgsMapCanvas(self.window)
                 self.canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:2180"))
                 self.canvas.setExtent(QgsRectangle(500000, 500000, 500512, 500512))
-                self.menu = []
+                self.menu = self.window.menuBar().addMenu("Plugins")
+                self.existing_action = self.menu.addAction("Existing plugin")
                 self.toolbar = []
 
             def mainWindow(self):
@@ -128,12 +129,8 @@ def check(filename):
             def mapCanvas(self):
                 return self.canvas
 
-            def addPluginToMenu(self, menu, action):
-                assert menu == "QGIS Project Snapshot"
-                self.menu.append(action)
-
-            def removePluginMenu(self, menu, action):
-                self.menu.remove(action)
+            def pluginMenu(self):
+                return self.menu
 
             def addToolBarIcon(self, action):
                 self.toolbar.append(action)
@@ -151,9 +148,14 @@ def check(filename):
         plugin = qgis.utils.plugins["mbtiles_batch_exporter"]
         module = importlib.import_module("mbtiles_batch_exporter")
         assert Path(module.__file__).resolve().is_relative_to(plugins)
-        assert len(interface.menu) == len(interface.toolbar) == 1
-        assert interface.menu[0].text() == "Archiwizuj projekt…"
-        assert interface.menu[0].objectName() == "QgisProjectSnapshotArchive"
+        assert interface.menu.actions() == [
+            interface.existing_action,
+            plugin.archive_action,
+        ]
+        assert interface.toolbar == [plugin.archive_action]
+        assert plugin.archive_action.text() == "QGIS Project Snapshot"
+        assert plugin.archive_action.menu() is None
+        assert plugin.archive_action.objectName() == "QgisProjectSnapshotArchive"
         assert (
             qgis.utils.pluginMetadata("mbtiles_batch_exporter", "name")
             == "QGIS Project Snapshot"
@@ -172,7 +174,20 @@ def check(filename):
         plugin.archive_action.trigger()
         assert opened == [True] and plugin.archive_dlg is None
         assert qgis.utils.unloadPlugin("mbtiles_batch_exporter")
-        assert not interface.menu and not interface.toolbar
+        assert interface.menu.actions() == [interface.existing_action]
+        assert not interface.toolbar
+        # Re-enabling must restore a single direct action and preserve other plugins.
+        assert qgis.utils.loadPlugin("mbtiles_batch_exporter")
+        assert qgis.utils.startPlugin("mbtiles_batch_exporter")
+        reloaded = qgis.utils.plugins["mbtiles_batch_exporter"]
+        assert interface.menu.actions() == [
+            interface.existing_action,
+            reloaded.archive_action,
+        ]
+        assert interface.toolbar == [reloaded.archive_action]
+        assert qgis.utils.unloadPlugin("mbtiles_batch_exporter")
+        assert interface.menu.actions() == [interface.existing_action]
+        assert not interface.toolbar
         print(
             "ZIP: wykrywanie, ładowanie, okno archiwizacji i wyłączenie wtyczki — OK",
             flush=True,
@@ -180,7 +195,8 @@ def check(filename):
 
         # All tests now import the installed package, including its worker entry point.
         tests = Path(__file__).resolve().parent
-        suite = unittest.defaultTestLoader.discover(str(tests), pattern="test_*.py")
+        suite = unittest.defaultTestLoader.discover(str(tests), pattern=pattern)
+        assert suite.countTestCases(), f"No tests matched {pattern}"
 
         def unexpected_warning(parent, title, message, *args, **kwargs):
             raise AssertionError(
@@ -219,4 +235,6 @@ def check(filename):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("zip", type=Path)
-    check(parser.parse_args().zip.resolve())
+    parser.add_argument("--pattern", default="test_*.py")
+    args = parser.parse_args()
+    check(args.zip.resolve(), args.pattern)
