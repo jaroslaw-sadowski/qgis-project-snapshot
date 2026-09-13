@@ -669,12 +669,12 @@ class ArchiveDialog(QDialog):
                     QgsCoordinateTransform(crs, self.project.crs(), self.project)
                 )
             box = area.boundingBox()
+            first_zoom = self.zoom_min.currentData()
+            stop_zoom = self.zoom_max.currentData() + 1
             count = sum(
                 math.ceil(box.width() / (TILE_SIZE * level["resolution"]))
                 * math.ceil(box.height() / (TILE_SIZE * level["resolution"]))
-                for level in levels[
-                    self.zoom_min.currentData() : self.zoom_max.currentData() + 1
-                ]
+                for level in levels[first_zoom:stop_zoom]
             )
             # Planning scenarios, not measured throughput or an export ETA.
             # Each process renders one map; do not divide its time by workers.

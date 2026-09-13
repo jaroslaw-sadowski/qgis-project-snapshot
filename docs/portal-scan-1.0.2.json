@@ -5,12 +5,10 @@
     "warnings": 0,
     "critical": 0,
     "info": 0,
-    "files_scanned": 92,
+    "files_scanned": 90,
     "total_issues": 0
   },
-  "config_files": [
-    ".flake8"
-  ],
+  "config_files": [],
   "checks": [
     {
       "name": "Bandit Security Analysis",
@@ -48,7 +46,7 @@
       "severity": "info",
       "description": "Checks for files with executable or unusual permissions",
       "passed": true,
-      "files_checked": 29,
+      "files_checked": 28,
       "issues_found": 0,
       "details": []
     },
@@ -58,7 +56,7 @@
       "severity": "warning",
       "description": "Detects suspicious file types, hidden files, or unexpected executables",
       "passed": true,
-      "files_checked": 29,
+      "files_checked": 28,
       "issues_found": 0,
       "details": []
     }
@@ -67,20 +65,15 @@
     "upstream_commit": "487ac16367d4387ab91630149200e3f9b1ee9ff8",
     "upstream_sha256": "cbe3fef41492e1959064550d8c17aad8b4fcc26bd820e6a0189b9553dcb6dbe6",
     "bandit_rule_count": 75,
-    "scope": "All five upstream scanner checks; all installed rules; Django imports replaced only; no portal database.",
-    "portal_active_bandit_rules": 74,
-    "retired_rules_checked_separately": {
-      "B111": "No run_as_root keyword anywhere in packaged Python",
-      "B320": "No lxml imports anywhere in packaged Python"
-    }
+    "scope": "All five upstream scanner checks; all installed rules; Django imports replaced only; no portal database."
   },
-  "package_sha256": "4b1e8842764a9c66e32b976861e2516a443924aa92ec0b5593ac51f82b08ec87",
-  "package_validator": {
+  "metadata_validator": {
     "passed": true,
-    "version": "1.0.1",
+    "version": "1.0.2",
     "package": "mbtiles_batch_exporter",
     "upstream_sha256": "3753c45d7c5ece4efd6bc566720acd2c2a9db2a2a112c83c9459ffd2a29da955",
     "new_plugin_checks": true,
     "url_checks": true
-  }
+  },
+  "package_sha256": "212875e603838513d7f4a3eeaeb758863780186a8aebcb78ea5a4b8c646f5053"
 }

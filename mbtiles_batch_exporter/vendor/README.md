@@ -10,7 +10,9 @@ reference rejection. The unused global defuse_stdlib() API and its _apply_defusi
 removed; other XML frontends are not bundled. No pip, global
 monkey patching, or installation-time network access is required.
 
-Apart from removing these unused global patch functions, upstream code is
+Unused Python 2 import/parser branches and their PY3 flag were also removed:
+the plugin requires Python 3.10 or newer. The Python 3 parser behavior is unchanged.
+Apart from these removals, upstream code is
 unchanged except for narrowly scoped Bandit comments on ElementTree imports
 (the implementation of the protected parser itself). Upstream formatting
 is retained. Never replace these imports with an unprotected parser fallback.

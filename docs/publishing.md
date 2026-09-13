@@ -1,8 +1,9 @@
-# Publikacja poprawki 1.0.1
+# Publikacja poprawki 1.0.2
 
 Krótki opis użytkownika: [README](../README.md). Wyniki kontroli i identyfikacja
-ZIP-a: [odbiór 1.0.1](release-1.0.1.md). Wersja 1.0.0 została zablokowana
-przez skaner portalu; ponownie zgłaszamy poprawioną **1.0.1**.
+ZIP-a: [odbiór 1.0.2](release-1.0.2.md). Wersja 1.0.0 została zablokowana
+przez skaner portalu; 1.0.1 przeszła skan z oznaczeniem „configured”.
+Poprawka **1.0.2** nie zawiera plików konfiguracji skanerów.
 
 ## Wymagania katalogu
 
@@ -29,14 +30,14 @@ Nazwa: **QGIS Project Snapshot**. ID pakietu: **mbtiles_batch_exporter**;
 aktualizacja zastępuje wcześniejszą instalację. Kod GPL-2.0-only, dołączony
 frontend defusedxml na licencji PSF. Nie ma instalacji pip u użytkownika.
 ZIP zawiera tylko źródła, zasoby, metadane, instrukcję i licencje; bez danych
-użytkownika, historii Git, środowisk testowych oraz instrukcji agentów.
+użytkownika, konfiguracji skanerów, historii Git, środowisk testowych oraz instrukcji agentów.
 Plik .qm jest katalogiem tłumaczeń Qt z dołączonym źródłem .ts.
 
 ## Kroki wydania
 
 1. Zatwierdź sprawdzone źródła i wyślij je do publicznego repozytorium.
-2. Utwórz nowy tag **v1.0.1** oraz GitHub Release z
-   `dist/qgis-project-snapshot-1.0.1.zip` i `.zip.sha256`. Nie przestawiaj v1.0.0.
+2. Utwórz nowy tag **v1.0.2** oraz GitHub Release z
+   `dist/qgis-project-snapshot-1.0.2.zip` i `.zip.sha256`. Nie przestawiaj wcześniejszych tagów.
 3. Pobierz oba załączniki bez logowania i sprawdź ich zgodność z lokalnymi
    plikami oraz źródłami pod tagiem.
 4. W plugins.qgis.org otwórz swoją istniejącą wtyczkę i dodaj **nową wersję**.

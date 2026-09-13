@@ -1,9 +1,9 @@
-# Działanie i ograniczenia archiwizacji (1.0.1)
+# Działanie i ograniczenia archiwizacji (1.0.2)
 
 Pierwsze oficjalne wydanie to 1.0.0. Numery 1.1–1.4 poniżej odnoszą się
 do wcześniejszych wersji rozwojowych i historii wdrażania funkcji.
 
-Jedna akcja **Archiwizuj projekt…** tworzy osobny katalog projektu z lokalnymi
+Jedna akcja **QGIS Project Snapshot** tworzy osobny katalog projektu z lokalnymi
 danymi, raportem HTML i manifestem JSON. Nie zastępuje oryginału. Techniczny
 identyfikator `mbtiles_batch_exporter` pozostaje dla aktualizacji istniejących
 instalacji; dawny eksporter, jego okno i pomocniczy moduł zostały usunięte.
@@ -99,7 +99,7 @@ obiektów nieużywanych układów i widoków 3D. Style do renderowania nadal są
 odczytywane; cały źródłowy XML pozostaje podstawą wynikowego projektu. Audyt
 lokalnych warstw nadal otwiera dostawców i wykrywa brak danych. Tylko osobna,
 wcześniejsza kontrola struktury XML używa `DontResolveLayers`.
-Pomiar syntetyczny i ograniczenia: [raport 1.4.3](validation-1.4.3.md).
+Pomiar syntetyczny i ograniczenia: [raport 1.4.3](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/v1.0.1/docs/validation-1.4.3.md).
 
 API `create_archive(..., adaptive=False)` zachowuje zgodny tryb stały. Okno używa
 wyłącznie `adaptive=True`. Procesy map mają własne QGIS; do wątków nadzorujących

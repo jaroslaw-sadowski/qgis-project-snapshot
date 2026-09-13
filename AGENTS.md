@@ -74,3 +74,6 @@ Aktualizuj `docs/PROJECT_STATE.md` po istotnym etapie. Trwałe reguły zapisuj t
 instrukcję użytkownika w `docs/team-guide.md`, techniczne szczegóły w dokumentacji,
 a wyniki prób w raportach. Nie twórz równoległych plików pamięci z tym samym stanem.
 ZIP-y generuj w ignorowanym `dist/`; instrukcje agentów nie należą do paczki QGIS.
+Konfiguracje developerskie (`.flake8`, `.bandit`, `.secrets.baseline`) nie należą
+do ZIP-a. Całą paczkę, także vendor, sprawdzaj standardowymi regułami portalu
+poza repozytorium, aby skaner nie odczytał przypadkowo lokalnej konfiguracji.

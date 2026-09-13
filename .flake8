@@ -6,6 +6,3 @@ per-file-ignores =
     tests/test_archive.py:E402
     tests/test_raster_archive.py:E402
     tests/test_archive_resources.py:E402
-    # Bundled defusedxml: original formatting and Python 2/3 import branches.
-    ElementTree.py:E501,F811
-    common.py:E501

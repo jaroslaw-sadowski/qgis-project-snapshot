@@ -3,7 +3,7 @@
 Polecenia wykonuj z katalogu głównego repozytorium. Użyj interpretera z modułami
 `qgis` i `osgeo` dostarczonymi z QGIS; zwykłe środowisko Pythona może ich nie mieć.
 Środowiska odbioru 1.0.0: Ubuntu, QGIS 3.40.15/Qt5 i QGIS 4.0.3/Qt6 6.10.2,
-GDAL 3.12.2, Python 3.14.4. Wyniki: [odbiór poprawki 1.0.1](release-1.0.1.md).
+GDAL 3.12.2, Python 3.14.4. Wyniki: [odbiór poprawki 1.0.2](release-1.0.2.md).
 Numery 1.1–1.4 w dalszych opisach oznaczają historyczne wersje rozwojowe.
 
 ## Testy źródeł
@@ -51,7 +51,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.0.1.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.0.2.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,
@@ -63,7 +63,7 @@ błąd odbioru. Dla ograniczonej korekty interfejsu można podać
 a zestaw funkcjonalny ogranicza się wtedy do wskazanego pliku. Profil użytkownika nie jest zmieniany. Test nie publikuje paczki.
 
 Przy zmianie wersji zaktualizuj powyższą nazwę w poleceniu, odnośniki w README
-i instrukcję. Raporty historyczne zachowują numery i sumy kontrolne poprzednich prób.
+i instrukcję. Raporty historyczne są dostępne w historii Git i pod tagiem v1.0.1.
 
 ## Opcjonalny benchmark
 
@@ -75,7 +75,7 @@ Wymaga Linuksa (`/proc`) i lokalnych gniazd HTTP. Porównuje 1/2/4 procesy,
 czas, sumę RSS, pliki tymczasowe oraz identyczność PNG. Korzysta z dwóch
 kontrolowanych WMS i po próbie usuwa wygenerowane archiwa. Uruchamiaj go bez
 innych obciążających zadań. Szczegóły i ograniczenia pomiarów opisuje
-[raport kroku 4](validation-step4.md).
+[raport kroku 4](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/v1.0.1/docs/validation-step4.md).
 
 Koszt technicznego odczytu projektu można zmierzyć osobno:
 
@@ -137,8 +137,8 @@ Stałe API `adaptive=False` zachowuje ustawienia liczby procesów.
 
 Regresje obejmują wzrost powyżej dwóch zadań na host, uruchamianie i kończenie
 procesów między próbkami RAM, ocenę rzeczywistego obciążenia oraz zachowanie map
-przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](validation-0.9.7.md).
-Bieżące wydanie: [1.0.0](release-1.0.0.md).
+przy anulowaniu. Historia tej poprawki: [odbiór 0.9.7](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/v1.0.1/docs/validation-0.9.7.md).
+Bieżące wydanie: [1.0.2](release-1.0.2.md).
 
 ## Kontrole adaptacji i budżetu Windows (1.3.0)
 
@@ -162,7 +162,7 @@ sprawdź wyniki PNG i kompletność, a następnie czasy oraz powody zmian limit�
 Wyniki różnych obszarów lub zoomów nie są porównaniem samej wersji algorytmu.
 Nie uznawaj poprawnych testów jednostkowych za pomiar przyspieszenia usług
 produkcyjnych ani pełny odbiór Windows. Wyniki wydania zapisuje
-[raport 1.3.0](validation-1.3.0.md).
+[raport 1.3.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/v1.0.1/docs/validation-1.3.0.md).
 
 ## Kontrole diagnostyki wydajności (1.2.0)
 
@@ -172,7 +172,7 @@ zakres commit i I/O oraz niezależność błędów odczytu. Istniejące testy pa
 weryfikują niezmienioną semantykę budżetowania. `test_performance_diagnostics.py`
 oraz `test_diagnostics.py` obejmują okresowe próbki, zakończenie samplera,
 kontekst etapów, pomiary sieci i brak treści poufnych.
-Pełny odbiór oraz ograniczenia platform opisuje [raport 1.2.0](validation-1.2.0.md).
+Pełny odbiór oraz ograniczenia platform opisuje [raport 1.2.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/v1.0.1/docs/validation-1.2.0.md).
 
 W próbie ręcznej wykonaj eksport, poczekaj na kilka próbek i anuluj go zwykłym
 przyciskiem. Po zapisaniu wyniku sprawdź `performance_sample` głównego QGIS i map,
@@ -242,7 +242,7 @@ Sprawdź folder `.w-trakcie-`, kopię wyników, liczbę żądań tylko dla brak�
 całe PNG i końcową integralność. Nie używaj do testu niezapisanej pracy użytkownika.
 Zakończenie procesu nie symuluje wszystkich skutków awarii dysku lub zasilania;
 nie jest podstawą deklaracji odporności na fizyczne uszkodzenie danych.
-Wyniki tego etapu zapisuje [raport 1.4.0](validation-1.4.0.md).
+Wyniki tego etapu zapisuje [raport 1.4.0](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/v1.0.1/docs/validation-1.4.0.md).
 
 ## Kontrole nazw i układu folderu (1.4.2)
 
@@ -261,7 +261,7 @@ Testy okna mają odczytać nowy manifest przez `read_resume_manifest`, wyświetl
 `output_name` i pamiętać cały folder archiwum. Kontynuacja musi przyjmować
 również starszy manifest z folderu głównego. Sprawdź nowy zapis w `diagnostyka/`
 i brak pustego `stan-pobierania/`, bez usuwania postępu potrzebnego do wznowienia.
-Wyniki i paczkę opisuje [raport 1.4.2](validation-1.4.2.md).
+Wyniki i paczkę opisuje [raport 1.4.2](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/v1.0.1/docs/validation-1.4.2.md).
 
 ## Tłumaczenia
 
@@ -319,7 +319,7 @@ Dodatkowe narzędzia są wyłącznie do rozwoju, w osobnym środowisku:
 /tmp/snapshot-audit-venv/bin/pip install bandit==1.9.4 detect-secrets==1.5.0 flake8==7.3.0
 /tmp/snapshot-audit-venv/bin/bandit -r mbtiles_batch_exporter -f json -o /tmp/snapshot-bandit.json
 /tmp/snapshot-audit-venv/bin/detect-secrets scan --all-files --no-verify mbtiles_batch_exporter > /tmp/snapshot-secrets.json
-/tmp/snapshot-audit-venv/bin/flake8 mbtiles_batch_exporter --max-line-length=88 --extend-ignore=E203 --jobs=1
+/tmp/snapshot-audit-venv/bin/flake8 --isolated --max-line-length=120 --jobs=1 mbtiles_batch_exporter
 ```
 
 Bandit może zakończyć się kodem 1 dla ostrzeżeń wymagających przeglądu; nie uznawaj
@@ -356,11 +356,12 @@ Używa skryptu `scripts/pyqt5_to_pyqt6/pyqt5_to_pyqt6.py` z QGIS; parametr
 zależności developerskich podanych przez narzędzie. Przypnij sprawdzoną rewizję
 przy odtwarzaniu audytu. Sam kontroler nie wykrywa wszystkich zmian zachowania.
 
-Konfiguracja `.flake8` w repozytorium i ZIP-ie ustala ten sam limit 88 znaków
-oraz E203 co Ruff. Nie wyłącza kontroli bezpieczeństwa. Bandit i skan sekretów
-uruchamiaj także na rozpakowanej paczce. Zmiana zakresu na 4.99 jest zgodna z
-[aktualną instrukcją QGIS](https://plugins.qgis.org/docs/migrate-qgis4);
-nie dodawaj wycofanego pola `supportsQt6`.
+Konfiguracja `.flake8` pozostaje wyłącznie narzędziem rozwoju w repozytorium.
+ZIP nie zawiera konfiguracji skanerów ani ukrytych plików; kontroluje to test paczki.
+Cały kod paczki, również vendor, musi przechodzić Flake8 `--isolated` z limitem
+120 znaków portalu. Uruchom także skaner poza repozytorium, aby nie odczytał
+przypadkowo konfiguracji developerskiej. Nie dodawaj wycofanego `supportsQt6`;
+zakres 4.99 wynika z [instrukcji QGIS](https://plugins.qgis.org/docs/migrate-qgis4/).
 
 ## Odtworzenie kontroli portalu po blokadzie
 
@@ -370,12 +371,12 @@ adnotacje Bandit. Skanuj cały rozpakowany ZIP, łącznie z vendor. Sprawdzaj ta
 wyłączeń. Portal uruchamia Bandita z JSON i traktuje niepowodzenie całej kontroli
 jako critical — lokalne LOW/MEDIUM nie oznacza, że przesłana paczka przejdzie.
 
-Flake8 portalu dostaje jawnie wszystkie pliki Python i `--config` paczki;
-powtórz taki wariant poza katalogiem źródeł. Samo `exclude=vendor` nie pomija
-plików wskazanych jawnie. Dla dwóch plików upstream defusedxml konfiguracja
-opisuje tylko E501/F811 (formatowanie i zgodne gałęzie importów Python 2/3).
-Biblioteka nadal podlega skanowi bezpieczeństwa. Nie jest instalowana przez pip
-u użytkownika. Budowa pakuje jej prywatny podkatalog i licencję PSF.
+Flake8 portalu dostaje jawnie wszystkie pliki Python i limit 120 znaków.
+Powtórz ten wariant poza katalogiem źródeł, bez pliku konfiguracyjnego.
+W 1.0.2 usunięto nieużywane gałęzie Pythona 2 z prywatnego defusedxml;
+nie potrzeba wyjątków F811/E501 dla biblioteki. Biblioteka nadal podlega całemu
+skanowi bezpieczeństwa i nie jest instalowana przez pip u użytkownika.
+Budowa pakuje jej prywatny podkatalog, opis zmian i licencję PSF.
 
 Testy `test_security.py`: encje wewnętrzne/zewnętrzne i parametryczne w UTF-8/16,
 poprawny DOCTYPE QGIS, odrzucenie SVG i odwołań do niego bez zmiany oryginału,

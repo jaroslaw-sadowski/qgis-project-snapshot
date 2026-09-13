@@ -7,6 +7,7 @@
 """
 from __future__ import print_function, absolute_import
 
+import importlib
 import sys
 import warnings
 # Defused parser implementation; see vendor/README.md.
@@ -17,17 +18,6 @@ from xml.etree.ElementTree import TreeBuilder as _TreeBuilder  # nosec B405
 from xml.etree.ElementTree import parse as _parse  # nosec B405
 # Defused parser implementation; see vendor/README.md.
 from xml.etree.ElementTree import tostring  # nosec B405
-
-from .common import PY3
-
-if PY3:
-    import importlib
-else:
-    # Defused parser implementation; see vendor/README.md.
-    from xml.etree.ElementTree import XMLParser as _XMLParser  # nosec B405
-    # Defused parser implementation; see vendor/README.md.
-    from xml.etree.ElementTree import iterparse as _iterparse  # nosec B405
-
 
 from .common import (
     DTDForbidden,
@@ -75,8 +65,7 @@ def _get_py3_cls():
     return _XMLParser, _iterparse
 
 
-if PY3:
-    _XMLParser, _iterparse = _get_py3_cls()
+_XMLParser, _iterparse = _get_py3_cls()
 
 
 _sentinel = object()
@@ -92,7 +81,6 @@ class DefusedXMLParser(_XMLParser):
         forbid_entities=True,
         forbid_external=True,
     ):
-        # Python 2.x old style class
         _XMLParser.__init__(self, target=target, encoding=encoding)
         if html is not _sentinel:
             # the 'html' argument has been deprecated and ignored in all
@@ -109,10 +97,7 @@ class DefusedXMLParser(_XMLParser):
         self.forbid_dtd = forbid_dtd
         self.forbid_entities = forbid_entities
         self.forbid_external = forbid_external
-        if PY3:
-            parser = self.parser
-        else:
-            parser = self._parser
+        parser = self.parser
         if self.forbid_dtd:
             parser.StartDoctypeDeclHandler = self.defused_start_doctype_decl
         if self.forbid_entities:

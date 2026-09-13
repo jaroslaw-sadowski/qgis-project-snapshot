@@ -32,7 +32,6 @@ def build(output):
         {
             "LICENSE": ROOT / "LICENSE",
             "INSTRUKCJA.md": ROOT / "docs" / "team-guide.md",
-            ".flake8": ROOT / ".flake8",
         }
     )
     sources.update(
