@@ -1,4 +1,4 @@
-# QGIS Project Snapshot — user guide / instrukcja 1.0.0
+# QGIS Project Snapshot — user guide / instrukcja 1.0.1
 
 ## English — installation and export
 
@@ -7,7 +7,7 @@ supplied by QGIS. No extra packages are needed. Ensure access to project sources
 enough disk space and permission to download and store the selected data.
 
 1. Choose **Plugins → Manage and Install Plugins → Install from ZIP** and select
-   `qgis-project-snapshot-1.0.0.zip`. Restart QGIS when upgrading.
+   `qgis-project-snapshot-1.0.1.zip`. Restart QGIS when upgrading.
 2. Open the project, then **Plugins → QGIS Project Snapshot**
    or the map-in-an-archive-box toolbar icon.
 3. Choose a folder, area, layers and zoom range, then **Create archive**.
@@ -200,7 +200,7 @@ z instalacji QGIS. Nie są potrzebne dodatkowe pakiety. Zapewnij dostęp do źr�
 projektu oraz miejsce na archiwum i pliki tymczasowe.
 
 1. W QGIS wybierz **Wtyczki → Zarządzanie wtyczkami → Zainstaluj z ZIP**.
-2. Wskaż `qgis-project-snapshot-1.0.0.zip`. Po aktualizacji uruchom ponownie QGIS.
+2. Wskaż `qgis-project-snapshot-1.0.1.zip`. Po aktualizacji uruchom ponownie QGIS.
 3. Otwórz projekt, następnie **Wtyczki → QGIS Project Snapshot**
    lub ikonę mapy w pudełku na pasku wtyczek.
 

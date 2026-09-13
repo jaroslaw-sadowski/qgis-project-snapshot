@@ -1,7 +1,7 @@
 # Stan projektu — punkt startowy dla kolejnej sesji
 
-Aktualizacja: 13 września 2026. Pierwsze oficjalne wydanie **1.0.0**,
-przygotowanie paczki dla QGIS 3/Qt5 i QGIS 4/Qt6. Numery 1.1–1.4 były
+Aktualizacja: 13 września 2026. Poprawka **1.0.1** po blokadzie skanu 1.0.0,
+wspólna paczka dla QGIS 3/Qt5 i QGIS 4/Qt6. Numery 1.1–1.4 były
 rozwojowe; ich raporty zachowano, ale nie oznaczają kolejnych oficjalnych wydań.
 
 ## Bieżący etap
@@ -21,12 +21,26 @@ jak w portalu. Skan ZIP-a obejmuje vendor: Bandit 0 po punktowych adnotacjach,
 sekrety 0. Bez globalnego wyłączania Bandita lub pomijania vendor w tym skanerze.
 Szczegóły: [security-scan-fix.md](security-scan-fix.md).
 
-Użytkownik wcześniej wymagał numeru 1.0.0. Publiczny kod formularza portalu
-odrzuca istniejący numer, a ponowny skan nie odblokowuje starego zgłoszenia.
-Wysłano pytanie o zgodę na 1.0.1 albo zachowanie 1.0.0 i uzgodnienie usunięcia
-zablokowanego zgłoszenia. Do odpowiedzi numer pozostaje 1.0.0; naprawa nie
-została jeszcze ponownie zgłoszona do portalu. Poniższe opisy wydania stanowią
-historię sprzed poprawki zabezpieczeń.
+Użytkownik zatwierdził 1.0.1, ponowne sprawdzenie wymagań i GitHub Release.
+Zaktualizowano numer, changelog, README/instrukcję i informację o dołączonym
+parserze PSF. Kod jest identyczny z pełnym odbiorem 236 testów.
+Finalny ZIP 1.0.1: 150 998 bajtów, 29 plików, SHA-256
+`4b1e8842764a9c66e32b976861e2516a443924aa92ec0b5593ac51f82b08ec87`.
+
+Podwójny audyt: dokumentacja QGIS i wykonanie kodu portalu z commitu
+487ac16367d4387ab91630149200e3f9b1ee9ff8. Oryginalny walidator paczek/metadanych
+przeszedł, również dla nowej wtyczki i z rzeczywistymi publicznymi URL.
+Pięć metod skanera upstream: 5/5, zero zgłoszeń, bez ignorowania całych kategorii.
+Użyto 75 obsługiwanych reguł Bandit, a dwie wycofane w tej wersji (B111/B320)
+sprawdzono osobno. Kontroler Qt6: zero wymaganych zmian. Finalna instalacja/GUI
+ZIP-a 1.0.1: po 15/15 testów Qt5 i Qt6, kody 0; pełny identyczny kod wcześniej
+po 236/236. Ruff/format i Flake8 również OK.
+[Raport 1.0.1](release-1.0.1.md), [wynik skanera](portal-scan-1.0.1.json).
+
+Przygotowano wydanie GitHub v1.0.1; publikacja i weryfikacja załączników w toku.
+Tag 1.0.0 pozostaje historyczny. Poprawionej paczki nie wysłano jeszcze do
+plugins.qgis.org — należy ją zgłosić jako nową wersję istniejącej wtyczki.
+Poniższe sekcje stanowią historię przygotowania 1.0.0, przed poprawką bezpieczeństwa.
 
 - Krótkie README i metadane: angielski przed polskim, wymagania i instalacja,
   automatyczna równoległość, licencje źródeł, AI/vibe coding i zakres testów.

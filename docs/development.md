@@ -3,7 +3,7 @@
 Polecenia wykonuj z katalogu głównego repozytorium. Użyj interpretera z modułami
 `qgis` i `osgeo` dostarczonymi z QGIS; zwykłe środowisko Pythona może ich nie mieć.
 Środowiska odbioru 1.0.0: Ubuntu, QGIS 3.40.15/Qt5 i QGIS 4.0.3/Qt6 6.10.2,
-GDAL 3.12.2, Python 3.14.4. Wyniki: [odbiór wydania](release-1.0.0.md).
+GDAL 3.12.2, Python 3.14.4. Wyniki: [odbiór poprawki 1.0.1](release-1.0.1.md).
 Numery 1.1–1.4 w dalszych opisach oznaczają historyczne wersje rozwojowe.
 
 ## Testy źródeł
@@ -51,7 +51,7 @@ Zmiana instrukcji zespołowej też zmienia zawartość paczki i jej SHA-256.
 ## Test gotowej paczki
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.0.0.zip
+QT_QPA_PLATFORM=offscreen PYTHONDONTWRITEBYTECODE=1 python3 -I tests/check_plugin_zip.py dist/qgis-project-snapshot-1.0.1.zip
 ```
 
 Skrypt rozpakowuje ZIP do tymczasowego profilu QGIS. Sprawdza natywne wykrywanie,

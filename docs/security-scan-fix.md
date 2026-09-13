@@ -79,8 +79,8 @@ Przygotowany ZIP 1.0.0: **150 716 bajtów, 29 plików**, SHA-256:
 
 [Formularz portalu](https://github.com/qgis/QGIS-Plugins-Website/blob/master/qgis-app/plugins/forms.py)
 odrzuca już istniejący numer. Ponowne uruchomienie skanu starego wpisu nie zmienia
-jego blokady. Zapytano użytkownika o 1.0.1, ponieważ wcześniej wymagał zachowania
-1.0.0; alternatywą jest uzgodnienie usunięcia starego zgłoszenia z opiekunem.
-Na razie lokalna poprawka ma 1.0.0 i nie została ponownie wysłana do portalu.
+jego blokady. Użytkownik zatwierdził wydanie 1.0.1 i ponowną kontrolę wymagań portalu.
+Powyższy ZIP 1.0.0 był paczką roboczą naprawy; nie jest paczką do ponownego
+zgłoszenia. Finalny ZIP, odtworzenie skanera i wydanie: [release-1.0.1.md](release-1.0.1.md).
 Lokalne wyniki nie są decyzją moderatora ani wynikiem ponownego skanu portalu.
 Propozycja commitu: `Harden XML parsing and resolve reviewed security findings`.

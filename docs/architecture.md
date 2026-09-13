@@ -1,4 +1,4 @@
-# Działanie i ograniczenia archiwizacji (1.0.0)
+# Działanie i ograniczenia archiwizacji (1.0.1)
 
 Pierwsze oficjalne wydanie to 1.0.0. Numery 1.1–1.4 poniżej odnoszą się
 do wcześniejszych wersji rozwojowych i historii wdrażania funkcji.

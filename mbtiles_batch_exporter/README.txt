@@ -1,4 +1,4 @@
-# QGIS Project Snapshot 1.0.0
+# QGIS Project Snapshot 1.0.1
 
 ## English
 
@@ -8,10 +8,10 @@ basemaps, for offline use. Choose the map view or a polygon layer as your area.
 Keep the whole folder to move it or resume interrupted downloads.
 
 **Getting started:** use QGIS 3.40–3.x (Qt5) or QGIS 4.x (Qt6), with
-Python ≥3.10 and GDAL ≥3.7 supplied by QGIS. No extra packages needed.
+Python ≥3.10 and GDAL ≥3.7 supplied by QGIS. XML protection uses bundled defusedxml (PSF license); no extra packages needed.
 You'll need source access and disk space.
 In **Plugins → Manage and Install Plugins → Install from ZIP**, select
-`qgis-project-snapshot-1.0.0.zip` and restart QGIS. Then choose
+`qgis-project-snapshot-1.0.1.zip` and restart QGIS. Then choose
 **Plugins → QGIS Project Snapshot**.
 
 **Plan ahead:** With many layers and a large area, especially at zoom levels
@@ -31,7 +31,7 @@ Code license: GPL-2.0-only.
 
 Built with help from AI and vibe coding, and tested (Bandit, secret scanning,
 Qt6 checks, Ruff/Flake8, proxy/error handling, archive integrity and crash recovery).
-[User guide](INSTRUKCJA.md) · [Release checks](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/main/docs/release-1.0.0.md).
+[User guide](INSTRUKCJA.md) · [Release checks](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/main/docs/release-1.0.1.md).
 
 ## Polski
 
@@ -41,10 +41,10 @@ OpenStreetMap, do pracy bez sieci. Wskaż obszar z widoku mapy lub warstwy
 poligonowej. Zachowaj całe archiwum, żeby je przenieść lub wznowić pobieranie.
 
 **Na początek:** potrzebujesz QGIS 3.40–3.x (Qt5) lub QGIS 4.x (Qt6), z Pythonem
-≥3.10 i GDAL ≥3.7 dostarczanymi przez QGIS. Bez dodatkowych
-pakietów Pythona. Zadbaj o dostęp do źródeł i miejsce na dysku.
+≥3.10 i GDAL ≥3.7 dostarczanymi przez QGIS. Ochronę XML zapewnia dołączony
+defusedxml (licencja PSF); nie instalujesz dodatkowych pakietów Pythona. Zadbaj o dostęp do źródeł i miejsce na dysku.
 W **Wtyczki → Zarządzanie wtyczkami → Instaluj z ZIP** wybierz
-`qgis-project-snapshot-1.0.0.zip` i uruchom QGIS ponownie. Wybierz
+`qgis-project-snapshot-1.0.1.zip` i uruchom QGIS ponownie. Wybierz
 **Wtyczki → QGIS Project Snapshot**.
 
 **Zaplanuj czas:** Przy wielu warstwach i dużym obszarze, zwłaszcza przy zoomie
@@ -64,4 +64,4 @@ Licencja kodu: GPL-2.0-only.
 
 Wtyczka powstała z pomocą AI, metodą vibe codingu. Przeszła testy (Bandit, skan
 sekretów, Qt6, Ruff/Flake8, obsługa proxy/błędów, integralność archiwum i wznowienie
-po awarii). [Instrukcja](INSTRUKCJA.md) · [Kontrole wydania](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/main/docs/release-1.0.0.md).
+po awarii). [Instrukcja](INSTRUKCJA.md) · [Kontrole wydania](https://github.com/jaroslaw-sadowski/qgis-project-snapshot/blob/main/docs/release-1.0.1.md).
