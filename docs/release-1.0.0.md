@@ -7,7 +7,7 @@ rozwojowy; poniższa suma identyfikuje wydanie oficjalne.
 
 ## Paczka
 
-`dist/qgis-project-snapshot-1.0.0.zip`: **143 205 bajtów, 23 pliki**.
+`dist/qgis-project-snapshot-1.0.0.zip`: **144 005 bajtów, 23 pliki**.
 Jeden katalog `mbtiles_batch_exporter`, prawa 0644, wymagane metadane, GPL,
 README, instrukcja, tłumaczenia i `.flake8`; bez danych oraz środowisk testowych.
 Powtórna budowa dała identyczny ZIP. Porównano wszystkie pliki paczki ze źródłami;
@@ -16,8 +16,20 @@ kontrola odnośników lokalnych i `git diff --check` przeszła.
 SHA-256:
 
 ```text
-fb36f7a64cd005d9ef3fb505abe5349fd65983a553481b570b88da50b9dbdae4
+74a756dffe1e992455183c588dc7d3d29d22f1fb8d874840feb47e20a3e66bd1
 ```
+
+## Wskazówka o długim pobieraniu
+
+Dopisano krótką informację EN/PL w README i metadanych oraz na początku
+podpowiedzi licznika kafelków: wiele warstw, duży obszar i zoom powyżej 17
+mogą oznaczać pobieranie od kilku godzin do kilku dni. Natywna podpowiedź Qt,
+bez dodatkowego dialogu, zmian obliczeń, pobierania lub numeru 1.0.0.
+Przebudowano katalog QM: 337 gotowych tłumaczeń. Zmienione pliki paczki to tylko
+README.txt, metadata.txt, archive_dialog.py i katalogi tłumaczeń en.ts/en.qm.
+Gotowa paczka: 15/15 testów Qt5 (1,628 s) i Qt6 (1,503 s), kody 0; kompletność
+i odczyt tłumaczeń oraz załadowanie/okno wtyczki OK. Ruff/format, Flake8 i diff OK.
+Propozycja commitu: `Explain download duration for large high-zoom archives`.
 
 ## Korekta opisów i menu bez zmiany numeru
 
@@ -132,7 +144,7 @@ na fizyczną awarię nośnika.
 pierwotny tag wskazywał commit `1c84110aeb54858a2dff05b32f2bc65dd5e60463`.
 Pierwotna paczka miała SHA-256:
 `b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37`. Korekta menu/opisów zastępuje ją w tym samym wydaniu.
-Zaktualizowany tag v1.0.0 wskazuje `fd134c45ae7dc615a7decb01b2f8c1ed460f305a`.
+Po korekcie menu tag v1.0.0 wskazywał `fd134c45ae7dc615a7decb01b2f8c1ed460f305a`.
 Oba załączniki i suma w opisie wydania zostały podmienione; ponowne pobranie
 bez logowania potwierdziło zgodność ZIP/SHA z lokalnymi plikami oraz wszystkich
 plików paczki ze źródłem pod tagiem. Wydanie nadal jest stabilne i publiczne.

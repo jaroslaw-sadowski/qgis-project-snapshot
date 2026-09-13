@@ -396,6 +396,9 @@ class ArchiveDialog(QDialog):
             ),
             self.zoom_hint: tr(
                 (
+                    "Przy wielu warstwach i dużym obszarze, zwłaszcza przy "
+                    "zoomie powyżej 17, liczba kafelków może być ogromna, "
+                    "a pobieranie potrwać od kilku godzin do kilku dni. "
                     "Model dla prostokąta obszaru, jednej mapy i wszystkich "
                     "wybranych zoomów: 0,2–2 s oraz 10–250 KiB "
                     "skompresowanego PNG na kafelek 256 × 256. To założenia, "

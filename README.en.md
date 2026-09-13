@@ -13,6 +13,10 @@ In **Plugins → Manage and Install Plugins → Install from ZIP**, select
 `qgis-project-snapshot-1.0.0.zip` and restart QGIS. Then choose
 **Plugins → QGIS Project Snapshot**.
 
+**Plan ahead:** With many layers and a large area, especially at zoom levels
+above 17, the tile count can be huge and downloads may take several hours
+to several days.
+
 **Processing and privacy:** it runs locally, using QGIS processes and supervising threads. It adjusts the load to your
 memory/CPU and server responses. It doesn't upload your project or
 diagnostics to the author and has no analytics. Requests send the
@@ -40,6 +44,10 @@ pakietów Pythona. Zadbaj o dostęp do źródeł i miejsce na dysku.
 W **Wtyczki → Zarządzanie wtyczkami → Instaluj z ZIP** wybierz
 `qgis-project-snapshot-1.0.0.zip` i uruchom QGIS ponownie. Wybierz
 **Wtyczki → QGIS Project Snapshot**.
+
+**Zaplanuj czas:** Przy wielu warstwach i dużym obszarze, zwłaszcza przy zoomie
+powyżej 17, liczba kafelków może być ogromna, a pobieranie potrwać od kilku
+godzin do kilku dni.
 
 **Działanie i prywatność:** działa na Twoim komputerze, w kilku
 procesach QGIS i wątkach nadzorujących. Wtyczka sama dobiera obciążenie do pamięci,

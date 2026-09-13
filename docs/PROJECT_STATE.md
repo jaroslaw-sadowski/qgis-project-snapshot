@@ -36,7 +36,7 @@ menu opisano osobno poniżej; aktualna suma znajduje się w raporcie.
 kody procesów 0. Qt5: 170,064 s; Qt6: 171,448 s. Ruff/format, Flake8, składnia
 Python 3.10, linki i diff OK. Sekrety: 0 w kodzie i ZIP-ie. Kontroler Qt6: 0
 niezgodności. Bandit: 20 przejrzanych ostrzeżeń, bez high/Critical. Aktualna paczka
-143 205 bajtów, 23 pliki; powtarzalna budowa i zgodność wszystkich źródeł.
+144 005 bajtów, 23 pliki; powtarzalna budowa i zgodność wszystkich źródeł.
 Samodzielny program odbioru zamyka QGIS przez exitQgis(), aby odroczone sprzątanie
 OGR nie trafiało na końcowe niszczenie bibliotek.
 
@@ -52,7 +52,7 @@ Menu używa natywnego pluginMenu().addAction/removeAction, jak we wskazanej
 wtyczce Poprawka Odwzorowawcza. Jedyna zmiana kodu produkcyjnego to etykieta
 i rejestracja/usuwanie akcji menu; algorytmy archiwizacji pozostały identyczne.
 
-Aktualny ZIP: po 15/15 testów w QGIS 3.40/Qt5 (1,424 s) i 4.0.3/Qt6 (1,328 s),
+ZIP po korekcie menu: po 15/15 testów w QGIS 3.40/Qt5 (1,424 s) i 4.0.3/Qt6 (1,328 s),
 kody 0. Sprawdzono bezpośrednią akcję, otwarcie okna, wyłączenie i ponowne
 włączenie bez duplikatów oraz zachowanie cudzych pozycji menu. Ruff/format,
 Flake8, składnia 3.10 i diff OK. Flake8 uruchomiono z --jobs 1, ponieważ sandbox
@@ -60,6 +60,18 @@ blokuje gniazdo forkserver; zakres kontroli bez zmian. Pełne 231 testów jest
 wcześniejszą bazą odbioru; nie powtarzano ich dla zmiany tekstów/menu.
 W ramach istniejącego wydania podmieniono ZIP i tag v1.0.0, zgodnie z poleceniem
 zachowania numeru. Synchronizację potwierdzono poniżej.
+
+## Wskazówka o czasie dużych pobrań w 1.0.0
+
+Dodano po jednym krótkim akapicie EN/PL w README repozytorium/paczki i metadanych:
+wiele warstw, duży obszar i zoom powyżej 17 mogą oznaczać ogromną liczbę kafelków
+oraz od kilku godzin do kilku dni pobierania. Ten sam tekst rozpoczyna natywną
+podpowiedź po najechaniu na szacowaną liczbę kafelków; bez okna blokującego.
+Zaktualizowano TS i skompilowano QM (337 kompletnych tłumaczeń). Nie zmieniono
+obliczeń szacunku, algorytmów pobierania ani numeru wersji.
+Gotowy ZIP: 15/15 testów w Qt5 (1,628 s) i Qt6 (1,503 s), kody 0; obejmują
+zgodność katalogu tłumaczeń i ładowanie/okno wtyczki. Ruff/format, Flake8 i diff OK.
+Paczka i suma przygotowane do zastąpienia załączników istniejącego wydania.
 
 ## Środowiska i ograniczenia
 
@@ -101,8 +113,8 @@ jest opublikowany jako stabilny, z ZIP-em i plikiem SHA-256. Pierwotny tag wskaz
 issues, strona wydania i oba załączniki sprawdzone bez logowania (HTTP 200).
 Pierwotnie pobrany publicznie ZIP był identyczny z lokalnym; poprzedni SHA-256:
 `b6e8d1f17e0b27d313b45d68e99504dd59d68a4b4fd5a98a888408e2fc64ea37`.
-Aktualna paczka po korekcie opisów/menu: `fb36f7a64cd005d9ef3fb505abe5349fd65983a553481b570b88da50b9dbdae4`.
-Tag v1.0.0 wskazuje teraz commit `fd134c45ae7dc615a7decb01b2f8c1ed460f305a`.
+Poprzednia paczka po korekcie opisów/menu: `fb36f7a64cd005d9ef3fb505abe5349fd65983a553481b570b88da50b9dbdae4`.
+Po korekcie menu tag v1.0.0 wskazywał commit `fd134c45ae7dc615a7decb01b2f8c1ed460f305a`.
 Podmieniono oba załączniki i sumę w opisie istniejącego wydania. Pobrano je
 publicznie bez logowania: ZIP i SHA są identyczne z lokalnymi. Każdy plik ZIP-a
 jest zgodny ze źródłem pod tagiem. Repo pozostaje publiczne, wydanie stabilne.
